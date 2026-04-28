@@ -1,41 +1,41 @@
 # Research Pipeline
 
 - Contract Version: 2026-04-21.1
-- Generated At: 2026-04-28T02:09:55.621Z
+- Generated At: 2026-04-28T05:52:55.334Z
 - Provider: rule-based
 - Model: openai/gpt-4.1
 - Source: github-actions
 - Status: fallback
 - Sectors: 반도체, 에너지(오일)
-- Tickers: NVDA, AMD, 005930.KS, XOM, 010950.KS
+- Tickers: NVDA, AMD, 005930.KS, 010950.KS, XOM
 
 ## Main Headline
-- Dow Jones Futures: Nasdaq, S&P 500 Set More Record Highs; Micron, Nvidia, Sandisk, Alphabet Are Big Winners
+- Amazon or AMD: Cathie Wood Is Leaning Toward One High-Conviction AI Stock
 - Why it matters: 반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.
 - Action: NVDA 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.
 
 ## Agent Transcript
 ### 01 News Editor -> Macro Analyst
-메인 헤드라인을 "Dow Jones Futures: Nasdaq, S&P 500 Set More Record Highs; Micron, Nvidia, Sandisk, Alphabet Are Big Winners"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.
-References: live-semiconductors-dow-jones-futures-nasdaq-s-p-500-set-more-record-highs-micron-nvidia-sandisk-alp, live-semiconductors-how-the-himadri-speciality-chemical-bse-500184-narrative-is-evolving-with-ai-sup, live-semiconductors-nvidia-s-nvda-explosive-run-may-see-limits-going-forward-warns-jpmorgan, live-semiconductors-nebius-ai-cloud-3-5-launch-tests-rich-valuation-and-growth-hopes
+메인 헤드라인을 "Amazon or AMD: Cathie Wood Is Leaning Toward One High-Conviction AI Stock"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.
+References: live-semiconductors-amazon-or-amd-cathie-wood-is-leaning-toward-one-high-conviction-ai-stock, live-semiconductors-bank-of-america-resets-nvidia-stock-forecast, live-semiconductors-dow-jones-futures-nasdaq-s-p-500-set-more-record-highs-micron-nvidia-sandisk-alp, live-semiconductors-how-the-himadri-speciality-chemical-bse-500184-narrative-is-evolving-with-ai-sup
 
 ### 02 Macro Analyst -> Ticker Analyst
 지금 시장은 반도체 리더십과 방어형 에너지로 자금이 압축되는 국면입니다. 이 해석은 티커 딥분석과 행동 제안 에이전트의 공통 컨텍스트가 됩니다.
-References: live-semiconductors-dow-jones-futures-nasdaq-s-p-500-set-more-record-highs-micron-nvidia-sandisk-alp, live-semiconductors-how-the-himadri-speciality-chemical-bse-500184-narrative-is-evolving-with-ai-sup
+References: live-semiconductors-amazon-or-amd-cathie-wood-is-leaning-toward-one-high-conviction-ai-stock, live-semiconductors-bank-of-america-resets-nvidia-stock-forecast
 
 ### 03 Ticker Analyst -> Execution Trader
 NVDA를 대표 분석 티커로 선택해 추세, 패턴, 섹터 연결을 해석했습니다. 이 출력은 행동 제안 에이전트가 진입/관망/회피 조건을 만드는 기준이 됩니다.
-References: NVDA, live-semiconductors-dow-jones-futures-nasdaq-s-p-500-set-more-record-highs-micron-nvidia-sandisk-alp, live-semiconductors-how-the-himadri-speciality-chemical-bse-500184-narrative-is-evolving-with-ai-sup, live-semiconductors-nvidia-s-nvda-explosive-run-may-see-limits-going-forward-warns-jpmorgan
+References: NVDA, live-semiconductors-amazon-or-amd-cathie-wood-is-leaning-toward-one-high-conviction-ai-stock, live-semiconductors-bank-of-america-resets-nvidia-stock-forecast, live-semiconductors-dow-jones-futures-nasdaq-s-p-500-set-more-record-highs-micron-nvidia-sandisk-alp
 
 ### 04 Execution Trader -> Operator
-NVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다. 이 출력은 사용자에게 보이는 최종 실행 제안이자 제품 팀 리뷰의 평가 대상입니다.
-References: NVDA, live-semiconductors-how-the-himadri-speciality-chemical-bse-500184-narrative-is-evolving-with-ai-sup, live-semiconductors-nvidia-s-nvda-explosive-run-may-see-limits-going-forward-warns-jpmorgan, live-semiconductors-nebius-ai-cloud-3-5-launch-tests-rich-valuation-and-growth-hopes
+NVDA 중심의 조정 매수만 허용하고, 010950.KS로 방어 노출을 병행하는 전략이 우세합니다. 이 출력은 사용자에게 보이는 최종 실행 제안이자 제품 팀 리뷰의 평가 대상입니다.
+References: NVDA, live-semiconductors-bank-of-america-resets-nvidia-stock-forecast, live-semiconductors-dow-jones-futures-nasdaq-s-p-500-set-more-record-highs-micron-nvidia-sandisk-alp, live-semiconductors-how-the-himadri-speciality-chemical-bse-500184-narrative-is-evolving-with-ai-sup
 
 ## Trader Plan
-- Strategy: NVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다.
+- Strategy: NVDA 중심의 조정 매수만 허용하고, 010950.KS로 방어 노출을 병행하는 전략이 우세합니다.
 - Do: NVDA는 추격 대신 조정 구간에서만 분할 진입합니다.
 - Do: AMD는 이벤트 전 기대가 과열되면 비중을 늘리지 않고, 가이던스 확인 뒤 확장합니다.
-- Do: XOM 같은 방어형 에너지로 포지션 균형을 맞춥니다.
+- Do: 010950.KS 같은 방어형 에너지로 포지션 균형을 맞춥니다.
 - Avoid: 서비스주나 후행 확산주를 뉴스 헤드라인만 보고 추격 매수하지 않습니다.
 - Avoid: 행동 조건 없이 모든 관심 티커를 동시에 매수하는 분산 진입은 피합니다.
 - Risk: 리드타임 둔화나 고객 믹스 악화 코멘트가 나오면 반도체 강세 논리가 빠르게 약해질 수 있습니다.
