@@ -4,7 +4,7 @@
 - Owner: PM
 - Issue: https://github.com/mlender-ai/auto-trading-bot/issues/39
 - Branch: codex/agent-council/pm-newsletter-web-parity
-- Generated At: 2026-04-28T08:11:12.704Z
+- Generated At: 2026-04-28T10:57:20.861Z
 - Status: queued
 
 ## Detail
