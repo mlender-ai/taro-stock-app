@@ -1,7 +1,7 @@
 # Research Pipeline
 
 - Contract Version: 2026-04-21.1
-- Generated At: 2026-05-01T20:42:59.891Z
+- Generated At: 2026-05-01T21:45:36.640Z
 - Provider: rule-based
 - Model: openai/gpt-4.1
 - Source: github-actions
@@ -17,19 +17,19 @@
 ## Agent Transcript
 ### 01 News Editor -> Macro Analyst
 메인 헤드라인을 "Nvidia, Google, Microsoft Win Major Pentagon AI Contracts"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.
-References: live-semiconductors-nvidia-google-microsoft-win-major-pentagon-ai-contracts, live-semiconductors-arm-marvell-or-vertiv-which-ai-infrastructure-stock-crushed-it-in-april, live-semiconductors-the-first-6-trillion-company-may-not-be-nvidia, live-semiconductors-broadcom-shares-trade-near-52-week-high-can-the-rally-continue
+References: live-semiconductors-nvidia-google-microsoft-win-major-pentagon-ai-contracts, live-semiconductors-riot-platform-stock-spikes-after-data-center-debut-amd-doubles-capacity, live-semiconductors-broadcom-shares-trade-near-52-week-high-can-the-rally-continue, live-semiconductors-riot-jumps-10-as-amd-signs-additional-25-mw-ai-deployment-q1-earnings
 
 ### 02 Macro Analyst -> Ticker Analyst
 지금 시장은 반도체 리더십과 방어형 에너지로 자금이 압축되는 국면입니다. 이 해석은 티커 딥분석과 행동 제안 에이전트의 공통 컨텍스트가 됩니다.
-References: live-semiconductors-nvidia-google-microsoft-win-major-pentagon-ai-contracts, live-semiconductors-arm-marvell-or-vertiv-which-ai-infrastructure-stock-crushed-it-in-april, live-energy-oil-chevron-exxon-show-earnings-resilience-but-stocks-fail-key-test
+References: live-semiconductors-nvidia-google-microsoft-win-major-pentagon-ai-contracts, live-semiconductors-riot-platform-stock-spikes-after-data-center-debut-amd-doubles-capacity, live-energy-oil-chevron-exxon-show-earnings-resilience-but-stocks-fail-key-test
 
 ### 03 Ticker Analyst -> Execution Trader
 NVDA를 대표 분석 티커로 선택해 추세, 패턴, 섹터 연결을 해석했습니다. 이 출력은 행동 제안 에이전트가 진입/관망/회피 조건을 만드는 기준이 됩니다.
-References: NVDA, live-semiconductors-nvidia-google-microsoft-win-major-pentagon-ai-contracts, live-semiconductors-arm-marvell-or-vertiv-which-ai-infrastructure-stock-crushed-it-in-april, live-semiconductors-the-first-6-trillion-company-may-not-be-nvidia
+References: NVDA, live-semiconductors-nvidia-google-microsoft-win-major-pentagon-ai-contracts, live-semiconductors-riot-platform-stock-spikes-after-data-center-debut-amd-doubles-capacity, live-semiconductors-broadcom-shares-trade-near-52-week-high-can-the-rally-continue
 
 ### 04 Execution Trader -> Operator
 NVDA 중심의 조정 매수만 허용하고, 010950.KS로 방어 노출을 병행하는 전략이 우세합니다. 이 출력은 사용자에게 보이는 최종 실행 제안이자 제품 팀 리뷰의 평가 대상입니다.
-References: NVDA, live-semiconductors-arm-marvell-or-vertiv-which-ai-infrastructure-stock-crushed-it-in-april, live-semiconductors-the-first-6-trillion-company-may-not-be-nvidia, live-semiconductors-broadcom-shares-trade-near-52-week-high-can-the-rally-continue
+References: NVDA, live-semiconductors-riot-platform-stock-spikes-after-data-center-debut-amd-doubles-capacity, live-semiconductors-broadcom-shares-trade-near-52-week-high-can-the-rally-continue, live-semiconductors-riot-jumps-10-as-amd-signs-additional-25-mw-ai-deployment-q1-earnings
 
 ## Trader Plan
 - Strategy: NVDA 중심의 조정 매수만 허용하고, 010950.KS로 방어 노출을 병행하는 전략이 우세합니다.
