@@ -1,7 +1,7 @@
 # Research Pipeline
 
 - Contract Version: 2026-04-21.1
-- Generated At: 2026-05-03T17:42:19.593Z
+- Generated At: 2026-05-03T18:47:14.066Z
 - Provider: rule-based
 - Model: openai/gpt-4.1
 - Source: github-actions
@@ -10,26 +10,26 @@
 - Tickers: NVDA, AMD, 005930.KS, 010950.KS, XOM
 
 ## Main Headline
-- Upcoming Console Cycle Adds To AMD Growth Story But Valuation Stays Stretched
+- Gorilla Technology Group (GRRR) Is Up 17.9% After Massive India GPU Deal And Astrikos.AI Investment
 - Why it matters: 반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.
-- Action: AMD 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.
+- Action: NVDA 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.
 
 ## Agent Transcript
 ### 01 News Editor -> Macro Analyst
-메인 헤드라인을 "Upcoming Console Cycle Adds To AMD Growth Story But Valuation Stays Stretched"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.
-References: live-semiconductors-upcoming-console-cycle-adds-to-amd-growth-story-but-valuation-stays-stretched, live-semiconductors-cathie-wood-sells-79-9m-of-strong-surging-semiconductor-stock, live-semiconductors-jim-cramer-reveals-why-advanced-micro-devices-amd-was-successful, live-semiconductors-how-surging-ai-data-center-demand-and-big-name-deals-at-amd-amd-has-changed-its-
+메인 헤드라인을 "Gorilla Technology Group (GRRR) Is Up 17.9% After Massive India GPU Deal And Astrikos.AI Investment"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.
+References: live-semiconductors-gorilla-technology-group-grrr-is-up-17-9-after-massive-india-gpu-deal-and-astrik, live-semiconductors-nvidia-s-1-million-problem-is-getting-worse-in-china, live-semiconductors-how-riot-s-ai-data-center-pivot-and-wider-amd-deal-may-reshape-riot-platforms-ri, live-semiconductors-jobs-report-palantir-pinterest-amd-paypal-disney-and-more-to-watch-this-week
 
 ### 02 Macro Analyst -> Ticker Analyst
 지금 시장은 반도체 리더십과 방어형 에너지로 자금이 압축되는 국면입니다. 이 해석은 티커 딥분석과 행동 제안 에이전트의 공통 컨텍스트가 됩니다.
-References: live-semiconductors-upcoming-console-cycle-adds-to-amd-growth-story-but-valuation-stays-stretched, live-semiconductors-cathie-wood-sells-79-9m-of-strong-surging-semiconductor-stock, live-energy-oil-us-is-oil-supplier-of-last-resort-as-hormuz-disruptions-worsen
+References: live-semiconductors-gorilla-technology-group-grrr-is-up-17-9-after-massive-india-gpu-deal-and-astrik, live-semiconductors-nvidia-s-1-million-problem-is-getting-worse-in-china, live-energy-oil-us-is-oil-supplier-of-last-resort-as-hormuz-disruptions-worsen
 
 ### 03 Ticker Analyst -> Execution Trader
 NVDA를 대표 분석 티커로 선택해 추세, 패턴, 섹터 연결을 해석했습니다. 이 출력은 행동 제안 에이전트가 진입/관망/회피 조건을 만드는 기준이 됩니다.
-References: NVDA, live-semiconductors-upcoming-console-cycle-adds-to-amd-growth-story-but-valuation-stays-stretched, live-semiconductors-cathie-wood-sells-79-9m-of-strong-surging-semiconductor-stock, live-semiconductors-jim-cramer-reveals-why-advanced-micro-devices-amd-was-successful
+References: NVDA, live-semiconductors-gorilla-technology-group-grrr-is-up-17-9-after-massive-india-gpu-deal-and-astrik, live-semiconductors-nvidia-s-1-million-problem-is-getting-worse-in-china, live-semiconductors-how-riot-s-ai-data-center-pivot-and-wider-amd-deal-may-reshape-riot-platforms-ri
 
 ### 04 Execution Trader -> Operator
 NVDA 중심의 조정 매수만 허용하고, 010950.KS로 방어 노출을 병행하는 전략이 우세합니다. 이 출력은 사용자에게 보이는 최종 실행 제안이자 제품 팀 리뷰의 평가 대상입니다.
-References: NVDA, live-semiconductors-cathie-wood-sells-79-9m-of-strong-surging-semiconductor-stock, live-semiconductors-jim-cramer-reveals-why-advanced-micro-devices-amd-was-successful, live-semiconductors-how-surging-ai-data-center-demand-and-big-name-deals-at-amd-amd-has-changed-its-
+References: NVDA, live-semiconductors-nvidia-s-1-million-problem-is-getting-worse-in-china, live-semiconductors-how-riot-s-ai-data-center-pivot-and-wider-amd-deal-may-reshape-riot-platforms-ri, live-semiconductors-jobs-report-palantir-pinterest-amd-paypal-disney-and-more-to-watch-this-week
 
 ## Trader Plan
 - Strategy: NVDA 중심의 조정 매수만 허용하고, 010950.KS로 방어 노출을 병행하는 전략이 우세합니다.
