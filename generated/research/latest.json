@@ -42,7 +42,7 @@
   },
   "workspace": {
     "contractVersion": "2026-04-21.1",
-    "generatedAt": "2026-05-13T21:21:22.191Z",
+    "generatedAt": "2026-05-13T23:00:26.851Z",
     "preferences": {
       "sectors": [
         "semiconductors",
@@ -227,12 +227,12 @@
     },
     "news": {
       "headline": {
-        "id": "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-",
-        "title": "Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs",
+        "id": "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s",
+        "title": "Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs",
         "summary": "The S&P 500 and Nasdaq ran higher, led by Google, Nvidia, Tesla and other titans. Cisco earnings beat while AI chipmaker Cerebras will price its IPO.",
         "source": "FINANCE",
         "sourceUrl": "https://finance.yahoo.com/m/2bbeed6b-f614-3af5-aeb5-c5470d5bd3b6/dow-jones-futures-rise%2C-cisco.html?.tsrc=rss",
-        "publishedAt": "2026-05-13T20:56:55.000Z",
+        "publishedAt": "2026-05-13T22:10:17.000Z",
         "imageUrl": "https://s.yimg.com/os/en/ibd.com/2be72e1456dae8bce44c16eb0cace633",
         "sectorTag": "semiconductors",
         "tickerTags": [
@@ -247,13 +247,13 @@
       },
       "derivedArticles": [
         {
-          "id": "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip",
-          "title": "Nvidia Rallies As CEO Jensen Huang Joins Trump's China Trip",
-          "summary": "Nvidia and other chip stocks tied to the artificial intelligence megatrend received positive analyst reports on Wednesday.",
+          "id": "live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma",
+          "title": "Micron Tops $900 Billion Market Cap. How the Samsung Strike Could Help the Chip Maker.",
+          "summary": "A walkout at rival Samsung could hit about 3% of global memory-chip production, according to estimates.",
           "source": "FINANCE",
-          "sourceUrl": "https://finance.yahoo.com/m/1f0c7cfd-5384-3231-b8d1-483d8cbb6452/nvidia-rallies-as-ceo-jensen.html?.tsrc=rss",
-          "publishedAt": "2026-05-13T20:45:03.000Z",
-          "imageUrl": "https://s.yimg.com/os/en/ibd.com/03d4b6028941af989bf5499751615ba4",
+          "sourceUrl": "https://finance.yahoo.com/m/2129388d-de35-330c-8e3d-8652ba487258/micron-tops-%24900-billion.html?.tsrc=rss",
+          "publishedAt": "2026-05-13T21:36:00.000Z",
+          "imageUrl": "https://s.yimg.com/ny/api/res/1.2/cccEDDLTsWqC2VtabjXE0A--/YXBwaWQ9aGlnaGxhbmRlcjt3PTEyMDA7aD02MDA-/https://media.zenfs.com/en/Barrons.com/9d0e818f4d88ebb5d2ea6d5e5b58e660",
           "sectorTag": "semiconductors",
           "tickerTags": [
             "NVDA",
@@ -266,23 +266,23 @@
           "recommendation": "NVDA 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다."
         },
         {
-          "id": "live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b",
-          "title": "Stock Market Today: Nasdaq Ends Strong As AI Leads; Cybersecurity Stock Attempts Breakout (Live Coverage)",
-          "summary": "The Dow Jones index fell but Nvidia, Sandisk, Micron and Intel buoyed techs as the Trump-Xi summit looms. Nextpower, Nebius are big earnings winners.",
+          "id": "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip",
+          "title": "Nvidia Rallies As CEO Jensen Huang Joins Trump's China Trip",
+          "summary": "Nvidia and other chip stocks tied to the artificial intelligence megatrend received positive analyst reports on Wednesday.",
           "source": "FINANCE",
-          "sourceUrl": "https://finance.yahoo.com/m/7b388d5b-d465-332e-bc39-f94ac0bef55b/stock-market-today%3A-nasdaq.html?.tsrc=rss",
-          "publishedAt": "2026-05-13T20:34:07.000Z",
-          "imageUrl": "https://s.yimg.com/os/en/ibd.com/10f486cbd1f81741cdcafe2dbf95f03d",
+          "sourceUrl": "https://finance.yahoo.com/m/1f0c7cfd-5384-3231-b8d1-483d8cbb6452/nvidia-rallies-as-ceo-jensen.html?.tsrc=rss",
+          "publishedAt": "2026-05-13T20:45:03.000Z",
+          "imageUrl": "https://s.yimg.com/os/en/ibd.com/03d4b6028941af989bf5499751615ba4",
           "sectorTag": "semiconductors",
           "tickerTags": [
-            "NVDA",
             "AMD",
+            "NVDA",
             "TSM"
           ],
           "importanceScore": 98,
           "priority": "critical",
-          "analysis": "실적과 가이던스 변화가 공급 체인 기대치를 바로 다시 가격에 반영할 수 있어 리더 종목 밸류에이션에 직접 연결됩니다.",
-          "recommendation": "NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다."
+          "analysis": "반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.",
+          "recommendation": "AMD 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다."
         },
         {
           "id": "live-semiconductors-cerebras-ipo-is-expected-to-price-tonight-in-major-test-for-chip-rally",
@@ -291,7 +291,7 @@
           "source": "FINANCE",
           "sourceUrl": "https://finance.yahoo.com/m/ba5eabee-9927-38ff-86b4-8e09db7e8ca6/cerebras-ipo-is-expected-to.html?.tsrc=rss",
           "publishedAt": "2026-05-13T20:03:00.000Z",
-          "imageUrl": "https://s.yimg.com/ny/api/res/1.2/qh5G5TQUIo19UeAdmhia5w--/YXBwaWQ9aGlnaGxhbmRlcjt3PTEyMDA7aD02MDA-/https://media.zenfs.com/en/Barrons.com/73877e94553edc85fb7fff4d3818864d",
+          "imageUrl": "https://s.yimg.com/ny/api/res/1.2/ysgJwCBDkY1M6tiYMxKuYw--/YXBwaWQ9aGlnaGxhbmRlcjt3PTEyMDA7aD02MDA7Y2Y9d2VicA--/https://media.zenfs.com/en/Barrons.com/73877e94553edc85fb7fff4d3818864d",
           "sectorTag": "semiconductors",
           "tickerTags": [
             "AMD",
@@ -309,13 +309,13 @@
           "sectorTag": "semiconductors",
           "sectorLabel": "반도체",
           "item": {
-            "id": "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip",
-            "title": "Nvidia Rallies As CEO Jensen Huang Joins Trump's China Trip",
-            "summary": "Nvidia and other chip stocks tied to the artificial intelligence megatrend received positive analyst reports on Wednesday.",
+            "id": "live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma",
+            "title": "Micron Tops $900 Billion Market Cap. How the Samsung Strike Could Help the Chip Maker.",
+            "summary": "A walkout at rival Samsung could hit about 3% of global memory-chip production, according to estimates.",
             "source": "FINANCE",
-            "sourceUrl": "https://finance.yahoo.com/m/1f0c7cfd-5384-3231-b8d1-483d8cbb6452/nvidia-rallies-as-ceo-jensen.html?.tsrc=rss",
-            "publishedAt": "2026-05-13T20:45:03.000Z",
-            "imageUrl": "https://s.yimg.com/os/en/ibd.com/03d4b6028941af989bf5499751615ba4",
+            "sourceUrl": "https://finance.yahoo.com/m/2129388d-de35-330c-8e3d-8652ba487258/micron-tops-%24900-billion.html?.tsrc=rss",
+            "publishedAt": "2026-05-13T21:36:00.000Z",
+            "imageUrl": "https://s.yimg.com/ny/api/res/1.2/cccEDDLTsWqC2VtabjXE0A--/YXBwaWQ9aGlnaGxhbmRlcjt3PTEyMDA7aD02MDA-/https://media.zenfs.com/en/Barrons.com/9d0e818f4d88ebb5d2ea6d5e5b58e660",
             "sectorTag": "semiconductors",
             "tickerTags": [
               "NVDA",
@@ -353,12 +353,12 @@
             "confidence": "high"
           }
         ],
-        "marketContext": "섹터 프록시도 20일선과 50일선 위에 있어 업종 흐름이 종목을 지지하는 구간입니다. 연결 뉴스에서는 \"Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"가 가장 큰 가격 재료로 작동하고 있습니다.",
+        "marketContext": "섹터 프록시도 20일선과 50일선 위에 있어 업종 흐름이 종목을 지지하는 구간입니다. 연결 뉴스에서는 \"Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"가 가장 큰 가격 재료로 작동하고 있습니다.",
         "recommendation": "NVDA는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.",
         "linkedNewsIds": [
-          "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-",
-          "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip",
-          "live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b"
+          "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s",
+          "live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma",
+          "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip"
         ],
         "latestPrice": 225.8300018310547,
         "priceChange": 5.0500030517578125,
@@ -743,12 +743,12 @@
             "confidence": "low"
           }
         ],
-        "marketContext": "섹터 프록시도 20일선과 50일선 위에 있어 업종 흐름이 종목을 지지하는 구간입니다. 연결 뉴스에서는 \"Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"가 가장 큰 가격 재료로 작동하고 있습니다.",
+        "marketContext": "섹터 프록시도 20일선과 50일선 위에 있어 업종 흐름이 종목을 지지하는 구간입니다. 연결 뉴스에서는 \"Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"가 가장 큰 가격 재료로 작동하고 있습니다.",
         "recommendation": "AMD는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.",
         "linkedNewsIds": [
-          "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-",
-          "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip",
-          "live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b"
+          "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s",
+          "live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma",
+          "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip"
         ],
         "latestPrice": 445.5,
         "priceChange": -2.790008544921875,
@@ -1138,12 +1138,12 @@
             "confidence": "high"
           }
         ],
-        "marketContext": "섹터 프록시도 20일선과 50일선 위에 있어 업종 흐름이 종목을 지지하는 구간입니다. 연결 뉴스에서는 \"Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"가 가장 큰 가격 재료로 작동하고 있습니다.",
+        "marketContext": "섹터 프록시도 20일선과 50일선 위에 있어 업종 흐름이 종목을 지지하는 구간입니다. 연결 뉴스에서는 \"Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"가 가장 큰 가격 재료로 작동하고 있습니다.",
         "recommendation": "005930.KS는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.",
         "linkedNewsIds": [
-          "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-",
-          "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip",
-          "live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b"
+          "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s",
+          "live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma",
+          "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip"
         ],
         "latestPrice": 284000,
         "priceChange": 5000,
@@ -2326,19 +2326,19 @@
           "name": "News Editor",
           "roleLabel": "뉴스 선별",
           "objective": "가격 영향이 큰 뉴스만 추려 메인 헤드라인과 파생 뉴스, 섹터 핵심 이슈를 만든다.",
-          "summary": "메인 헤드라인을 \"Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"로 고정하고 파생 뉴스 3개를 연결했습니다.",
+          "summary": "메인 헤드라인을 \"Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"로 고정하고 파생 뉴스 3개를 연결했습니다.",
           "outputLines": [
-            "메인 헤드라인: Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs",
+            "메인 헤드라인: Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs",
+            "파생 뉴스: Micron Tops $900 Billion Market Cap. How the Samsung Strike Could Help the Chip Maker.",
             "파생 뉴스: Nvidia Rallies As CEO Jensen Huang Joins Trump's China Trip",
-            "파생 뉴스: Stock Market Today: Nasdaq Ends Strong As AI Leads; Cybersecurity Stock Attempts Breakout (Live Coverage)",
             "파생 뉴스: Cerebras IPO Is Expected to Price Tonight in Major Test for Chip Rally",
-            "반도체: Nvidia Rallies As CEO Jensen Huang Joins Trump's China Trip"
+            "반도체: Micron Tops $900 Billion Market Cap. How the Samsung Strike Could Help the Chip Maker."
           ],
           "handoffNote": "이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.",
           "references": [
-            "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-",
+            "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s",
+            "live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma",
             "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip",
-            "live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b",
             "live-semiconductors-cerebras-ipo-is-expected-to-price-tonight-in-major-test-for-chip-rally"
           ]
         },
@@ -2356,8 +2356,8 @@
           ],
           "handoffNote": "이 해석은 티커 딥분석과 행동 제안 에이전트의 공통 컨텍스트가 됩니다.",
           "references": [
-            "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-",
-            "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip"
+            "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s",
+            "live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma"
           ]
         },
         {
@@ -2371,14 +2371,14 @@
             "요약: 추세 우위가 유지되는 동안 눌림 확인 매매가 유리한 구조입니다.",
             "기술적 상태: 단기와 중기 추세가 모두 상방입니다. 주요 지지는 $194.74 / $164.27, 저항은 $227.84 / $227.84입니다. RSI는 과열권에 가까워 추격보다 눌림 확인이 우선입니다. MACD는 상방 모멘텀이 남아 있어 추세 추종 쪽이 우세합니다.",
             "패턴: 상승 추세 내 눌림 후 재가속, AB=CD 조정형",
-            "시황 연결: 섹터 프록시도 20일선과 50일선 위에 있어 업종 흐름이 종목을 지지하는 구간입니다. 연결 뉴스에서는 \"Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"가 가장 큰 가격 재료로 작동하고 있습니다."
+            "시황 연결: 섹터 프록시도 20일선과 50일선 위에 있어 업종 흐름이 종목을 지지하는 구간입니다. 연결 뉴스에서는 \"Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"가 가장 큰 가격 재료로 작동하고 있습니다."
           ],
           "handoffNote": "이 출력은 행동 제안 에이전트가 진입/관망/회피 조건을 만드는 기준이 됩니다.",
           "references": [
             "NVDA",
-            "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-",
-            "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip",
-            "live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b"
+            "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s",
+            "live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma",
+            "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip"
           ]
         },
         {
@@ -2399,8 +2399,8 @@
           "handoffNote": "이 출력은 사용자에게 보이는 최종 실행 제안이자 제품 팀 리뷰의 평가 대상입니다.",
           "references": [
             "NVDA",
+            "live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma",
             "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip",
-            "live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b",
             "live-semiconductors-cerebras-ipo-is-expected-to-price-tonight-in-major-test-for-chip-rally"
           ]
         }
@@ -2470,14 +2470,14 @@
         ]
       },
       "runtime": {
-        "runId": "fallback-2026-05-13T21:21:22.191Z",
+        "runId": "fallback-2026-05-13T23:00:26.851Z",
         "provider": "rule-based",
         "model": "openai/gpt-4.1",
         "source": "github-actions",
         "status": "fallback",
-        "generatedAt": "2026-05-13T21:21:22.191Z",
+        "generatedAt": "2026-05-13T23:00:26.851Z",
         "artifactPath": "generated/research/latest.json",
-        "summaryMarkdown": "# Research Pipeline\n\n- Contract Version: 2026-04-21.1\n- Generated At: 2026-05-13T21:21:22.191Z\n- Provider: rule-based\n- Model: openai/gpt-4.1\n- Source: github-actions\n- Status: fallback\n- Sectors: 반도체, 에너지(오일)\n- Tickers: NVDA, AMD, 005930.KS, XOM, 010950.KS\n\n## Main Headline\n- Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\n- Why it matters: 실적과 가이던스 변화가 공급 체인 기대치를 바로 다시 가격에 반영할 수 있어 리더 종목 밸류에이션에 직접 연결됩니다.\n- Action: NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.\n\n## Agent Transcript\n### 01 News Editor -> Macro Analyst\n메인 헤드라인을 \"Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.\nReferences: live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip, live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b, live-semiconductors-cerebras-ipo-is-expected-to-price-tonight-in-major-test-for-chip-rally\n\n### 02 Macro Analyst -> Ticker Analyst\n지금 시장은 반도체 리더십과 방어형 에너지로 자금이 압축되는 국면입니다. 이 해석은 티커 딥분석과 행동 제안 에이전트의 공통 컨텍스트가 됩니다.\nReferences: live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip\n\n### 03 Ticker Analyst -> Execution Trader\nNVDA를 대표 분석 티커로 선택해 추세, 패턴, 섹터 연결을 해석했습니다. 이 출력은 행동 제안 에이전트가 진입/관망/회피 조건을 만드는 기준이 됩니다.\nReferences: NVDA, live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip, live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b\n\n### 04 Execution Trader -> Operator\nNVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다. 이 출력은 사용자에게 보이는 최종 실행 제안이자 제품 팀 리뷰의 평가 대상입니다.\nReferences: NVDA, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip, live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b, live-semiconductors-cerebras-ipo-is-expected-to-price-tonight-in-major-test-for-chip-rally\n\n## Trader Plan\n- Strategy: NVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다.\n- Do: NVDA는 추격 대신 조정 구간에서만 분할 진입합니다.\n- Do: AMD는 이벤트 전 기대가 과열되면 비중을 늘리지 않고, 가이던스 확인 뒤 확장합니다.\n- Do: XOM 같은 방어형 에너지로 포지션 균형을 맞춥니다.\n- Avoid: 서비스주나 후행 확산주를 뉴스 헤드라인만 보고 추격 매수하지 않습니다.\n- Avoid: 행동 조건 없이 모든 관심 티커를 동시에 매수하는 분산 진입은 피합니다.\n- Risk: 리드타임 둔화나 고객 믹스 악화 코멘트가 나오면 반도체 강세 논리가 빠르게 약해질 수 있습니다.\n- Risk: 메이저 오일의 capex 보수화는 에너지 내 강세 확산을 막고 서비스주를 먼저 흔들 수 있습니다.\n\n## Behavior Funnel\n- 헤드라인 열람: 0회\n- 다음 단계 이동: 0회\n- 티커 선택: 0회\n- 행동 제안 확장: 0회\n\n## Product Action Items\n- 행동 제안을 진입 조건 사다리로 바꿉니다.\n  Owner: Trader\n  Detail: NVDA 같은 대표 티커는 추천 행동을 한 줄 조언으로 끝내지 말고, 진입 조건, 무효화 조건, 추격 금지 규칙 순서로 보여줘 실행 오류를 줄입니다.\n  Implementation Status: ready\n  Focus: 행동 제안을 매수/관망/회피 분류보다 조건 기반 의사결정 카드로 재구성합니다.\n  Scope: packages/shared/src/research.ts, apps/web/components/research/ResearchWorkspace.tsx, apps/web/app/globals.css\n  Verify: npm run typecheck | npm run build:web\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/37\n  Branch: codex/agent-council/trader-entry-condition-ladder\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/16\n  Plan: .github/agent-council/trader-entry-condition-ladder.md\n  Changed Files: none yet\n\n- 실데이터 fetch와 fallback 상태를 운영 패널에 드러냅니다.\n  Owner: CTO\n  Detail: 뉴스 RSS, 차트 API, 기사 이미지 추출이 실패해 fallback으로 내려간 경우를 회의 탭과 markdown summary에서 바로 알 수 있게 만듭니다.\n  Implementation Status: ready\n  Focus: 실데이터 성공률과 fallback 사용 여부를 구조화된 운영 신호로 표면화합니다.\n  Scope: packages/shared/src/researchLive.ts, packages/shared/src/researchPipeline.ts, apps/web/components/research/ResearchWorkspace.tsx\n  Verify: npm run typecheck | npm run research:generate | npm run build:web\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/38\n  Branch: codex/agent-council/cto-live-data-health-check\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/18\n  Plan: .github/agent-council/cto-live-data-health-check.md\n  Changed Files: none yet\n\n- 웹과 뉴스레터의 섹션 구조 차이를 자동 점검합니다.\n  Owner: PM\n  Detail: 웹에서는 보이는데 뉴스레터에는 빠지는 요소, 뉴스레터에는 있는데 웹에는 없는 요소를 자동 점검해 동일 데이터 기반 경험을 유지합니다.\n  Implementation Status: ready\n  Focus: 뉴스, 시황, 행동, 섹터 이슈의 섹션 parity를 검증 가능한 규칙으로 정의합니다.\n  Scope: packages/shared/src/research.ts, scripts/research-newsletter.ts, apps/web/lib/researchPipelineStore.ts\n  Verify: npm run typecheck | npm run research:newsletter\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/39\n  Branch: codex/agent-council/pm-newsletter-web-parity\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/20\n  Plan: .github/agent-council/pm-newsletter-web-parity.md\n  Changed Files: none yet\n\n- fallback 데이터 사용 시 사용자에게 명확히 표시합니다.\n  Owner: QA\n  Detail: 실제 뉴스나 가격 데이터를 가져오지 못해 fallback snapshot을 쓴 경우, 웹과 뉴스레터에 분명한 상태 표시를 넣어 신뢰 저하를 막습니다.\n  Implementation Status: ready\n  Focus: 실패를 숨기지 않고 사용자와 운영자가 즉시 구분할 수 있는 disclosure 패턴을 도입합니다.\n  Scope: packages/shared/src/researchPipeline.ts, apps/web/components/research/ResearchWorkspace.tsx, scripts/research-newsletter.ts\n  Verify: npm run typecheck | npm run build:web\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/40\n  Branch: codex/agent-council/qa-fallback-visibility\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/22\n  Plan: .github/agent-council/qa-fallback-visibility.md\n  Changed Files: none yet\n\n- 에이전트 아이디어가 실제 구현으로 이어지는 비율을 측정합니다.\n  Owner: DA\n  Detail: 회의에서 나온 아이디어가 issue 생성, PR 생성, merge 완료로 얼마나 이어지는지 추적해 council의 아이디어 품질을 평가합니다.\n  Implementation Status: ready\n  Focus: 아이디어 생산량보다 실제 실행 전환율을 기준으로 council의 품질을 평가하는 지표를 만듭니다.\n  Scope: scripts/research-agent-issues.ts, .github/workflows/research-pipeline.yml, packages/shared/src/research.ts\n  Verify: npm run typecheck | npm run research:issues\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/41\n  Branch: codex/agent-council/da-idea-yield-score\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/24\n  Plan: .github/agent-council/da-idea-yield-score.md\n  Changed Files: none yet\n",
+        "summaryMarkdown": "# Research Pipeline\n\n- Contract Version: 2026-04-21.1\n- Generated At: 2026-05-13T23:00:26.851Z\n- Provider: rule-based\n- Model: openai/gpt-4.1\n- Source: github-actions\n- Status: fallback\n- Sectors: 반도체, 에너지(오일)\n- Tickers: NVDA, AMD, 005930.KS, XOM, 010950.KS\n\n## Main Headline\n- Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\n- Why it matters: 실적과 가이던스 변화가 공급 체인 기대치를 바로 다시 가격에 반영할 수 있어 리더 종목 밸류에이션에 직접 연결됩니다.\n- Action: NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.\n\n## Agent Transcript\n### 01 News Editor -> Macro Analyst\n메인 헤드라인을 \"Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.\nReferences: live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s, live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip, live-semiconductors-cerebras-ipo-is-expected-to-price-tonight-in-major-test-for-chip-rally\n\n### 02 Macro Analyst -> Ticker Analyst\n지금 시장은 반도체 리더십과 방어형 에너지로 자금이 압축되는 국면입니다. 이 해석은 티커 딥분석과 행동 제안 에이전트의 공통 컨텍스트가 됩니다.\nReferences: live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s, live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma\n\n### 03 Ticker Analyst -> Execution Trader\nNVDA를 대표 분석 티커로 선택해 추세, 패턴, 섹터 연결을 해석했습니다. 이 출력은 행동 제안 에이전트가 진입/관망/회피 조건을 만드는 기준이 됩니다.\nReferences: NVDA, live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s, live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip\n\n### 04 Execution Trader -> Operator\nNVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다. 이 출력은 사용자에게 보이는 최종 실행 제안이자 제품 팀 리뷰의 평가 대상입니다.\nReferences: NVDA, live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip, live-semiconductors-cerebras-ipo-is-expected-to-price-tonight-in-major-test-for-chip-rally\n\n## Trader Plan\n- Strategy: NVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다.\n- Do: NVDA는 추격 대신 조정 구간에서만 분할 진입합니다.\n- Do: AMD는 이벤트 전 기대가 과열되면 비중을 늘리지 않고, 가이던스 확인 뒤 확장합니다.\n- Do: XOM 같은 방어형 에너지로 포지션 균형을 맞춥니다.\n- Avoid: 서비스주나 후행 확산주를 뉴스 헤드라인만 보고 추격 매수하지 않습니다.\n- Avoid: 행동 조건 없이 모든 관심 티커를 동시에 매수하는 분산 진입은 피합니다.\n- Risk: 리드타임 둔화나 고객 믹스 악화 코멘트가 나오면 반도체 강세 논리가 빠르게 약해질 수 있습니다.\n- Risk: 메이저 오일의 capex 보수화는 에너지 내 강세 확산을 막고 서비스주를 먼저 흔들 수 있습니다.\n\n## Behavior Funnel\n- 헤드라인 열람: 0회\n- 다음 단계 이동: 0회\n- 티커 선택: 0회\n- 행동 제안 확장: 0회\n\n## Product Action Items\n- 행동 제안을 진입 조건 사다리로 바꿉니다.\n  Owner: Trader\n  Detail: NVDA 같은 대표 티커는 추천 행동을 한 줄 조언으로 끝내지 말고, 진입 조건, 무효화 조건, 추격 금지 규칙 순서로 보여줘 실행 오류를 줄입니다.\n  Implementation Status: ready\n  Focus: 행동 제안을 매수/관망/회피 분류보다 조건 기반 의사결정 카드로 재구성합니다.\n  Scope: packages/shared/src/research.ts, apps/web/components/research/ResearchWorkspace.tsx, apps/web/app/globals.css\n  Verify: npm run typecheck | npm run build:web\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/37\n  Branch: codex/agent-council/trader-entry-condition-ladder\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/16\n  Plan: .github/agent-council/trader-entry-condition-ladder.md\n  Changed Files: none yet\n\n- 실데이터 fetch와 fallback 상태를 운영 패널에 드러냅니다.\n  Owner: CTO\n  Detail: 뉴스 RSS, 차트 API, 기사 이미지 추출이 실패해 fallback으로 내려간 경우를 회의 탭과 markdown summary에서 바로 알 수 있게 만듭니다.\n  Implementation Status: ready\n  Focus: 실데이터 성공률과 fallback 사용 여부를 구조화된 운영 신호로 표면화합니다.\n  Scope: packages/shared/src/researchLive.ts, packages/shared/src/researchPipeline.ts, apps/web/components/research/ResearchWorkspace.tsx\n  Verify: npm run typecheck | npm run research:generate | npm run build:web\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/38\n  Branch: codex/agent-council/cto-live-data-health-check\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/18\n  Plan: .github/agent-council/cto-live-data-health-check.md\n  Changed Files: none yet\n\n- 웹과 뉴스레터의 섹션 구조 차이를 자동 점검합니다.\n  Owner: PM\n  Detail: 웹에서는 보이는데 뉴스레터에는 빠지는 요소, 뉴스레터에는 있는데 웹에는 없는 요소를 자동 점검해 동일 데이터 기반 경험을 유지합니다.\n  Implementation Status: ready\n  Focus: 뉴스, 시황, 행동, 섹터 이슈의 섹션 parity를 검증 가능한 규칙으로 정의합니다.\n  Scope: packages/shared/src/research.ts, scripts/research-newsletter.ts, apps/web/lib/researchPipelineStore.ts\n  Verify: npm run typecheck | npm run research:newsletter\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/39\n  Branch: codex/agent-council/pm-newsletter-web-parity\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/20\n  Plan: .github/agent-council/pm-newsletter-web-parity.md\n  Changed Files: none yet\n\n- fallback 데이터 사용 시 사용자에게 명확히 표시합니다.\n  Owner: QA\n  Detail: 실제 뉴스나 가격 데이터를 가져오지 못해 fallback snapshot을 쓴 경우, 웹과 뉴스레터에 분명한 상태 표시를 넣어 신뢰 저하를 막습니다.\n  Implementation Status: ready\n  Focus: 실패를 숨기지 않고 사용자와 운영자가 즉시 구분할 수 있는 disclosure 패턴을 도입합니다.\n  Scope: packages/shared/src/researchPipeline.ts, apps/web/components/research/ResearchWorkspace.tsx, scripts/research-newsletter.ts\n  Verify: npm run typecheck | npm run build:web\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/40\n  Branch: codex/agent-council/qa-fallback-visibility\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/22\n  Plan: .github/agent-council/qa-fallback-visibility.md\n  Changed Files: none yet\n\n- 에이전트 아이디어가 실제 구현으로 이어지는 비율을 측정합니다.\n  Owner: DA\n  Detail: 회의에서 나온 아이디어가 issue 생성, PR 생성, merge 완료로 얼마나 이어지는지 추적해 council의 아이디어 품질을 평가합니다.\n  Implementation Status: ready\n  Focus: 아이디어 생산량보다 실제 실행 전환율을 기준으로 council의 품질을 평가하는 지표를 만듭니다.\n  Scope: scripts/research-agent-issues.ts, .github/workflows/research-pipeline.yml, packages/shared/src/research.ts\n  Verify: npm run typecheck | npm run research:issues\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/41\n  Branch: codex/agent-council/da-idea-yield-score\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/24\n  Plan: .github/agent-council/da-idea-yield-score.md\n  Changed Files: none yet\n",
         "transcript": [
           {
             "id": "news-editor-message-1",
@@ -2486,12 +2486,12 @@
             "author": "News Editor",
             "roleLabel": "뉴스 선별",
             "audience": "Macro Analyst",
-            "summary": "메인 헤드라인을 \"Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"로 고정하고 파생 뉴스 3개를 연결했습니다.",
-            "text": "메인 헤드라인을 \"Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.",
+            "summary": "메인 헤드라인을 \"Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"로 고정하고 파생 뉴스 3개를 연결했습니다.",
+            "text": "메인 헤드라인을 \"Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.",
             "references": [
-              "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-",
+              "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s",
+              "live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma",
               "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip",
-              "live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b",
               "live-semiconductors-cerebras-ipo-is-expected-to-price-tonight-in-major-test-for-chip-rally"
             ]
           },
@@ -2505,8 +2505,8 @@
             "summary": "지금 시장은 반도체 리더십과 방어형 에너지로 자금이 압축되는 국면입니다.",
             "text": "지금 시장은 반도체 리더십과 방어형 에너지로 자금이 압축되는 국면입니다. 이 해석은 티커 딥분석과 행동 제안 에이전트의 공통 컨텍스트가 됩니다.",
             "references": [
-              "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-",
-              "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip"
+              "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s",
+              "live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma"
             ]
           },
           {
@@ -2520,9 +2520,9 @@
             "text": "NVDA를 대표 분석 티커로 선택해 추세, 패턴, 섹터 연결을 해석했습니다. 이 출력은 행동 제안 에이전트가 진입/관망/회피 조건을 만드는 기준이 됩니다.",
             "references": [
               "NVDA",
-              "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-",
-              "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip",
-              "live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b"
+              "live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s",
+              "live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma",
+              "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip"
             ]
           },
           {
@@ -2536,8 +2536,8 @@
             "text": "NVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다. 이 출력은 사용자에게 보이는 최종 실행 제안이자 제품 팀 리뷰의 평가 대상입니다.",
             "references": [
               "NVDA",
+              "live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma",
               "live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip",
-              "live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b",
               "live-semiconductors-cerebras-ipo-is-expected-to-price-tonight-in-major-test-for-chip-rally"
             ]
           }
@@ -2768,7 +2768,7 @@
       ]
     },
     "meeting": {
-      "topic": "Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs",
+      "topic": "Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs",
       "objective": "뉴스 → 시황 → 분석 → 행동 체인이 실제 제품 흐름으로 이어지는지 점검합니다.",
       "nextAction": "NVDA는 추격 대신 조정 구간에서만 분할 진입합니다.",
       "messages": [
@@ -2829,16 +2829,16 @@
     },
     "newsletter": {
       "cadence": "daily",
-      "generatedAt": "2026-05-13T21:21:22.191Z",
+      "generatedAt": "2026-05-13T23:00:26.851Z",
       "nextRunAt": "2026-05-14T07:30:00.000Z",
-      "subject": "[Daily Brief] Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs",
+      "subject": "[Daily Brief] Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs",
       "previewText": "The S&P 500 and Nasdaq ran higher, led by Google, Nvidia, Tesla and other titans. Cisco earnings beat while AI chipmaker Cerebras will price its IPO. / 행동 제안: NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.",
       "to": [],
-      "bodyText": "[Daily Brief] Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\n\nThe S&P 500 and Nasdaq ran higher, led by Google, Nvidia, Tesla and other titans. Cisco earnings beat while AI chipmaker Cerebras will price its IPO. / 행동 제안: NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.\n\n[메인 헤드라인]\nDow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\n- 분석: 실적과 가이던스 변화가 공급 체인 기대치를 바로 다시 가격에 반영할 수 있어 리더 종목 밸류에이션에 직접 연결됩니다.\n- 행동: NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.\n\n[파생 기사]\n- Nvidia Rallies As CEO Jensen Huang Joins Trump's China Trip\n  분석: 반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.\n  행동: NVDA 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.\n- Stock Market Today: Nasdaq Ends Strong As AI Leads; Cybersecurity Stock Attempts Breakout (Live Coverage)\n  분석: 실적과 가이던스 변화가 공급 체인 기대치를 바로 다시 가격에 반영할 수 있어 리더 종목 밸류에이션에 직접 연결됩니다.\n  행동: NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.\n- Cerebras IPO Is Expected to Price Tonight in Major Test for Chip Rally\n  분석: 반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.\n  행동: AMD 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.\n\n[섹터별 핵심 이슈]\n- 반도체: Nvidia Rallies As CEO Jensen Huang Joins Trump's China Trip\n  행동: NVDA 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.\n\n[티커 행동 우선순위]\n- NVDA: NVDA는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.\n- AMD: AMD는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.\n- 005930.KS: 005930.KS는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.",
-      "bodyHtml": "<h1>[Daily Brief] Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&amp;P 500, Nasdaq To Highs</h1><p>The S&amp;P 500 and Nasdaq ran higher, led by Google, Nvidia, Tesla and other titans. Cisco earnings beat while AI chipmaker Cerebras will price its IPO. / 행동 제안: NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.</p><h2>메인 헤드라인</h2><article><strong>Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&amp;P 500, Nasdaq To Highs</strong><p>실적과 가이던스 변화가 공급 체인 기대치를 바로 다시 가격에 반영할 수 있어 리더 종목 밸류에이션에 직접 연결됩니다.</p><p>NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.</p></article><h2>파생 기사</h2><ul><li><strong>Nvidia Rallies As CEO Jensen Huang Joins Trump&#39;s China Trip</strong><br />반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.<br />NVDA 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.</li><li><strong>Stock Market Today: Nasdaq Ends Strong As AI Leads; Cybersecurity Stock Attempts Breakout (Live Coverage)</strong><br />실적과 가이던스 변화가 공급 체인 기대치를 바로 다시 가격에 반영할 수 있어 리더 종목 밸류에이션에 직접 연결됩니다.<br />NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.</li><li><strong>Cerebras IPO Is Expected to Price Tonight in Major Test for Chip Rally</strong><br />반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.<br />AMD 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.</li></ul><h2>섹터별 핵심 이슈</h2><ul><li><strong>반도체</strong> - Nvidia Rallies As CEO Jensen Huang Joins Trump&#39;s China Trip<br />NVDA 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.</li></ul><h2>티커 행동 우선순위</h2><ul><li><strong>NVDA</strong> - NVDA는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.</li><li><strong>AMD</strong> - AMD는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.</li><li><strong>005930.KS</strong> - 005930.KS는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.</li></ul>"
+      "bodyText": "[Daily Brief] Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\n\nThe S&P 500 and Nasdaq ran higher, led by Google, Nvidia, Tesla and other titans. Cisco earnings beat while AI chipmaker Cerebras will price its IPO. / 행동 제안: NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.\n\n[메인 헤드라인]\nDow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\n- 분석: 실적과 가이던스 변화가 공급 체인 기대치를 바로 다시 가격에 반영할 수 있어 리더 종목 밸류에이션에 직접 연결됩니다.\n- 행동: NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.\n\n[파생 기사]\n- Micron Tops $900 Billion Market Cap. How the Samsung Strike Could Help the Chip Maker.\n  분석: 반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.\n  행동: NVDA 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.\n- Nvidia Rallies As CEO Jensen Huang Joins Trump's China Trip\n  분석: 반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.\n  행동: AMD 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.\n- Cerebras IPO Is Expected to Price Tonight in Major Test for Chip Rally\n  분석: 반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.\n  행동: AMD 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.\n\n[섹터별 핵심 이슈]\n- 반도체: Micron Tops $900 Billion Market Cap. How the Samsung Strike Could Help the Chip Maker.\n  행동: NVDA 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.\n\n[티커 행동 우선순위]\n- NVDA: NVDA는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.\n- AMD: AMD는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.\n- 005930.KS: 005930.KS는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.",
+      "bodyHtml": "<h1>[Daily Brief] Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&amp;P 500, Nasdaq To Highs</h1><p>The S&amp;P 500 and Nasdaq ran higher, led by Google, Nvidia, Tesla and other titans. Cisco earnings beat while AI chipmaker Cerebras will price its IPO. / 행동 제안: NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.</p><h2>메인 헤드라인</h2><article><strong>Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&amp;P 500, Nasdaq To Highs</strong><p>실적과 가이던스 변화가 공급 체인 기대치를 바로 다시 가격에 반영할 수 있어 리더 종목 밸류에이션에 직접 연결됩니다.</p><p>NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.</p></article><h2>파생 기사</h2><ul><li><strong>Micron Tops $900 Billion Market Cap. How the Samsung Strike Could Help the Chip Maker.</strong><br />반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.<br />NVDA 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.</li><li><strong>Nvidia Rallies As CEO Jensen Huang Joins Trump&#39;s China Trip</strong><br />반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.<br />AMD 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.</li><li><strong>Cerebras IPO Is Expected to Price Tonight in Major Test for Chip Rally</strong><br />반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.<br />AMD 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.</li></ul><h2>섹터별 핵심 이슈</h2><ul><li><strong>반도체</strong> - Micron Tops $900 Billion Market Cap. How the Samsung Strike Could Help the Chip Maker.<br />NVDA 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.</li></ul><h2>티커 행동 우선순위</h2><ul><li><strong>NVDA</strong> - NVDA는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.</li><li><strong>AMD</strong> - AMD는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.</li><li><strong>005930.KS</strong> - 005930.KS는 추격보다 20일선 근처 눌림 확인 뒤 진입하는 편이 유리하고, 20일선이 무너지면 관망으로 전환하는 게 좋습니다.</li></ul>"
     }
   },
-  "markdown": "# Research Pipeline\n\n- Contract Version: 2026-04-21.1\n- Generated At: 2026-05-13T21:21:22.191Z\n- Provider: rule-based\n- Model: openai/gpt-4.1\n- Source: github-actions\n- Status: fallback\n- Sectors: 반도체, 에너지(오일)\n- Tickers: NVDA, AMD, 005930.KS, XOM, 010950.KS\n\n## Main Headline\n- Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\n- Why it matters: 실적과 가이던스 변화가 공급 체인 기대치를 바로 다시 가격에 반영할 수 있어 리더 종목 밸류에이션에 직접 연결됩니다.\n- Action: NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.\n\n## Agent Transcript\n### 01 News Editor -> Macro Analyst\n메인 헤드라인을 \"Dow Jones Futures Rise, Cisco Soars On Earnings; Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.\nReferences: live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip, live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b, live-semiconductors-cerebras-ipo-is-expected-to-price-tonight-in-major-test-for-chip-rally\n\n### 02 Macro Analyst -> Ticker Analyst\n지금 시장은 반도체 리더십과 방어형 에너지로 자금이 압축되는 국면입니다. 이 해석은 티커 딥분석과 행동 제안 에이전트의 공통 컨텍스트가 됩니다.\nReferences: live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip\n\n### 03 Ticker Analyst -> Execution Trader\nNVDA를 대표 분석 티커로 선택해 추세, 패턴, 섹터 연결을 해석했습니다. 이 출력은 행동 제안 에이전트가 진입/관망/회피 조건을 만드는 기준이 됩니다.\nReferences: NVDA, live-semiconductors-dow-jones-futures-rise-cisco-soars-on-earnings-google-nvidia-tesla-lead-s-p-500-, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip, live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b\n\n### 04 Execution Trader -> Operator\nNVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다. 이 출력은 사용자에게 보이는 최종 실행 제안이자 제품 팀 리뷰의 평가 대상입니다.\nReferences: NVDA, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip, live-semiconductors-stock-market-today-nasdaq-ends-strong-as-ai-leads-cybersecurity-stock-attempts-b, live-semiconductors-cerebras-ipo-is-expected-to-price-tonight-in-major-test-for-chip-rally\n\n## Trader Plan\n- Strategy: NVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다.\n- Do: NVDA는 추격 대신 조정 구간에서만 분할 진입합니다.\n- Do: AMD는 이벤트 전 기대가 과열되면 비중을 늘리지 않고, 가이던스 확인 뒤 확장합니다.\n- Do: XOM 같은 방어형 에너지로 포지션 균형을 맞춥니다.\n- Avoid: 서비스주나 후행 확산주를 뉴스 헤드라인만 보고 추격 매수하지 않습니다.\n- Avoid: 행동 조건 없이 모든 관심 티커를 동시에 매수하는 분산 진입은 피합니다.\n- Risk: 리드타임 둔화나 고객 믹스 악화 코멘트가 나오면 반도체 강세 논리가 빠르게 약해질 수 있습니다.\n- Risk: 메이저 오일의 capex 보수화는 에너지 내 강세 확산을 막고 서비스주를 먼저 흔들 수 있습니다.\n\n## Behavior Funnel\n- 헤드라인 열람: 0회\n- 다음 단계 이동: 0회\n- 티커 선택: 0회\n- 행동 제안 확장: 0회\n\n## Product Action Items\n- 행동 제안을 진입 조건 사다리로 바꿉니다.\n  Owner: Trader\n  Detail: NVDA 같은 대표 티커는 추천 행동을 한 줄 조언으로 끝내지 말고, 진입 조건, 무효화 조건, 추격 금지 규칙 순서로 보여줘 실행 오류를 줄입니다.\n  Implementation Status: ready\n  Focus: 행동 제안을 매수/관망/회피 분류보다 조건 기반 의사결정 카드로 재구성합니다.\n  Scope: packages/shared/src/research.ts, apps/web/components/research/ResearchWorkspace.tsx, apps/web/app/globals.css\n  Verify: npm run typecheck | npm run build:web\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/37\n  Branch: codex/agent-council/trader-entry-condition-ladder\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/16\n  Plan: .github/agent-council/trader-entry-condition-ladder.md\n  Changed Files: none yet\n\n- 실데이터 fetch와 fallback 상태를 운영 패널에 드러냅니다.\n  Owner: CTO\n  Detail: 뉴스 RSS, 차트 API, 기사 이미지 추출이 실패해 fallback으로 내려간 경우를 회의 탭과 markdown summary에서 바로 알 수 있게 만듭니다.\n  Implementation Status: ready\n  Focus: 실데이터 성공률과 fallback 사용 여부를 구조화된 운영 신호로 표면화합니다.\n  Scope: packages/shared/src/researchLive.ts, packages/shared/src/researchPipeline.ts, apps/web/components/research/ResearchWorkspace.tsx\n  Verify: npm run typecheck | npm run research:generate | npm run build:web\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/38\n  Branch: codex/agent-council/cto-live-data-health-check\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/18\n  Plan: .github/agent-council/cto-live-data-health-check.md\n  Changed Files: none yet\n\n- 웹과 뉴스레터의 섹션 구조 차이를 자동 점검합니다.\n  Owner: PM\n  Detail: 웹에서는 보이는데 뉴스레터에는 빠지는 요소, 뉴스레터에는 있는데 웹에는 없는 요소를 자동 점검해 동일 데이터 기반 경험을 유지합니다.\n  Implementation Status: ready\n  Focus: 뉴스, 시황, 행동, 섹터 이슈의 섹션 parity를 검증 가능한 규칙으로 정의합니다.\n  Scope: packages/shared/src/research.ts, scripts/research-newsletter.ts, apps/web/lib/researchPipelineStore.ts\n  Verify: npm run typecheck | npm run research:newsletter\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/39\n  Branch: codex/agent-council/pm-newsletter-web-parity\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/20\n  Plan: .github/agent-council/pm-newsletter-web-parity.md\n  Changed Files: none yet\n\n- fallback 데이터 사용 시 사용자에게 명확히 표시합니다.\n  Owner: QA\n  Detail: 실제 뉴스나 가격 데이터를 가져오지 못해 fallback snapshot을 쓴 경우, 웹과 뉴스레터에 분명한 상태 표시를 넣어 신뢰 저하를 막습니다.\n  Implementation Status: ready\n  Focus: 실패를 숨기지 않고 사용자와 운영자가 즉시 구분할 수 있는 disclosure 패턴을 도입합니다.\n  Scope: packages/shared/src/researchPipeline.ts, apps/web/components/research/ResearchWorkspace.tsx, scripts/research-newsletter.ts\n  Verify: npm run typecheck | npm run build:web\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/40\n  Branch: codex/agent-council/qa-fallback-visibility\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/22\n  Plan: .github/agent-council/qa-fallback-visibility.md\n  Changed Files: none yet\n\n- 에이전트 아이디어가 실제 구현으로 이어지는 비율을 측정합니다.\n  Owner: DA\n  Detail: 회의에서 나온 아이디어가 issue 생성, PR 생성, merge 완료로 얼마나 이어지는지 추적해 council의 아이디어 품질을 평가합니다.\n  Implementation Status: ready\n  Focus: 아이디어 생산량보다 실제 실행 전환율을 기준으로 council의 품질을 평가하는 지표를 만듭니다.\n  Scope: scripts/research-agent-issues.ts, .github/workflows/research-pipeline.yml, packages/shared/src/research.ts\n  Verify: npm run typecheck | npm run research:issues\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/41\n  Branch: codex/agent-council/da-idea-yield-score\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/24\n  Plan: .github/agent-council/da-idea-yield-score.md\n  Changed Files: none yet\n",
+  "markdown": "# Research Pipeline\n\n- Contract Version: 2026-04-21.1\n- Generated At: 2026-05-13T23:00:26.851Z\n- Provider: rule-based\n- Model: openai/gpt-4.1\n- Source: github-actions\n- Status: fallback\n- Sectors: 반도체, 에너지(오일)\n- Tickers: NVDA, AMD, 005930.KS, XOM, 010950.KS\n\n## Main Headline\n- Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\n- Why it matters: 실적과 가이던스 변화가 공급 체인 기대치를 바로 다시 가격에 반영할 수 있어 리더 종목 밸류에이션에 직접 연결됩니다.\n- Action: NVDA는 추격보다 실적 코멘트 확인 뒤 눌림 구간에서만 대응하고, 후행주는 확산 신호가 나올 때까지 보수적으로 봅니다.\n\n## Agent Transcript\n### 01 News Editor -> Macro Analyst\n메인 헤드라인을 \"Dow Jones Futures Rise, Cisco Soars On AI Orders After Google, Nvidia, Tesla Lead S&P 500, Nasdaq To Highs\"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.\nReferences: live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s, live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip, live-semiconductors-cerebras-ipo-is-expected-to-price-tonight-in-major-test-for-chip-rally\n\n### 02 Macro Analyst -> Ticker Analyst\n지금 시장은 반도체 리더십과 방어형 에너지로 자금이 압축되는 국면입니다. 이 해석은 티커 딥분석과 행동 제안 에이전트의 공통 컨텍스트가 됩니다.\nReferences: live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s, live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma\n\n### 03 Ticker Analyst -> Execution Trader\nNVDA를 대표 분석 티커로 선택해 추세, 패턴, 섹터 연결을 해석했습니다. 이 출력은 행동 제안 에이전트가 진입/관망/회피 조건을 만드는 기준이 됩니다.\nReferences: NVDA, live-semiconductors-dow-jones-futures-rise-cisco-soars-on-ai-orders-after-google-nvidia-tesla-lead-s, live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip\n\n### 04 Execution Trader -> Operator\nNVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다. 이 출력은 사용자에게 보이는 최종 실행 제안이자 제품 팀 리뷰의 평가 대상입니다.\nReferences: NVDA, live-semiconductors-micron-tops-900-billion-market-cap-how-the-samsung-strike-could-help-the-chip-ma, live-semiconductors-nvidia-rallies-as-ceo-jensen-huang-joins-trump-s-china-trip, live-semiconductors-cerebras-ipo-is-expected-to-price-tonight-in-major-test-for-chip-rally\n\n## Trader Plan\n- Strategy: NVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다.\n- Do: NVDA는 추격 대신 조정 구간에서만 분할 진입합니다.\n- Do: AMD는 이벤트 전 기대가 과열되면 비중을 늘리지 않고, 가이던스 확인 뒤 확장합니다.\n- Do: XOM 같은 방어형 에너지로 포지션 균형을 맞춥니다.\n- Avoid: 서비스주나 후행 확산주를 뉴스 헤드라인만 보고 추격 매수하지 않습니다.\n- Avoid: 행동 조건 없이 모든 관심 티커를 동시에 매수하는 분산 진입은 피합니다.\n- Risk: 리드타임 둔화나 고객 믹스 악화 코멘트가 나오면 반도체 강세 논리가 빠르게 약해질 수 있습니다.\n- Risk: 메이저 오일의 capex 보수화는 에너지 내 강세 확산을 막고 서비스주를 먼저 흔들 수 있습니다.\n\n## Behavior Funnel\n- 헤드라인 열람: 0회\n- 다음 단계 이동: 0회\n- 티커 선택: 0회\n- 행동 제안 확장: 0회\n\n## Product Action Items\n- 행동 제안을 진입 조건 사다리로 바꿉니다.\n  Owner: Trader\n  Detail: NVDA 같은 대표 티커는 추천 행동을 한 줄 조언으로 끝내지 말고, 진입 조건, 무효화 조건, 추격 금지 규칙 순서로 보여줘 실행 오류를 줄입니다.\n  Implementation Status: ready\n  Focus: 행동 제안을 매수/관망/회피 분류보다 조건 기반 의사결정 카드로 재구성합니다.\n  Scope: packages/shared/src/research.ts, apps/web/components/research/ResearchWorkspace.tsx, apps/web/app/globals.css\n  Verify: npm run typecheck | npm run build:web\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/37\n  Branch: codex/agent-council/trader-entry-condition-ladder\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/16\n  Plan: .github/agent-council/trader-entry-condition-ladder.md\n  Changed Files: none yet\n\n- 실데이터 fetch와 fallback 상태를 운영 패널에 드러냅니다.\n  Owner: CTO\n  Detail: 뉴스 RSS, 차트 API, 기사 이미지 추출이 실패해 fallback으로 내려간 경우를 회의 탭과 markdown summary에서 바로 알 수 있게 만듭니다.\n  Implementation Status: ready\n  Focus: 실데이터 성공률과 fallback 사용 여부를 구조화된 운영 신호로 표면화합니다.\n  Scope: packages/shared/src/researchLive.ts, packages/shared/src/researchPipeline.ts, apps/web/components/research/ResearchWorkspace.tsx\n  Verify: npm run typecheck | npm run research:generate | npm run build:web\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/38\n  Branch: codex/agent-council/cto-live-data-health-check\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/18\n  Plan: .github/agent-council/cto-live-data-health-check.md\n  Changed Files: none yet\n\n- 웹과 뉴스레터의 섹션 구조 차이를 자동 점검합니다.\n  Owner: PM\n  Detail: 웹에서는 보이는데 뉴스레터에는 빠지는 요소, 뉴스레터에는 있는데 웹에는 없는 요소를 자동 점검해 동일 데이터 기반 경험을 유지합니다.\n  Implementation Status: ready\n  Focus: 뉴스, 시황, 행동, 섹터 이슈의 섹션 parity를 검증 가능한 규칙으로 정의합니다.\n  Scope: packages/shared/src/research.ts, scripts/research-newsletter.ts, apps/web/lib/researchPipelineStore.ts\n  Verify: npm run typecheck | npm run research:newsletter\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/39\n  Branch: codex/agent-council/pm-newsletter-web-parity\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/20\n  Plan: .github/agent-council/pm-newsletter-web-parity.md\n  Changed Files: none yet\n\n- fallback 데이터 사용 시 사용자에게 명확히 표시합니다.\n  Owner: QA\n  Detail: 실제 뉴스나 가격 데이터를 가져오지 못해 fallback snapshot을 쓴 경우, 웹과 뉴스레터에 분명한 상태 표시를 넣어 신뢰 저하를 막습니다.\n  Implementation Status: ready\n  Focus: 실패를 숨기지 않고 사용자와 운영자가 즉시 구분할 수 있는 disclosure 패턴을 도입합니다.\n  Scope: packages/shared/src/researchPipeline.ts, apps/web/components/research/ResearchWorkspace.tsx, scripts/research-newsletter.ts\n  Verify: npm run typecheck | npm run build:web\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/40\n  Branch: codex/agent-council/qa-fallback-visibility\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/22\n  Plan: .github/agent-council/qa-fallback-visibility.md\n  Changed Files: none yet\n\n- 에이전트 아이디어가 실제 구현으로 이어지는 비율을 측정합니다.\n  Owner: DA\n  Detail: 회의에서 나온 아이디어가 issue 생성, PR 생성, merge 완료로 얼마나 이어지는지 추적해 council의 아이디어 품질을 평가합니다.\n  Implementation Status: ready\n  Focus: 아이디어 생산량보다 실제 실행 전환율을 기준으로 council의 품질을 평가하는 지표를 만듭니다.\n  Scope: scripts/research-agent-issues.ts, .github/workflows/research-pipeline.yml, packages/shared/src/research.ts\n  Verify: npm run typecheck | npm run research:issues\n  Issue: https://github.com/mlender-ai/auto-trading-bot/issues/41\n  Branch: codex/agent-council/da-idea-yield-score\n  PR: https://github.com/mlender-ai/auto-trading-bot/pull/24\n  Plan: .github/agent-council/da-idea-yield-score.md\n  Changed Files: none yet\n",
   "warnings": [
     "AI 파이프라인 실행 실패: AI request failed (429): Too many requests. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https://docs.github.com/en/site-policy/github-terms/github-terms-of-service).\n"
   ]
