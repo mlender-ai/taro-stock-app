@@ -1,7 +1,7 @@
 # Research Pipeline
 
 - Contract Version: 2026-04-21.1
-- Generated At: 2026-05-14T07:38:44.136Z
+- Generated At: 2026-05-14T10:08:54.866Z
 - Provider: rule-based
 - Model: openai/gpt-4.1
 - Source: github-actions
@@ -10,26 +10,26 @@
 - Tickers: NVDA, AMD, 005930.KS, XOM, 010950.KS
 
 ## Main Headline
-- Exclusive-US clears H200 chip sales to 10 China firms as Nvidia CEO looks for breakthrough
+- Market Chatter: Alibaba, JD.com Among Chinese Firms Cleared by US to Buy Nvidia H200 AI Chips But Deals Stall
 - Why it matters: 반도체는 수급보다 리드타임과 고객 믹스에 더 민감해져 있어, 기사 한 건이 업황 기대의 방향을 빠르게 바꿀 수 있습니다.
 - Action: NVDA 중심으로만 노출을 유지하고, 제목만 강한 후행 설계주 추격은 피하는 편이 좋습니다.
 
 ## Agent Transcript
 ### 01 News Editor -> Macro Analyst
-메인 헤드라인을 "Exclusive-US clears H200 chip sales to 10 China firms as Nvidia CEO looks for breakthrough"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.
-References: live-semiconductors-exclusive-us-clears-h200-chip-sales-to-10-china-firms-as-nvidia-ceo-looks-for-br, live-semiconductors-nvidia-overtakes-silver-to-become-world-s-second-largest-asset-at-5-52-trillion-, live-semiconductors-nvidia-ceo-jensen-huang-s-foundation-donates-108-million-in-coreweave-ai-computi, live-semiconductors-nvidia-stock-rises-jensen-huang-is-betting-on-the-next-phase-of-ai
+메인 헤드라인을 "Market Chatter: Alibaba, JD.com Among Chinese Firms Cleared by US to Buy Nvidia H200 AI Chips But Deals Stall"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.
+References: live-semiconductors-market-chatter-alibaba-jd-com-among-chinese-firms-cleared-by-us-to-buy-nvidia-h2, live-semiconductors-nvidia-stock-is-at-new-highs-the-china-summit-could-provide-another-boost, live-semiconductors-exclusive-us-clears-h200-chip-sales-to-10-china-firms-as-nvidia-ceo-looks-for-br, live-semiconductors-nvidia-overtakes-silver-to-become-world-s-second-largest-asset-at-5-52-trillion-
 
 ### 02 Macro Analyst -> Ticker Analyst
 지금 시장은 반도체 리더십과 방어형 에너지로 자금이 압축되는 국면입니다. 이 해석은 티커 딥분석과 행동 제안 에이전트의 공통 컨텍스트가 됩니다.
-References: live-semiconductors-exclusive-us-clears-h200-chip-sales-to-10-china-firms-as-nvidia-ceo-looks-for-br, live-semiconductors-nvidia-overtakes-silver-to-become-world-s-second-largest-asset-at-5-52-trillion-
+References: live-semiconductors-market-chatter-alibaba-jd-com-among-chinese-firms-cleared-by-us-to-buy-nvidia-h2, live-semiconductors-nvidia-stock-is-at-new-highs-the-china-summit-could-provide-another-boost, live-energy-oil-energy-stocks-have-soared-why-the-boom-can-last
 
 ### 03 Ticker Analyst -> Execution Trader
 NVDA를 대표 분석 티커로 선택해 추세, 패턴, 섹터 연결을 해석했습니다. 이 출력은 행동 제안 에이전트가 진입/관망/회피 조건을 만드는 기준이 됩니다.
-References: NVDA, live-semiconductors-exclusive-us-clears-h200-chip-sales-to-10-china-firms-as-nvidia-ceo-looks-for-br, live-semiconductors-nvidia-overtakes-silver-to-become-world-s-second-largest-asset-at-5-52-trillion-, live-semiconductors-nvidia-ceo-jensen-huang-s-foundation-donates-108-million-in-coreweave-ai-computi
+References: NVDA, live-semiconductors-market-chatter-alibaba-jd-com-among-chinese-firms-cleared-by-us-to-buy-nvidia-h2, live-semiconductors-nvidia-stock-is-at-new-highs-the-china-summit-could-provide-another-boost, live-semiconductors-exclusive-us-clears-h200-chip-sales-to-10-china-firms-as-nvidia-ceo-looks-for-br
 
 ### 04 Execution Trader -> Operator
 NVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다. 이 출력은 사용자에게 보이는 최종 실행 제안이자 제품 팀 리뷰의 평가 대상입니다.
-References: NVDA, live-semiconductors-nvidia-overtakes-silver-to-become-world-s-second-largest-asset-at-5-52-trillion-, live-semiconductors-nvidia-ceo-jensen-huang-s-foundation-donates-108-million-in-coreweave-ai-computi, live-semiconductors-nvidia-stock-rises-jensen-huang-is-betting-on-the-next-phase-of-ai
+References: NVDA, live-semiconductors-nvidia-stock-is-at-new-highs-the-china-summit-could-provide-another-boost, live-semiconductors-exclusive-us-clears-h200-chip-sales-to-10-china-firms-as-nvidia-ceo-looks-for-br, live-semiconductors-nvidia-overtakes-silver-to-become-world-s-second-largest-asset-at-5-52-trillion-
 
 ## Trader Plan
 - Strategy: NVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다.
