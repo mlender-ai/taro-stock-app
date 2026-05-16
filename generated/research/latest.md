@@ -1,7 +1,7 @@
 # Research Pipeline
 
 - Contract Version: 2026-04-21.1
-- Generated At: 2026-05-16T06:01:40.660Z
+- Generated At: 2026-05-16T07:53:44.886Z
 - Provider: rule-based
 - Model: openai/gpt-4.1
 - Source: github-actions
@@ -17,7 +17,7 @@
 ## Agent Transcript
 ### 01 News Editor -> Macro Analyst
 메인 헤드라인을 "A Look At Nova (NVMI) Valuation After Record Q1 2026 Beat And Upgraded Outlook"로 고정하고 파생 뉴스 3개를 연결했습니다. 이 출력은 시황 해석 에이전트의 입력으로 넘어갑니다.
-References: live-semiconductors-a-look-at-nova-nvmi-valuation-after-record-q1-2026-beat-and-upgraded-outlook, live-semiconductors-dow-jones-futures-s-p-500-nasdaq-hold-near-highs-nvidia-walmart-earnings-loom, live-semiconductors-big-earnings-on-deck-what-to-watch-next-week, live-semiconductors-sharonai-holdings-inc-class-a-common-stock-q1-earnings-call-highlights
+References: live-semiconductors-a-look-at-nova-nvmi-valuation-after-record-q1-2026-beat-and-upgraded-outlook, live-semiconductors-dow-jones-futures-s-p-500-nasdaq-hold-near-highs-nvidia-walmart-earnings-loom, live-semiconductors-marvell-s-ai-partnerships-with-amd-google-and-amazon-test-lofty-valuation, live-semiconductors-intel-stock-is-falling-as-analyst-issues-chip-stock-bubble-warning
 
 ### 02 Macro Analyst -> Ticker Analyst
 지금 시장은 반도체 리더십과 방어형 에너지로 자금이 압축되는 국면입니다. 이 해석은 티커 딥분석과 행동 제안 에이전트의 공통 컨텍스트가 됩니다.
@@ -25,11 +25,11 @@ References: live-semiconductors-a-look-at-nova-nvmi-valuation-after-record-q1-20
 
 ### 03 Ticker Analyst -> Execution Trader
 NVDA를 대표 분석 티커로 선택해 추세, 패턴, 섹터 연결을 해석했습니다. 이 출력은 행동 제안 에이전트가 진입/관망/회피 조건을 만드는 기준이 됩니다.
-References: NVDA, live-semiconductors-a-look-at-nova-nvmi-valuation-after-record-q1-2026-beat-and-upgraded-outlook, live-semiconductors-dow-jones-futures-s-p-500-nasdaq-hold-near-highs-nvidia-walmart-earnings-loom, live-semiconductors-big-earnings-on-deck-what-to-watch-next-week
+References: NVDA, live-semiconductors-a-look-at-nova-nvmi-valuation-after-record-q1-2026-beat-and-upgraded-outlook, live-semiconductors-dow-jones-futures-s-p-500-nasdaq-hold-near-highs-nvidia-walmart-earnings-loom, live-semiconductors-marvell-s-ai-partnerships-with-amd-google-and-amazon-test-lofty-valuation
 
 ### 04 Execution Trader -> Operator
 NVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다. 이 출력은 사용자에게 보이는 최종 실행 제안이자 제품 팀 리뷰의 평가 대상입니다.
-References: NVDA, live-semiconductors-dow-jones-futures-s-p-500-nasdaq-hold-near-highs-nvidia-walmart-earnings-loom, live-semiconductors-big-earnings-on-deck-what-to-watch-next-week, live-semiconductors-sharonai-holdings-inc-class-a-common-stock-q1-earnings-call-highlights
+References: NVDA, live-semiconductors-dow-jones-futures-s-p-500-nasdaq-hold-near-highs-nvidia-walmart-earnings-loom, live-semiconductors-marvell-s-ai-partnerships-with-amd-google-and-amazon-test-lofty-valuation, live-semiconductors-intel-stock-is-falling-as-analyst-issues-chip-stock-bubble-warning
 
 ## Trader Plan
 - Strategy: NVDA 중심의 조정 매수만 허용하고, XOM로 방어 노출을 병행하는 전략이 우세합니다.
