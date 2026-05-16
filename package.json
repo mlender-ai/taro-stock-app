@@ -25,6 +25,8 @@
     "typecheck:api": "npm --workspace @trading/api run typecheck",
     "typecheck:shared": "npm --workspace @trading/shared run typecheck",
     "typecheck:web": "npm --workspace @trading/web run typecheck",
+    "typecheck:core": "npm --workspace @taro/core run typecheck",
+    "build:core": "npm --workspace @taro/core run build",
     "paper:status": "tsx scripts/paper-status.ts",
     "qa:screenshot": "tsx scripts/qa-screenshot.ts",
     "research:generate": "tsx scripts/research-pipeline.ts",
