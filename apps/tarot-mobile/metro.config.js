@@ -31,12 +31,10 @@ config.resolver.extraNodeModules = {
   "react-native": path.resolve(projectRoot, "node_modules/react-native"),
 };
 
-// Native-only modules not available in Expo Go — mock with empty module
-// 실제 동작은 EAS 네이티브 빌드에서만 가능
+// Apple Authentication은 iOS 네이티브 바이너리 전용 — Expo Go에서 empty로 처리
+// Kakao/Naver는 JS 레이어 모듈이 있어서 정상 resolve 가능
 const NATIVE_ONLY_MODULES = [
   "@invertase/react-native-apple-authentication",
-  "@react-native-seoul/kakao-login",
-  "@react-native-seoul/naver-login",
 ];
 
 const originalResolveRequest = config.resolver.resolveRequest;

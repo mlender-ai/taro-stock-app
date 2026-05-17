@@ -48,5 +48,10 @@
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@react-native-seoul/kakao-login": "^5.4.2",
+    "@react-native-seoul/naver-login": "^4.2.4",
+    "expo-secure-store": "^55.0.14"
   }
 }
