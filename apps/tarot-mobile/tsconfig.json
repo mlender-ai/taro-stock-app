@@ -3,12 +3,23 @@
   "compilerOptions": {
     "strict": true,
     "skipLibCheck": true,
-    "typeRoots": ["./node_modules/@types", "../../node_modules/@types"],
+    "typeRoots": [
+      "./node_modules/@types",
+      "../../node_modules/@types"
+    ],
     "paths": {
-      "@taro/core": ["../../packages/tarot-core/src/index.ts"],
-      "@taro/core/*": ["../../packages/tarot-core/src/*"],
-      "@trading/shared": ["../../packages/shared/src/index.ts"],
-      "@trading/shared/*": ["../../packages/shared/src/*"]
+      "@taro/core": [
+        "../../packages/tarot-core/src/index.ts"
+      ],
+      "@taro/core/*": [
+        "../../packages/tarot-core/src/*"
+      ],
+      "@trading/shared": [
+        "../../packages/shared/src/index.ts"
+      ],
+      "@trading/shared/*": [
+        "../../packages/shared/src/*"
+      ]
     }
   },
   "include": [
@@ -16,6 +27,6 @@
     "**/*.tsx",
     ".expo/types/**/*.d.ts",
     "expo-env.d.ts",
-    "../../node_modules/nativewind/types.d.ts"
+    ".expo/types/**/*.ts"
   ]
 }
