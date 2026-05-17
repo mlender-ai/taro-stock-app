@@ -13,7 +13,19 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, "node_modules"),
 ];
 
-// React 중복 인스턴스 방지: 항상 앱 로컬 버전으로 고정
+const rootNodeModules = path.resolve(workspaceRoot, "node_modules");
+
+// react/react-native must resolve to a single copy — block root versions
+config.resolver.blockList = [
+  new RegExp(
+    `^${rootNodeModules.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/react/.*`
+  ),
+  new RegExp(
+    `^${rootNodeModules.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/react-native/.*`
+  ),
+];
+
+// Force all react/react-native imports (including those from root-hoisted packages) to app-local copy
 config.resolver.extraNodeModules = {
   "react":        path.resolve(projectRoot, "node_modules/react"),
   "react-native": path.resolve(projectRoot, "node_modules/react-native"),
