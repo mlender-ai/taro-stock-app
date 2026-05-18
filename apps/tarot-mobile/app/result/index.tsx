@@ -1,13 +1,15 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import {
   SafeAreaView, View, ScrollView, TouchableOpacity,
-  StyleSheet, Animated,
+  StyleSheet, Animated, Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Text } from "../../components/ui/Text";
 import { Button } from "../../components/ui/Button";
 import { Colors, Spacing, Radius } from "../../constants/theme";
 import { useDrawStore, type DrawnCard } from "../../lib/drawStore";
+import { useRewardedAd } from "../../lib/ads/useRewardedAd";
+import { useUserStore } from "../../lib/store";
 
 const DISCLAIMER = "본 해석은 오락 목적으로 제공되며 투자 조언이 아닙니다. 투자 결정은 본인의 판단과 책임 하에 이루어져야 합니다.";
 
@@ -49,6 +51,8 @@ function CardReveal({ card, index }: { card: DrawnCard; index: number }) {
 export default function ResultScreen() {
   const router = useRouter();
   const { result, reset } = useDrawStore();
+  const { credits, isLoggedIn } = useUserStore();
+  const { status: adStatus, errorMessage, load: loadAd, show: showAd, resetStatus } = useRewardedAd();
 
   if (!result) {
     router.replace("/(tabs)");
@@ -59,6 +63,22 @@ export default function ResultScreen() {
     reset();
     router.replace("/(tabs)/draw");
   };
+
+  const handleWatchAd = () => {
+    if (adStatus === "idle" || adStatus === "error") {
+      loadAd();
+    } else if (adStatus === "ready") {
+      showAd();
+    }
+  };
+
+  const rewardLabel =
+    adStatus === "loading" ? "광고 로딩 중..." :
+    adStatus === "ready" ? "광고 보고 +1 크레딧" :
+    adStatus === "showing" ? "시청 중..." :
+    adStatus === "earned" ? "크레딧 지급 완료!" :
+    adStatus === "error" ? (errorMessage ?? "다시 시도") :
+    "광고 보고 +1 크레딧";
 
   return (
     <SafeAreaView style={styles.container}>
@@ -71,6 +91,11 @@ export default function ResultScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Text variant="body-sm" color={Colors.midGrayText}>← 뒤로</Text>
           </TouchableOpacity>
+          {isLoggedIn && (
+            <View style={styles.creditBadge}>
+              <Text variant="caption" color={Colors.taroEssence}>✦ {credits}</Text>
+            </View>
+          )}
         </View>
 
         {/* 종목 + 날짜 */}
@@ -97,6 +122,21 @@ export default function ResultScreen() {
             ⚠ {DISCLAIMER}
           </Text>
         </View>
+
+        {/* 리워드 광고 */}
+        {isLoggedIn && (
+          <View style={styles.rewardSection}>
+            <Text variant="body-sm" color={Colors.silverHighlight} style={styles.rewardTitle}>
+              크레딧이 부족하신가요?
+            </Text>
+            <Button
+              variant="secondary"
+              label={rewardLabel}
+              disabled={adStatus === "loading" || adStatus === "showing" || adStatus === "earned"}
+              onPress={handleWatchAd}
+            />
+          </View>
+        )}
 
         {/* 액션 버튼 */}
         <View style={styles.actions}>
@@ -132,5 +172,8 @@ const styles = StyleSheet.create({
   detail:         { color: Colors.midGrayText, lineHeight: 22 },
   disclaimer:     { backgroundColor: Colors.steelSurface, borderRadius: 10, padding: Spacing.s16, marginBottom: Spacing.s24, borderWidth: 1, borderColor: Colors.carbonBorder },
   disclaimerText: { lineHeight: 18 },
+  rewardSection:  { marginBottom: Spacing.s24, gap: 8 },
+  rewardTitle:    { textAlign: "center", marginBottom: 4 },
+  creditBadge:    { borderWidth: 1, borderColor: Colors.deepInsight, borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 4 },
   actions:        { gap: 12 },
 });

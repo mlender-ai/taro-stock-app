@@ -3,17 +3,15 @@ import {
   SafeAreaView, View, Text, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert,
 } from "react-native";
-import * as uuid from "expo-crypto";
 import { Colors } from "../../constants/colors";
 import { useUserStore } from "../../lib/store";
 import { apiFetch } from "../../lib/api";
 import { useRewardedAd } from "../../lib/ads/useRewardedAd";
-import { getOfferings, purchasePackage, initRevenueCat } from "../../lib/iap/purchases";
-import type { PurchasesPackage } from "react-native-purchases";
+import { getOfferings, purchaseAndVerify, initRevenueCat, type CreditPackage } from "../../lib/iap/purchases";
 
 export default function ProfileScreen() {
   const { userId, credits, isLoggedIn, setCredits } = useUserStore();
-  const [packages, setPackages] = useState<PurchasesPackage[]>([]);
+  const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [purchasing, setPurchasing] = useState(false);
 
   const refreshCredits = useCallback(async () => {
@@ -24,29 +22,7 @@ export default function ProfileScreen() {
     } catch {}
   }, [isLoggedIn, setCredits]);
 
-  // 리워드 광고 콜백: 서버에 크레딧 지급 요청
-  const handleRewardEarned = useCallback(async () => {
-    if (!isLoggedIn) return;
-    try {
-      const key = await uuid.digestStringAsync(
-        uuid.CryptoDigestAlgorithm.SHA256,
-        `reward-${userId}-${Date.now()}`
-      );
-      const data = await apiFetch<{ credits: number }>("/api/tarot/credits/reward", {
-        method: "POST",
-        body: JSON.stringify({ idempotencyKey: key }),
-      });
-      setCredits(data.credits);
-      Alert.alert("크레딧 지급!", "+1 크레딧이 추가됐습니다");
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "";
-      if (msg.includes("REWARD_COOLDOWN")) {
-        Alert.alert("잠시 후 다시", "30분 뒤에 다시 시청할 수 있습니다");
-      }
-    }
-  }, [isLoggedIn, userId, setCredits]);
-
-  const { status: adStatus, load: loadAd, show: showAd } = useRewardedAd(handleRewardEarned);
+  const { status: adStatus, errorMessage, load: loadAd, show: showAd, resetStatus } = useRewardedAd();
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -55,25 +31,12 @@ export default function ProfileScreen() {
     getOfferings().then(setPackages).catch(() => {});
   }, [isLoggedIn, userId, refreshCredits]);
 
-  const handlePurchase = async (pkg: PurchasesPackage) => {
+  const handlePurchase = async (pkg: CreditPackage) => {
     if (purchasing) return;
     setPurchasing(true);
     try {
-      const customerInfo = await purchasePackage(pkg);
-      const latestTxn = customerInfo.nonSubscriptionTransactions.at(-1);
-      if (!latestTxn) throw new Error("No transaction found");
-
-      const key = latestTxn.transactionIdentifier;
-      const data = await apiFetch<{ credits: number }>("/api/tarot/credits/purchase", {
-        method: "POST",
-        body: JSON.stringify({
-          productId: pkg.product.identifier,
-          purchaseToken: latestTxn.transactionIdentifier,
-          idempotencyKey: key,
-        }),
-      });
-      setCredits(data.credits);
-      Alert.alert("구매 완료!", `크레딧이 추가됐습니다 (잔액: ${data.credits})`);
+      const result = await purchaseAndVerify(pkg);
+      Alert.alert("구매 완료!", `+${result.purchased} 크레딧 (잔액: ${result.credits})`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "구매 중 오류";
       if (!msg.includes("cancel")) Alert.alert("구매 실패", msg);
@@ -81,6 +44,22 @@ export default function ProfileScreen() {
       setPurchasing(false);
     }
   };
+
+  const handleWatchAd = () => {
+    if (adStatus === "idle" || adStatus === "error") {
+      loadAd();
+    } else if (adStatus === "ready") {
+      showAd();
+    }
+  };
+
+  // 리워드 지급 완료 시 알림
+  useEffect(() => {
+    if (adStatus === "earned") {
+      Alert.alert("크레딧 지급!", "+1 크레딧이 추가됐습니다");
+      resetStatus();
+    }
+  }, [adStatus, resetStatus]);
 
   if (!isLoggedIn) {
     return (
@@ -105,9 +84,11 @@ export default function ProfileScreen() {
       {/* 리워드 광고 */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>광고 시청 (+1 크레딧)</Text>
-        {adStatus === "idle" && (
-          <TouchableOpacity style={styles.btn} onPress={loadAd}>
-            <Text style={styles.btnText}>광고 불러오기</Text>
+        {(adStatus === "idle" || adStatus === "error") && (
+          <TouchableOpacity style={styles.btn} onPress={handleWatchAd}>
+            <Text style={styles.btnText}>
+              {adStatus === "error" ? (errorMessage ?? "다시 시도") : "광고 불러오기"}
+            </Text>
           </TouchableOpacity>
         )}
         {adStatus === "loading" && <ActivityIndicator color={Colors.accent} />}
@@ -116,9 +97,7 @@ export default function ProfileScreen() {
             <Text style={styles.btnText}>광고 시청하기</Text>
           </TouchableOpacity>
         )}
-        {adStatus === "error" && (
-          <Text style={styles.errorText}>광고를 불러오지 못했습니다</Text>
-        )}
+        {adStatus === "showing" && <ActivityIndicator color={Colors.accent} />}
       </View>
 
       {/* IAP 크레딧 구매 */}
@@ -135,7 +114,7 @@ export default function ProfileScreen() {
             disabled={purchasing}
           >
             <Text style={styles.btnText}>
-              {pkg.product.title} — {pkg.product.priceString}
+              {pkg.credits} 크레딧 — {pkg.localizedPrice}
             </Text>
           </TouchableOpacity>
         ))}
@@ -157,6 +136,5 @@ const styles = StyleSheet.create({
   btn:           { backgroundColor: Colors.card, borderRadius: 10, paddingVertical: 14, paddingHorizontal: 16, marginBottom: 10, alignItems: "center", borderWidth: 1, borderColor: Colors.border },
   btnGold:       { borderColor: Colors.gold },
   btnText:       { fontSize: 15, color: Colors.text, fontWeight: "500" },
-  errorText:     { fontSize: 13, color: "#e05c5c" },
   muted:         { fontSize: 13, color: Colors.muted },
 });

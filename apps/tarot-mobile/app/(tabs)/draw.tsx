@@ -11,6 +11,7 @@ import { useDrawStore, type SpreadType } from "../../lib/drawStore";
 import { useUserStore } from "../../lib/store";
 import { apiFetch } from "../../lib/api";
 import { localDraw, saveLocalDraw } from "../../lib/localEngine";
+import { AdBanner } from "../../components/AdBanner";
 
 const SPREAD_OPTIONS: { type: SpreadType; label: string; desc: string; cost: number }[] = [
   { type: "single",     label: "1장",  desc: "핵심 흐름",    cost: 1 },
@@ -202,6 +203,9 @@ export default function DrawScreen() {
             onPress={handleDraw}
           />
         </View>
+
+        {/* 배너 광고 */}
+        <AdBanner />
       </View>
     </SafeAreaView>
   );
