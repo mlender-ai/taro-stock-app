@@ -426,15 +426,15 @@ jobs:
         env:
           BRIEF: ${{ needs.ceo_brief.outputs.brief }}
         run: |
-          cat > /tmp/email_prompt.md << 'PROMPTEOF'
-아래 CEO Brief를 HTML 이메일 body로 변환하세요.
-스타일: 배경 #0f0f0f, 카드 #1e1e1e, 강조색 #3ecf8e, 충돌은 #e07b3e.
-핵심 3가지는 굵게 초록 강조. 섹션마다 border-left:3px solid #3ecf8e 카드 스타일.
-최하단에 GitHub 이슈 링크 포함.
-HTML body 내용만 반환 (body 태그 제외).
-
-PROMPTEOF
-          echo "$BRIEF" >> /tmp/email_prompt.md
+          {
+            printf '%s\n' "아래 CEO Brief를 HTML 이메일 body로 변환하세요."
+            printf '%s\n' "스타일: 배경 #0f0f0f, 카드 #1e1e1e, 강조색 #3ecf8e, 충돌은 #e07b3e."
+            printf '%s\n' "핵심 3가지는 굵게 초록 강조. 섹션마다 border-left:3px solid #3ecf8e 카드 스타일."
+            printf '%s\n' "최하단에 GitHub 이슈 링크 포함."
+            printf '%s\n' "HTML body 내용만 반환 (body 태그 제외)."
+            printf '%s\n' ""
+            echo "$BRIEF"
+          } > /tmp/email_prompt.md
 
       - name: Format and Send Email
         uses: actions/ai-inference@v1
