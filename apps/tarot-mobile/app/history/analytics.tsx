@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { Text } from "../../components/ui/Text";
 import { Colors, Spacing } from "../../constants/theme";
 import { apiFetch } from "../../lib/api";
+import { trackEvent } from "../../lib/tracking";
 
 interface AnalyticsData {
   totalDraws: number;
@@ -20,6 +21,7 @@ export default function AnalyticsScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    trackEvent("analytics_viewed");
     apiFetch<AnalyticsData>("/api/tarot/analytics")
       .then(setData)
       .catch(() => setData(null))
