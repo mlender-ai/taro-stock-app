@@ -22,7 +22,7 @@ permissions:
 jobs:
 
   pm:
-    if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'pm' || github.event_name == 'schedule' }}
+    if: ${{ always() && (github.event.inputs.agent == 'all' || github.event.inputs.agent == 'pm' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     outputs:
       proposal: ${{ steps.proposal.outputs.response }}
@@ -59,7 +59,8 @@ jobs:
             --repo "${{ github.repository }}"
 
   frontend:
-    if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'frontend' || github.event_name == 'schedule' }}
+    needs: [pm]
+    if: ${{ always() && (github.event.inputs.agent == 'all' || github.event.inputs.agent == 'frontend' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     outputs:
       proposal: ${{ steps.proposal.outputs.response }}
@@ -96,7 +97,8 @@ jobs:
             --repo "${{ github.repository }}"
 
   backend:
-    if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'backend' || github.event_name == 'schedule' }}
+    needs: [frontend]
+    if: ${{ always() && (github.event.inputs.agent == 'all' || github.event.inputs.agent == 'backend' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     outputs:
       proposal: ${{ steps.proposal.outputs.response }}
@@ -133,7 +135,8 @@ jobs:
             --repo "${{ github.repository }}"
 
   designer:
-    if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'designer' || github.event_name == 'schedule' }}
+    needs: [backend]
+    if: ${{ always() && (github.event.inputs.agent == 'all' || github.event.inputs.agent == 'designer' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     outputs:
       proposal: ${{ steps.proposal.outputs.response }}
@@ -169,7 +172,8 @@ jobs:
             --repo "${{ github.repository }}"
 
   qa:
-    if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'qa' || github.event_name == 'schedule' }}
+    needs: [designer]
+    if: ${{ always() && (github.event.inputs.agent == 'all' || github.event.inputs.agent == 'qa' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     outputs:
       proposal: ${{ steps.proposal.outputs.response }}
@@ -205,7 +209,8 @@ jobs:
             --repo "${{ github.repository }}"
 
   cto:
-    if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'cto' || github.event_name == 'schedule' }}
+    needs: [qa]
+    if: ${{ always() && (github.event.inputs.agent == 'all' || github.event.inputs.agent == 'cto' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     outputs:
       proposal: ${{ steps.proposal.outputs.response }}
@@ -241,7 +246,8 @@ jobs:
             --repo "${{ github.repository }}"
 
   marketer:
-    if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'marketer' || github.event_name == 'schedule' }}
+    needs: [cto]
+    if: ${{ always() && (github.event.inputs.agent == 'all' || github.event.inputs.agent == 'marketer' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     outputs:
       proposal: ${{ steps.proposal.outputs.response }}
@@ -278,7 +284,8 @@ jobs:
             --repo "${{ github.repository }}"
 
   security:
-    if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'security' || github.event_name == 'schedule' }}
+    needs: [marketer]
+    if: ${{ always() && (github.event.inputs.agent == 'all' || github.event.inputs.agent == 'security' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     outputs:
       proposal: ${{ steps.proposal.outputs.response }}
@@ -314,7 +321,8 @@ jobs:
             --repo "${{ github.repository }}"
 
   prompt_engineer:
-    if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'prompt_engineer' || github.event_name == 'schedule' }}
+    needs: [security]
+    if: ${{ always() && (github.event.inputs.agent == 'all' || github.event.inputs.agent == 'prompt_engineer' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     outputs:
       proposal: ${{ steps.proposal.outputs.response }}
