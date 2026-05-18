@@ -55,14 +55,13 @@ export default function ResultScreen() {
   const { result, reset } = useDrawStore();
   const { credits, isLoggedIn } = useUserStore();
   const { status: adStatus, errorMessage, load: loadAd, show: showAd, resetStatus } = useRewardedAd();
+  const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
+  const [feedbackSent, setFeedbackSent] = useState(false);
 
   if (!result) {
     router.replace("/(tabs)");
     return null;
   }
-
-  const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
-  const [feedbackSent, setFeedbackSent] = useState(false);
 
   const handleFeedback = async (rating: number) => {
     setFeedbackRating(rating);
