@@ -6,34 +6,32 @@ export default function PasswordInput() {
   const [show, setShow] = useState(false);
 
   return (
-    <div style={{ position: "relative", width: "100%" }}>
+    <div style={{ display: "flex", gap: "12px", width: "100%" }}>
       <input 
         name="password" 
         type={show ? "text" : "password"} 
         placeholder="Dashboard password" 
         required 
-        style={{ width: "100%", paddingRight: "40px" }}
+        style={{ flex: 1, minWidth: 0 }}
       />
       <button 
         type="button" 
         onClick={() => setShow(!show)}
         style={{ 
-          position: "absolute", 
-          right: "12px", 
-          top: "50%",
-          transform: "translateY(-50%)",
-          background: "transparent", 
-          border: "none", 
+          flexShrink: 0,
+          width: "50px",
+          background: "rgba(255, 255, 255, 0.05)", 
+          border: "1px solid rgba(255, 255, 255, 0.1)", 
+          borderRadius: "8px",
           cursor: "pointer",
-          fontSize: "18px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: 0,
-          margin: 0,
-          zIndex: 10
+          fontSize: "18px",
+          padding: 0
         }}
         tabIndex={-1}
+        title={show ? "비밀번호 숨기기" : "비밀번호 보기"}
       >
         {show ? "👁️" : "👁️‍🗨️"}
       </button>
