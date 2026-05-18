@@ -6,7 +6,7 @@ export default function PasswordInput() {
   const [show, setShow] = useState(false);
 
   return (
-    <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+    <div style={{ position: "relative", width: "100%" }}>
       <input 
         name="password" 
         type={show ? "text" : "password"} 
@@ -19,13 +19,21 @@ export default function PasswordInput() {
         onClick={() => setShow(!show)}
         style={{ 
           position: "absolute", 
-          right: "10px", 
-          background: "none", 
+          right: "12px", 
+          top: "50%",
+          transform: "translateY(-50%)",
+          background: "transparent", 
           border: "none", 
           cursor: "pointer",
-          fontSize: "16px",
-          color: "#999"
+          fontSize: "18px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 0,
+          margin: 0,
+          zIndex: 10
         }}
+        tabIndex={-1}
       >
         {show ? "👁️" : "👁️‍🗨️"}
       </button>

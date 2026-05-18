@@ -19,7 +19,7 @@ async function login(formData: FormData) {
     path: "/"
   });
 
-  redirect("/");
+  redirect("/admin");
 }
 
 export default function LoginPage({ searchParams }: { searchParams?: { error?: string } }) {
