@@ -84,9 +84,8 @@ export default function LoginScreen() {
           await loginWithApple();
           break;
         case "google":
-          // Google은 OAuth flow가 컴포넌트 훅 필요 → 임시 안내
           Alert.alert("준비 중", "Google 로그인은 EAS 빌드 후 사용 가능합니다.");
-          break;
+          return;
         case "kakao":
           await loginWithKakao();
           break;
@@ -94,16 +93,16 @@ export default function LoginScreen() {
           await loginWithNaver();
           break;
       }
-      router.replace("/(tabs)");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "로그인에 실패했습니다";
-      // 사용자 취소는 알림 없이 처리
       if (!msg.toLowerCase().includes("cancel") && !msg.toLowerCase().includes("취소")) {
         Alert.alert("로그인 실패", msg);
       }
-    } finally {
       setLoading(null);
+      return;
     }
+    setLoading(null);
+    router.replace("/(tabs)");
   }
 
   function handleSkip() {

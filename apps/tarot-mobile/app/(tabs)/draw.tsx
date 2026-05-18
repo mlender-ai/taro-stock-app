@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   SafeAreaView, View, TouchableOpacity, Animated,
   StyleSheet, ActivityIndicator, Alert,
@@ -43,9 +43,11 @@ interface ApiDrawResponse {
 
 function CardBack({ flipped, delay }: { flipped: boolean; delay: number }) {
   const anim = useRef(new Animated.Value(0)).current;
-  if (flipped) {
-    Animated.timing(anim, { toValue: 1, duration: 600, delay, useNativeDriver: true }).start();
-  }
+  useEffect(() => {
+    if (flipped) {
+      Animated.timing(anim, { toValue: 1, duration: 600, delay, useNativeDriver: true }).start();
+    }
+  }, [flipped]);
   const rotate = anim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "180deg"] });
   return (
     <Animated.View style={[styles.card, { transform: [{ rotateY: rotate }] }]}>

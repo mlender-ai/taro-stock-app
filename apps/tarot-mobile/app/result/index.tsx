@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   SafeAreaView, View, ScrollView, TouchableOpacity,
   StyleSheet, Animated, Alert,
@@ -57,6 +57,13 @@ export default function ResultScreen() {
   const { status: adStatus, errorMessage, load: loadAd, show: showAd, resetStatus } = useRewardedAd();
   const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
   const [feedbackSent, setFeedbackSent] = useState(false);
+
+  useEffect(() => {
+    if (adStatus === "earned") {
+      const t = setTimeout(resetStatus, 3000);
+      return () => clearTimeout(t);
+    }
+  }, [adStatus, resetStatus]);
 
   if (!result) {
     router.replace("/(tabs)");
