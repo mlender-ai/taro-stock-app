@@ -46,6 +46,16 @@ export interface MarketSnapshot {
   volume: number;
   rsi?: number;
   macd?: number;
+  macdSignal?: number;
+  macdHistogram?: number;
+  sma20?: number;
+  sma50?: number;
+  sma200?: number;
+  bbUpper?: number;
+  bbMiddle?: number;
+  bbLower?: number;
+  support20?: number;
+  resistance20?: number;
   sentimentScore?: number;
   condition: MarketCondition;
   summary: string;

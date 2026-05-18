@@ -1,16 +1,12 @@
 import type { MarketCondition, MarketSnapshot } from "@taro/core";
+import {
+  calculateRsi,
+  calculateMacd,
+  latestAverage,
+} from "@trading/shared/src/researchLive";
 
 const YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
 const USER_AGENT = "Mozilla/5.0 (compatible; TarotStockBot/1.0)";
-
-interface YahooQuote {
-  regularMarketPrice?: number;
-  regularMarketChangePercent?: number;
-  regularMarketVolume?: number;
-  shortName?: string;
-  longName?: string;
-  symbol?: string;
-}
 
 interface YahooChartResult {
   meta?: {
@@ -22,35 +18,77 @@ interface YahooChartResult {
   indicators?: {
     quote?: Array<{
       close?: Array<number | null>;
+      high?: Array<number | null>;
+      low?: Array<number | null>;
       volume?: Array<number | null>;
     }>;
   };
   timestamp?: number[];
 }
 
-function inferCondition(changePercent: number, rsi: number | undefined): MarketCondition {
-  if (rsi !== undefined) {
-    if (rsi >= 70) return "bullish";
-    if (rsi <= 30) return "bearish";
-  }
-  if (changePercent >= 3) return "bullish";
-  if (changePercent <= -3) return "bearish";
-  if (Math.abs(changePercent) <= 0.5) return "consolidating";
-  return "neutral";
+function calcBollingerBands(
+  closes: number[],
+  period = 20,
+  stdDev = 2
+): { upper: number; middle: number; lower: number } | null {
+  if (closes.length < period) return null;
+  const slice = closes.slice(-period);
+  const mean = slice.reduce((a, b) => a + b, 0) / period;
+  const variance = slice.reduce((sum, v) => sum + (v - mean) ** 2, 0) / period;
+  const sd = Math.sqrt(variance) * stdDev;
+  return { upper: mean + sd, middle: mean, lower: mean - sd };
 }
 
-function calcRsi(closes: number[], period = 14): number | undefined {
-  if (closes.length < period + 1) return undefined;
-  const recent = closes.slice(-period - 1);
-  let gains = 0, losses = 0;
-  for (let i = 1; i < recent.length; i++) {
-    const diff = (recent[i] ?? 0) - (recent[i - 1] ?? 0);
-    if (diff > 0) gains += diff;
-    else losses += Math.abs(diff);
+function inferCondition(
+  changePercent: number,
+  rsi: number | null,
+  macdHistogram: number | null,
+  price: number,
+  sma20: number | null,
+  bbUpper: number | null,
+  bbLower: number | null
+): MarketCondition {
+  let bullScore = 0;
+  let bearScore = 0;
+
+  // RSI
+  if (rsi !== null) {
+    if (rsi >= 70) bullScore += 2;
+    else if (rsi >= 55) bullScore += 1;
+    else if (rsi <= 30) bearScore += 2;
+    else if (rsi <= 45) bearScore += 1;
   }
-  if (losses === 0) return 100;
-  const rs = gains / losses;
-  return parseFloat((100 - 100 / (1 + rs)).toFixed(1));
+
+  // MACD histogram 방향
+  if (macdHistogram !== null) {
+    if (macdHistogram > 0) bullScore += 1;
+    else if (macdHistogram < 0) bearScore += 1;
+  }
+
+  // 가격 vs SMA20
+  if (sma20 !== null) {
+    if (price > sma20) bullScore += 1;
+    else bearScore += 1;
+  }
+
+  // 일간 등락률
+  if (changePercent >= 3) bullScore += 2;
+  else if (changePercent >= 1) bullScore += 1;
+  else if (changePercent <= -3) bearScore += 2;
+  else if (changePercent <= -1) bearScore += 1;
+
+  // 볼린저밴드 — 밴드 밖이면 volatile
+  if (bbUpper !== null && bbLower !== null) {
+    if (price > bbUpper || price < bbLower) return "volatile";
+  }
+
+  const net = bullScore - bearScore;
+  if (net >= 3) return "bullish";
+  if (net <= -3) return "bearish";
+  if (Math.abs(changePercent) <= 0.5 && Math.abs(net) <= 1) return "consolidating";
+  if (net > 0) return "bullish";
+  if (net < 0) return "bearish";
+  return "neutral";
 }
 
 export async function fetchMarketSnapshot(
@@ -62,7 +100,7 @@ export async function fetchMarketSnapshot(
     : ticker;
 
   const url = new URL(`${YAHOO_CHART_URL}/${encodeURIComponent(symbol)}`);
-  url.searchParams.set("range", "3mo");
+  url.searchParams.set("range", "1y");
   url.searchParams.set("interval", "1d");
   url.searchParams.set("includePrePost", "false");
 
@@ -78,15 +116,33 @@ export async function fetchMarketSnapshot(
   const result = payload.chart?.result?.[0];
   const meta = result?.meta;
   const quote = result?.indicators?.quote?.[0];
-  const timestamps = result?.timestamp ?? [];
 
   const closes = (quote?.close ?? []).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const highs = (quote?.high ?? []).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const lows = (quote?.low ?? []).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+
   const price = meta?.regularMarketPrice ?? closes[closes.length - 1] ?? 0;
   const prevClose = meta?.previousClose ?? (closes[closes.length - 2] ?? price);
   const changePercent = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
   const volume = meta?.regularMarketVolume ?? 0;
-  const rsi = calcRsi(closes);
-  const condition = inferCondition(changePercent, rsi);
+
+  // --- 기술적 지표 (researchLive.ts 함수 재사용) ---
+  const rsi = calculateRsi(closes, 14);
+  const macd = calculateMacd(closes);
+  const sma20 = latestAverage(closes, 20);
+  const sma50 = latestAverage(closes, 50);
+  const sma200 = latestAverage(closes, 200);
+  const bb = calcBollingerBands(closes);
+
+  // 지지/저항 (최근 20봉 기준)
+  const recentHighs = highs.slice(-20);
+  const recentLows = lows.slice(-20);
+  const support20 = recentLows.length > 0 ? Math.min(...recentLows) : undefined;
+  const resistance20 = recentHighs.length > 0 ? Math.max(...recentHighs) : undefined;
+
+  const condition = inferCondition(
+    changePercent, rsi, macd.histogram, price, sma20, bb?.upper ?? null, bb?.lower ?? null
+  );
 
   const conditionLabel: Record<MarketCondition, string> = {
     bullish: "강세",
@@ -105,6 +161,22 @@ export async function fetchMarketSnapshot(
     condition,
     summary: `${ticker} ${price.toLocaleString()} (${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%) — ${conditionLabel[condition]}`,
   };
-  if (rsi !== undefined) snapshot.rsi = rsi;
+
+  // optional 필드는 값 있을 때만 세팅
+  if (rsi !== null) snapshot.rsi = rsi;
+  if (macd.macd !== null) snapshot.macd = macd.macd;
+  if (macd.signal !== null) snapshot.macdSignal = macd.signal;
+  if (macd.histogram !== null) snapshot.macdHistogram = macd.histogram;
+  if (sma20 !== null) snapshot.sma20 = sma20;
+  if (sma50 !== null) snapshot.sma50 = sma50;
+  if (sma200 !== null) snapshot.sma200 = sma200;
+  if (bb) {
+    snapshot.bbUpper = bb.upper;
+    snapshot.bbMiddle = bb.middle;
+    snapshot.bbLower = bb.lower;
+  }
+  if (support20 !== undefined) snapshot.support20 = support20;
+  if (resistance20 !== undefined) snapshot.resistance20 = resistance20;
+
   return snapshot;
 }

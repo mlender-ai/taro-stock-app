@@ -879,7 +879,7 @@ async function attachImages(items: ResearchNewsItem[]): Promise<ResearchNewsItem
   }));
 }
 
-function average(values: number[]): number | null {
+export function average(values: number[]): number | null {
   if (values.length === 0) {
     return null;
   }
@@ -887,7 +887,7 @@ function average(values: number[]): number | null {
   return values.reduce((total, value) => total + value, 0) / values.length;
 }
 
-function latestAverage(values: number[], period: number): number | null {
+export function latestAverage(values: number[], period: number): number | null {
   if (values.length < period) {
     return null;
   }
@@ -895,7 +895,7 @@ function latestAverage(values: number[], period: number): number | null {
   return average(values.slice(-period));
 }
 
-function calculateEmaSeries(values: number[], period: number): Array<number | null> {
+export function calculateEmaSeries(values: number[], period: number): Array<number | null> {
   if (values.length === 0) {
     return [];
   }
@@ -928,7 +928,7 @@ function calculateEmaSeries(values: number[], period: number): Array<number | nu
   return series;
 }
 
-function calculateRsi(values: number[], period = 14): number | null {
+export function calculateRsi(values: number[], period = 14): number | null {
   if (values.length <= period) {
     return null;
   }
@@ -980,7 +980,7 @@ function calculateRsi(values: number[], period = 14): number | null {
   return 100 - 100 / (1 + rs);
 }
 
-function calculateMacd(values: number[]): { macd: number | null; signal: number | null; histogram: number | null } {
+export function calculateMacd(values: number[]): { macd: number | null; signal: number | null; histogram: number | null } {
   const fastSeries = calculateEmaSeries(values, 12);
   const slowSeries = calculateEmaSeries(values, 26);
   const macdSeries = values.map((_, index) => {
