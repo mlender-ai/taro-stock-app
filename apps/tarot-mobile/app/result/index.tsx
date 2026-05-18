@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import {
   SafeAreaView, View, ScrollView, TouchableOpacity,
   StyleSheet, Animated, Alert,
@@ -10,6 +10,7 @@ import { Colors, Spacing, Radius } from "../../constants/theme";
 import { useDrawStore, type DrawnCard } from "../../lib/drawStore";
 import { useRewardedAd } from "../../lib/ads/useRewardedAd";
 import { useUserStore } from "../../lib/store";
+import { apiFetch } from "../../lib/api";
 
 const DISCLAIMER = "본 해석은 오락 목적으로 제공되며 투자 조언이 아닙니다. 투자 결정은 본인의 판단과 책임 하에 이루어져야 합니다.";
 
@@ -58,6 +59,48 @@ export default function ResultScreen() {
     router.replace("/(tabs)");
     return null;
   }
+
+  const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
+  const [feedbackSent, setFeedbackSent] = useState(false);
+
+  const handleFeedback = async (rating: number) => {
+    setFeedbackRating(rating);
+    if (!isLoggedIn || !result.id) return;
+    try {
+      const ratingMap = ["ONE", "TWO", "THREE", "FOUR", "FIVE"] as const;
+      await apiFetch("/api/tarot/feedback", {
+        method: "POST",
+        body: JSON.stringify({ drawId: result.id, rating: ratingMap[rating - 1] }),
+      });
+      setFeedbackSent(true);
+    } catch {}
+  };
+
+  const handleReport = () => {
+    if (!isLoggedIn || !result.id) return;
+    Alert.alert(
+      "부적절한 해석 신고",
+      "이 해석이 투자 조언을 포함하거나 부적절한 내용이 있나요?",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "신고하기",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await apiFetch("/api/tarot/report", {
+                method: "POST",
+                body: JSON.stringify({ drawId: result.id, reason: "부적절한 해석 콘텐츠" }),
+              });
+              Alert.alert("신고 완료", "검토 후 조치하겠습니다");
+            } catch {
+              Alert.alert("오류", "신고에 실패했습니다");
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleDrawAgain = () => {
     reset();
@@ -123,6 +166,35 @@ export default function ResultScreen() {
           </Text>
         </View>
 
+        {/* 피드백 + 신고 */}
+        {isLoggedIn && (
+          <View style={styles.feedbackSection}>
+            <Text variant="body-sm" color={Colors.silverHighlight} style={styles.feedbackTitle}>
+              {feedbackSent ? "감사합니다!" : "이 해석이 도움이 됐나요?"}
+            </Text>
+            <View style={styles.starRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity
+                  key={star}
+                  onPress={() => handleFeedback(star)}
+                  disabled={feedbackSent}
+                  style={styles.starBtn}
+                >
+                  <Text style={[
+                    styles.starText,
+                    feedbackRating !== null && star <= feedbackRating && styles.starActive,
+                  ]}>
+                    {feedbackRating !== null && star <= feedbackRating ? "★" : "☆"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity onPress={handleReport} style={styles.reportBtn}>
+              <Text variant="caption" color={Colors.ironOutline}>부적절한 해석 신고</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* 리워드 광고 */}
         {isLoggedIn && (
           <View style={styles.rewardSection}>
@@ -172,6 +244,13 @@ const styles = StyleSheet.create({
   detail:         { color: Colors.midGrayText, lineHeight: 22 },
   disclaimer:     { backgroundColor: Colors.steelSurface, borderRadius: 10, padding: Spacing.s16, marginBottom: Spacing.s24, borderWidth: 1, borderColor: Colors.carbonBorder },
   disclaimerText: { lineHeight: 18 },
+  feedbackSection: { marginBottom: Spacing.s24, alignItems: "center", gap: 8 },
+  feedbackTitle:  { textAlign: "center" },
+  starRow:        { flexDirection: "row", gap: 8 },
+  starBtn:        { padding: 4 },
+  starText:       { fontSize: 28, color: Colors.ironOutline },
+  starActive:     { color: Colors.taroEssence },
+  reportBtn:      { marginTop: 4, padding: 4 },
   rewardSection:  { marginBottom: Spacing.s24, gap: 8 },
   rewardTitle:    { textAlign: "center", marginBottom: 4 },
   creditBadge:    { borderWidth: 1, borderColor: Colors.deepInsight, borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 4 },
