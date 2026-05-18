@@ -51,9 +51,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          printf '%s' "${{ steps.proposal.outputs.response }}" > /tmp/body.md
           gh issue create \
             --title "[PM] $(date '+%Y-%m-%d') 제품 개선 제안" \
-            --body "${{ steps.proposal.outputs.response }}" \
+            --body-file /tmp/body.md \
             --label "idea,agent-council,pm" \
             --repo "${{ github.repository }}"
 
@@ -87,9 +88,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          printf '%s' "${{ steps.proposal.outputs.response }}" > /tmp/body.md
           gh issue create \
             --title "[Frontend] $(date '+%Y-%m-%d') 모바일 UX 개선 제안" \
-            --body "${{ steps.proposal.outputs.response }}" \
+            --body-file /tmp/body.md \
             --label "idea,agent-council,frontend,mobile" \
             --repo "${{ github.repository }}"
 
@@ -123,9 +125,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          printf '%s' "${{ steps.proposal.outputs.response }}" > /tmp/body.md
           gh issue create \
             --title "[Backend] $(date '+%Y-%m-%d') API/인프라 개선 제안" \
-            --body "${{ steps.proposal.outputs.response }}" \
+            --body-file /tmp/body.md \
             --label "idea,agent-council,backend" \
             --repo "${{ github.repository }}"
 
@@ -158,9 +161,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          printf '%s' "${{ steps.proposal.outputs.response }}" > /tmp/body.md
           gh issue create \
             --title "[Designer] $(date '+%Y-%m-%d') UX/UI 개선 제안" \
-            --body "${{ steps.proposal.outputs.response }}" \
+            --body-file /tmp/body.md \
             --label "idea,agent-council,design" \
             --repo "${{ github.repository }}"
 
@@ -193,9 +197,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          printf '%s' "${{ steps.proposal.outputs.response }}" > /tmp/body.md
           gh issue create \
             --title "[QA] $(date '+%Y-%m-%d') 품질 개선 제안" \
-            --body "${{ steps.proposal.outputs.response }}" \
+            --body-file /tmp/body.md \
             --label "idea,agent-council,qa" \
             --repo "${{ github.repository }}"
 
@@ -228,9 +233,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          printf '%s' "${{ steps.proposal.outputs.response }}" > /tmp/body.md
           gh issue create \
             --title "[CTO] $(date '+%Y-%m-%d') 기술 부채 개선 제안" \
-            --body "${{ steps.proposal.outputs.response }}" \
+            --body-file /tmp/body.md \
             --label "idea,agent-council,cto,tech-debt" \
             --repo "${{ github.repository }}"
 
@@ -264,9 +270,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          printf '%s' "${{ steps.proposal.outputs.response }}" > /tmp/body.md
           gh issue create \
             --title "[Marketer] $(date '+%Y-%m-%d') 성장 전략 제안" \
-            --body "${{ steps.proposal.outputs.response }}" \
+            --body-file /tmp/body.md \
             --label "idea,agent-council,marketing" \
             --repo "${{ github.repository }}"
 
@@ -299,9 +306,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          printf '%s' "${{ steps.proposal.outputs.response }}" > /tmp/body.md
           gh issue create \
             --title "[Security] $(date '+%Y-%m-%d') 보안 점검 제안" \
-            --body "${{ steps.proposal.outputs.response }}" \
+            --body-file /tmp/body.md \
             --label "idea,agent-council,security" \
             --repo "${{ github.repository }}"
 
@@ -334,9 +342,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          printf '%s' "${{ steps.proposal.outputs.response }}" > /tmp/body.md
           gh issue create \
             --title "[Prompt Engineer] $(date '+%Y-%m-%d') AI 해석 품질 개선 제안" \
-            --body "${{ steps.proposal.outputs.response }}" \
+            --body-file /tmp/body.md \
             --label "idea,agent-council,prompt" \
             --repo "${{ github.repository }}"
 
@@ -381,9 +390,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          printf '%s' "${{ steps.brief.outputs.response }}" > /tmp/ceo_body.md
           URL=$(gh issue create \
             --title "📋 [CEO Brief] $(date '+%Y-%m-%d') 일일 에이전트 브리핑" \
-            --body "${{ steps.brief.outputs.response }}" \
+            --body-file /tmp/ceo_body.md \
             --label "ceo-brief,agent-council,daily" \
             --repo "${{ github.repository }}")
           echo "issue_url=$URL" >> $GITHUB_OUTPUT
