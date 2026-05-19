@@ -13,8 +13,9 @@
 - **KR2**: Google Play Store 등록 완료 (2026-06-30)
 - **KR3**: 출시 차단 이슈 0개 유지 (법적, 기술적, 정책적)
 - **KR4**: 프로덕션 환경 분리 완료 (AdMob, 환경변수, 빌드 프로필)
+- **KR5**: AI 해석 결과에 투자 조언성 표현 0건 (가격·수치·매수매도 언급 금지, 자동 안전 검사 통과율 100%)
 
-**관련 에이전트**: CTO, Security, QA, Frontend
+**관련 에이전트**: CTO, Security, QA, Frontend, Prompt Engineer, Content
 
 ---
 

@@ -7,3 +7,4 @@ export { getFallbackInterpretation } from "./fallback/templates.js";
 export { buildInterpretationPrompt, PROMPT_VERSION } from "./prompts/interpret-v1.0.0.js";
 export { buildInterpretationPromptV1_1, PROMPT_VERSION_1_1 } from "./prompts/interpret-v1.1.0.js";
 export { buildInterpretationPromptV2_0, PROMPT_VERSION_2_0 } from "./prompts/interpret-v2.0.0.js";
+export { buildInterpretationPromptV2_1, PROMPT_VERSION_2_1 } from "./prompts/interpret-v2.1.0.js";
