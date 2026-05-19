@@ -799,6 +799,24 @@ jobs:
             --body-file /tmp/ceo_body.md \
             --label "ceo-brief,agent-council,daily"
 
+      - name: Get today date
+        id: today
+        run: echo "date=$(TZ=Asia/Seoul date '+%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
+      - name: Send CEO Brief Email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "📋 [CEO Brief] ${{ steps.today.outputs.date }} 일일 에이전트 브리핑"
+          to: ${{ secrets.REPORT_EMAIL }}
+          from: "Trading Taro 에이전트 카운슬 <${{ secrets.SMTP_USERNAME }}>"
+          convert_markdown: true
+          body: ${{ steps.brief.outputs.response }}
+
   # ═══════════════════════════════════════════════════
   # Verdict — CEO 판정 파싱 + 라벨링 + 에이전트 반론
   # ═══════════════════════════════════════════════════
