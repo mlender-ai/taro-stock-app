@@ -20,7 +20,7 @@ permissions:
   models: read
 
 env:
-  AI_MODEL: openai/gpt-4o
+  AI_MODEL: gpt-4o
   AI_API_URL: https://models.inference.ai.azure.com/chat/completions
   AI_MAX_RETRIES: 3
   AI_RETRY_DELAY: 45
