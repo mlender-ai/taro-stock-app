@@ -461,6 +461,8 @@ jobs:
       always() &&
       (github.event.inputs.agent == 'all' || github.event_name == 'schedule')
     runs-on: ubuntu-latest
+    outputs:
+      brief: ${{ steps.brief.outputs.response }}
     steps:
       - uses: actions/checkout@v4
       - name: "[CEO] 에이전트 브리핑 종합 + 교차 검증"
@@ -582,3 +584,180 @@ jobs:
             --title "📋 [CEO Brief] $(TZ=Asia/Seoul date '+%Y-%m-%d') 일일 에이전트 브리핑" \
             --body-file /tmp/ceo_body.md \
             --label "ceo-brief,agent-council,daily"
+
+  # ═══════════════════════════════════════════════════
+  # Verdict — CEO 판정 파싱 + 라벨링 + 에이전트 반론
+  # ═══════════════════════════════════════════════════
+
+  process_verdicts:
+    needs: [ceo_brief]
+    if: >-
+      always() && needs.ceo_brief.result == 'success' &&
+      (github.event.inputs.agent == 'all' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── 1. CEO 브리프에서 판정 JSON 추출 ──────────────────
+      - name: Parse verdicts from CEO brief
+        id: verdicts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CEO_BRIEF: ${{ needs.ceo_brief.outputs.brief }}
+        run: |
+          source .github/scripts/ai-inference.sh
+
+          SYSTEM="당신은 CEO 브리프를 파싱하는 도구입니다. 순수 JSON만 반환하세요. 마크다운이나 설명 없이 JSON만."
+
+          PROMPT="아래 CEO 브리프에서 각 에이전트의 판정을 추출하세요.
+
+          반환 형식 (JSON만, 다른 텍스트 없이):
+          {
+            \"pm\": {\"verdict\": \"approved|deferred|killed\", \"reason\": \"한줄 사유\"},
+            \"frontend\": {\"verdict\": \"...\", \"reason\": \"...\"},
+            \"backend\": {\"verdict\": \"...\", \"reason\": \"...\"},
+            \"designer\": {\"verdict\": \"...\", \"reason\": \"...\"},
+            \"qa\": {\"verdict\": \"...\", \"reason\": \"...\"},
+            \"cto\": {\"verdict\": \"...\", \"reason\": \"...\"},
+            \"marketer\": {\"verdict\": \"...\", \"reason\": \"...\"},
+            \"security\": {\"verdict\": \"...\", \"reason\": \"...\"},
+            \"prompt_engineer\": {\"verdict\": \"...\", \"reason\": \"...\"}
+          }
+
+          판정 기준:
+          - ✅ 채택 → approved
+          - ⏸️ 보류 → deferred
+          - ❌ 거부 / Kill list → killed
+
+          CEO 브리프:
+          ${CEO_BRIEF}"
+
+          RESULT=$(ai_inference "$SYSTEM" "$PROMPT" 1000)
+          # JSON 블록만 추출 (```json ... ``` 래핑 제거)
+          CLEAN=$(echo "$RESULT" | sed 's/^```json//' | sed 's/^```//' | sed 's/```$//' | tr -d '\n')
+          echo "$CLEAN" | jq . > /tmp/verdicts.json 2>/dev/null || echo '{}' > /tmp/verdicts.json
+
+          { echo "json<<__VEOF__"; cat /tmp/verdicts.json; echo "__VEOF__"; } >> "$GITHUB_OUTPUT"
+
+      # ── 2. 오늘 에이전트 이슈에 라벨 부여 ────────────────
+      - name: Label agent issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERDICTS: ${{ steps.verdicts.outputs.json }}
+        run: |
+          TODAY=$(TZ=Asia/Seoul date '+%Y-%m-%d')
+
+          declare -A AGENT_LABELS=(
+            [pm]="agent-council,pm"
+            [frontend]="agent-council,frontend"
+            [backend]="agent-council,backend"
+            [designer]="agent-council,design"
+            [qa]="agent-council,qa"
+            [cto]="agent-council,cto"
+            [marketer]="agent-council,marketing"
+            [security]="agent-council,security"
+            [prompt_engineer]="agent-council,prompt"
+          )
+
+          for agent in pm frontend backend designer qa cto marketer security prompt_engineer; do
+            verdict=$(echo "$VERDICTS" | jq -r ".${agent}.verdict // \"deferred\"")
+            reason=$(echo "$VERDICTS" | jq -r ".${agent}.reason // \"판정 미확인\"")
+
+            # 오늘 날짜가 포함된 해당 에이전트의 이슈 찾기
+            ISSUE_NUM=$(gh issue list \
+              --label "${AGENT_LABELS[$agent]}" \
+              --state open \
+              --limit 5 \
+              --json number,title \
+              --jq "[.[] | select(.title | contains(\"$TODAY\"))] | .[0].number // empty")
+
+            if [ -z "$ISSUE_NUM" ]; then
+              echo "::notice::$agent: 오늘 이슈 없음, 스킵"
+              continue
+            fi
+
+            case "$verdict" in
+              approved)
+                gh issue edit "$ISSUE_NUM" --add-label "ceo-approved"
+                gh issue comment "$ISSUE_NUM" --body "✅ **CEO 채택**: $reason"
+                ;;
+              deferred)
+                gh issue edit "$ISSUE_NUM" --add-label "ceo-deferred"
+                gh issue comment "$ISSUE_NUM" --body "⏸️ **CEO 보류**: $reason"
+                ;;
+              killed)
+                gh issue edit "$ISSUE_NUM" --add-label "ceo-killed"
+                gh issue comment "$ISSUE_NUM" --body "❌ **CEO 거부**: $reason
+
+          ---
+          > 💬 이 판정에 동의하지 않는 에이전트는 아래에 반론을 제출합니다."
+                # killed 이슈 번호 저장 (반론용)
+                echo "${agent}=${ISSUE_NUM}" >> /tmp/killed_issues.env
+                ;;
+            esac
+            echo "::notice::$agent #$ISSUE_NUM → $verdict"
+          done
+
+          # 반론 대상 목록을 output으로 전달
+          if [ -f /tmp/killed_issues.env ]; then
+            { echo "killed<<__KEOF__"; cat /tmp/killed_issues.env; echo "__KEOF__"; } >> "$GITHUB_OUTPUT"
+          else
+            echo "killed=" >> "$GITHUB_OUTPUT"
+          fi
+        id: labeling
+
+      # ── 3. 킬된 에이전트 반론 (rebuttal) ─────────────────
+      - name: Agent rebuttals
+        if: steps.labeling.outputs.killed != ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          VERDICTS: ${{ steps.verdicts.outputs.json }}
+          KILLED_LIST: ${{ steps.labeling.outputs.killed }}
+        run: |
+          source .github/scripts/ai-inference.sh
+
+          declare -A AGENT_ROLES=(
+            [pm]="Product Manager"
+            [frontend]="프런트엔드 개발자"
+            [backend]="백엔드 개발자"
+            [designer]="UI/UX 디자이너"
+            [qa]="QA 엔지니어"
+            [cto]="CTO"
+            [marketer]="그로스 마케터"
+            [security]="보안 담당자"
+            [prompt_engineer]="프롬프트 엔지니어"
+          )
+
+          echo "$KILLED_LIST" | while IFS='=' read -r agent issue_num; do
+            [ -z "$agent" ] && continue
+            [ -z "$issue_num" ] && continue
+
+            reason=$(echo "$VERDICTS" | jq -r ".${agent}.reason // \"사유 없음\"")
+            role="${AGENT_ROLES[$agent]}"
+
+            SYSTEM="당신은 타로 증권 앱의 ${role}입니다.
+          CEO가 당신의 제안을 거부했습니다. 당신은 반론할 기회가 있습니다.
+          단, 반론은 CEO의 판단 기준(출시 차단 > 법적 리스크 > 핵심 UX > 수익화 > 백로그)을 존중해야 합니다.
+          감정적이지 않고 데이터/근거 기반으로 반론하세요.
+          CEO가 맞다고 생각하면 솔직히 수긍하세요."
+
+            PROMPT="CEO 거부 사유: ${reason}
+
+          아래 형식으로 반론하세요 (200자 이내):
+
+          ## 🔄 에이전트 반론
+
+          **수긍/반론**: (CEO 판단에 동의 or 반론)
+          **근거**: (왜 이것이 지금 필요한지 구체적 데이터나 리스크)
+          **절충안**: (있다면, 더 작은 스코프로 이번 주 실행 가능한 방법)"
+
+            REBUTTAL=$(ai_inference "$SYSTEM" "$PROMPT" 500)
+
+            if echo "$REBUTTAL" | grep -qi "수긍\|동의\|CEO.*맞"; then
+              gh issue comment "$issue_num" --body "$(printf '%s\n\n---\n🏷️ *에이전트가 CEO 판정을 수긍했습니다. 자동 종료 대상.*' "$REBUTTAL")"
+            else
+              gh issue comment "$issue_num" --body "$REBUTTAL"
+              gh issue edit "$issue_num" --add-label "agent-rebuttal"
+              echo "::warning::$agent #$issue_num: 에이전트가 반론 제출 — 수동 검토 필요"
+            fi
+          done
