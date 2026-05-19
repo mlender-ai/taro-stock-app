@@ -441,9 +441,21 @@ jobs:
         id: email_html
         with:
           model: openai/gpt-4o
-          system-prompt: |
-            당신은 CEO 비서 AI입니다. 브리핑을 모바일 최적화 HTML 이메일로 변환합니다.
+          system-prompt: "당신은 CEO 비서 AI입니다. 순수 HTML만 반환하세요. ```html 코드블록 절대 사용 금지. <html><head><body> 태그 없이 컨텐츠만 반환."
           prompt-file: /tmp/email_prompt.md
+
+      - name: Strip codeblock and save HTML
+        env:
+          EMAIL_RAW: ${{ steps.email_html.outputs.response }}
+        run: |
+          echo "$EMAIL_RAW" \
+            | sed 's/^```html[[:space:]]*//' \
+            | sed 's/^```[[:space:]]*//' \
+            | sed 's/[[:space:]]*```$//' \
+            > /tmp/email_body.html
+          TODAY=$(TZ=Asia/Seoul date '+%Y-%m-%d')
+          echo "TODAY=$TODAY" >> "$GITHUB_ENV"
+
       - name: Send Email via Gmail
         uses: dawidd6/action-send-mail@v3
         with:
@@ -452,7 +464,7 @@ jobs:
           secure: true
           username: ${{ secrets.SMTP_USERNAME }}
           password: ${{ secrets.SMTP_PASSWORD }}
-          subject: "☀️ [CEO Brief] $(date '+%Y-%m-%d') 일일 에이전트 브리핑"
+          subject: "☀️ [CEO Brief] ${{ env.TODAY }} 일일 에이전트 브리핑"
           to: ${{ secrets.REPORT_EMAIL }}
           from: "Trading Taro 에이전트 카운슬 <${{ secrets.SMTP_USERNAME }}>"
-          html_body: ${{ steps.email_html.outputs.response }}
+          html_body: file:///tmp/email_body.html
