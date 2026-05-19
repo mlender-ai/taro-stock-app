@@ -77,13 +77,14 @@ export async function purchaseAndVerify(pkg: CreditPackage): Promise<PurchaseRes
   const latestTx = transactions[transactions.length - 1];
   const purchaseToken = latestTx?.transactionIdentifier ?? customerInfo.originalAppUserId;
 
-  // 3. 서버에 영수증 검증 요청
+  // 3. 서버에 영수증 검증 요청 (idempotencyKey는 purchaseToken만으로 결정 — Date.now() 제외)
   const result = await apiFetch<PurchaseResult>("/api/tarot/credits/purchase", {
     method: "POST",
     body: JSON.stringify({
       productId: pkg.productId,
       purchaseToken,
-      idempotencyKey: `iap_${purchaseToken}_${Date.now()}`,
+      idempotencyKey: `iap_${purchaseToken}`,
+      platform: Platform.OS === "ios" ? "ios" : "android",
     }),
   });
 

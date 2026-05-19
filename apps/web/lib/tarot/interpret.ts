@@ -77,17 +77,24 @@ export async function generateInterpretation(
   cards: DrawnCard[],
   spread: TarotSpreadType,
   cacheKey: string,
-  cacheTtlMs: number
+  cacheTtlMs: number,
+  preloaded?: ParsedInterpretation
 ): Promise<TarotInterpretation> {
   const now = Date.now();
 
-  // 2차: 캐시 히트
+  // 1차: DB에서 넘어온 사전 캐시 (LLM 비용 0, 응답 즉시)
+  if (preloaded) {
+    interpretationCache.set(cacheKey, { data: preloaded, expiresAt: now + cacheTtlMs });
+    return buildResult(drawId, market, cards, spread, preloaded, "cache");
+  }
+
+  // 2차: in-memory 캐시 히트
   const cached = interpretationCache.get(cacheKey);
   if (cached && cached.expiresAt > now) {
     return buildResult(drawId, market, cards, spread, cached.data, "cache");
   }
 
-  // 1차: LLM 호출
+  // 3차: LLM 호출
   try {
     const prompt = buildInterpretationPromptV2_1(market, cards);
     const raw = await callLlm(prompt);
@@ -103,7 +110,7 @@ export async function generateInterpretation(
     interpretationCache.set(cacheKey, { data: parsed, expiresAt: now + cacheTtlMs });
     return buildResult(drawId, market, cards, spread, parsed, "llm");
   } catch (err) {
-    // 3차: 프리빌트 폴백 (사용자에게 폴백 여부 노출 안 함)
+    // 4차: 프리빌트 폴백 (사용자에게 폴백 여부 노출 안 함)
     console.warn("[tarot/interpret] falling back:", err instanceof Error ? err.message : err);
     const primaryCard = cards[0];
     if (!primaryCard) throw new Error("No cards drawn");

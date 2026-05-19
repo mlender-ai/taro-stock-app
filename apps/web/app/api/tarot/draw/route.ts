@@ -69,16 +69,27 @@ export async function POST(req: NextRequest) {
   // 카드 뽑기
   const drawnCards = drawCards(spread, marketSnapshot.condition);
 
-  // AI 해석 (3단 폴백)
+  // AI 해석 (4단 폴백) — DB 캐시 → in-memory 캐시 → LLM → 프리빌트 폴백
   const cacheKey = buildCacheKey(ticker, spread, drawnCards, marketSnapshot.condition);
   const cacheTtlMs = getCacheTtlMs(marketSnapshot.condition);
+
+  // DB 캐시: 동일 cacheKey의 최근 결과 재사용 (LLM 호출 생략, 응답 시간 대폭 단축)
+  const dbCached = await prisma.tarotDrawHistory.findFirst({
+    where: { cacheKey, createdAt: { gte: new Date(Date.now() - cacheTtlMs) } },
+    orderBy: { createdAt: "desc" },
+    select: { headline: true, summary: true, detail: true },
+  });
+
   const interpretation = await generateInterpretation(
     idempotencyKey,
     marketSnapshot,
     drawnCards,
     spread,
     cacheKey,
-    cacheTtlMs
+    cacheTtlMs,
+    dbCached
+      ? { headline: dbCached.headline, summary: dbCached.summary, detail: dbCached.detail ?? "" }
+      : undefined
   );
 
   // DB 저장
