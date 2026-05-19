@@ -5,11 +5,6 @@ import { Text } from "../../components/ui/Text";
 import { Colors, Spacing } from "../../constants/theme";
 import { useHistoryStore } from "../../lib/historyStore";
 
-// 목업 상세 데이터
-const MOCK_DETAIL: Record<string, any> = {
-  "1": { id: "1", ticker: "AAPL", market: "US", spread: "SINGLE", headline: "새로운 시작의 기운이 감지됩니다", summary: "시장은 새로운 사이클의 초입에 있습니다. 혁신을 향한 과감한 첫 걸음이 필요합니다.", detail: "광대 카드는 순수한 가능성과 새로운 출발을 상징합니다. Apple은 현재 다음 혁신의 문턱에 서 있으며, 이 시점에서의 접근은 높은 불확실성을 수반하지만 동시에 큰 기회를 내포합니다.", source: "LLM", creditCost: 1, createdAt: new Date(Date.now() - 3600000).toISOString(), feedbacks: [], cards: [{ cardId: "fool", orientation: "upright", slot: null, position: 0, card: { number: 0, name: "The Fool", nameKo: "광대", meaningUpright: "새로운 시작, 순수한 가능성, 모험", meaningReversed: "무모함, 준비 부족, 경솔함", keywordsKo: ["시작", "가능성", "모험"], keywords: ["beginning", "potential", "adventure"] } }] },
-  "2": { id: "2", ticker: "NVDA", market: "US", spread: "THREE_CARD", headline: "급격한 변화와 재편의 시기입니다", summary: "AI 혁명의 중심에서 극적인 변화가 예고됩니다. 기존 질서의 붕괴 이후 새로운 균형점을 찾는 과정.", detail: "역방향 탑은 파국을 피한 변화를 암시합니다. NVDA의 급격한 상승 이후 조정 국면이 예상되나 그 폭은 제한적일 것입니다. AI 섹터의 장기적 성장 스토리는 여전히 유효합니다.", source: "LLM", creditCost: 3, createdAt: new Date(Date.now() - 86400000).toISOString(), feedbacks: [], cards: [{ cardId: "tower", orientation: "reversed", slot: "past", position: 0, card: { number: 16, name: "The Tower", nameKo: "탑", meaningUpright: "급격한 변화, 파국, 붕괴", meaningReversed: "피할 수 있는 재앙, 제한적 변화", keywordsKo: ["변화", "충격", "재편"], keywords: ["change", "shock", "disruption"] } }, { cardId: "star", orientation: "upright", slot: "present", position: 1, card: { number: 17, name: "The Star", nameKo: "별", meaningUpright: "희망, 회복, 영감", meaningReversed: "실망, 비현실적 기대", keywordsKo: ["희망", "회복", "영감"], keywords: ["hope", "recovery", "inspiration"] } }, { cardId: "world", orientation: "upright", slot: "future", position: 2, card: { number: 21, name: "The World", nameKo: "세계", meaningUpright: "완성, 통합, 성취", meaningReversed: "미완성, 지연", keywordsKo: ["완성", "성취", "통합"], keywords: ["completion", "achievement", "integration"] } }] },
-};
 
 function slotLabel(slot: string | null) {
   if (slot === "past") return "과거";
@@ -27,13 +22,13 @@ export default function HistoryDetailScreen() {
   const router = useRouter();
   const { detail, detailLoading, fetchDetail } = useHistoryStore();
 
-  const data = MOCK_DETAIL[id as string] ?? detail;
+  const data = detail;
 
   useEffect(() => {
-    if (id && !MOCK_DETAIL[id as string]) fetchDetail(id as string);
+    if (id) fetchDetail(id as string);
   }, [id]);
 
-  if ((detailLoading && !data)) {
+  if (detailLoading && !data) {
     return (
       <SafeAreaView style={styles.container}>
         <ActivityIndicator color={Colors.taroEssence} style={{ marginTop: 60 }} />

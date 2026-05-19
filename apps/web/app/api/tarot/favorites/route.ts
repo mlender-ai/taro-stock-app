@@ -1,89 +1,71 @@
 import { NextResponse } from "next/server";
-import { prisma } from "../../../../lib/prisma";
+import { prisma } from "@/lib/tarot/prisma";
+import { requireAuth } from "@/lib/tarot/auth-api";
+import type { TarotMarket } from "@prisma/client";
 
-// 관심 종목 목록 조회
 export async function GET(request: Request) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
+
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "userId is required", code: "MISSING_USER_ID" },
-        { status: 400 }
-      );
-    }
-
     const favorites = await prisma.tarotFavorite.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
     });
-
     return NextResponse.json({ items: favorites });
   } catch (error) {
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Fetch failed",
-        code: "FETCH_FAILED",
-      },
+      { error: error instanceof Error ? error.message : "Fetch failed", code: "FETCH_FAILED" },
       { status: 500 }
     );
   }
 }
 
-// 관심 종목 추가
 export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const { userId, ticker, market, label } = body;
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
 
-    if (!userId || !ticker || !market) {
+  try {
+    const body = await request.json() as { ticker?: string; market?: string; label?: string };
+    const { ticker, label } = body;
+    const market = body.market as TarotMarket | undefined;
+
+    if (!ticker || !market) {
       return NextResponse.json(
-        {
-          error: "userId, ticker, and market are required",
-          code: "MISSING_FIELDS",
-        },
+        { error: "ticker and market are required", code: "MISSING_FIELDS" },
         { status: 400 }
       );
     }
 
     const favorite = await prisma.tarotFavorite.upsert({
       where: { userId_ticker: { userId, ticker } },
-      create: {
-        userId,
-        ticker,
-        market,
-        label: label ?? null,
-        alertEnabled: false,
-      },
-      update: {
-        label: label ?? undefined,
-        market,
-      },
+      create: { userId, ticker, market, label: label ?? null, alertEnabled: false },
+      update: { market, ...(label !== undefined ? { label } : {}) },
     });
 
     return NextResponse.json(favorite, { status: 201 });
   } catch (error) {
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Create failed",
-        code: "CREATE_FAILED",
-      },
+      { error: error instanceof Error ? error.message : "Create failed", code: "CREATE_FAILED" },
       { status: 500 }
     );
   }
 }
 
-// 관심 종목 삭제
 export async function DELETE(request: Request) {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  const userId = auth;
+
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
     const ticker = searchParams.get("ticker");
 
-    if (!userId || !ticker) {
+    if (!ticker) {
       return NextResponse.json(
-        { error: "userId and ticker are required", code: "MISSING_FIELDS" },
+        { error: "ticker is required", code: "MISSING_FIELDS" },
         { status: 400 }
       );
     }
@@ -95,10 +77,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Delete failed",
-        code: "DELETE_FAILED",
-      },
+      { error: error instanceof Error ? error.message : "Delete failed", code: "DELETE_FAILED" },
       { status: 500 }
     );
   }

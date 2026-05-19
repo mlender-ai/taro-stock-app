@@ -16,14 +16,9 @@ interface FavoritesState {
   loading: boolean;
   pushToken: string | null;
 
-  fetchFavorites: (userId: string) => Promise<void>;
-  addFavorite: (
-    userId: string,
-    ticker: string,
-    market: string,
-    label?: string
-  ) => Promise<void>;
-  removeFavorite: (userId: string, ticker: string) => Promise<void>;
+  fetchFavorites: () => Promise<void>;
+  addFavorite: (ticker: string, market: string, label?: string) => Promise<void>;
+  removeFavorite: (ticker: string) => Promise<void>;
   toggleAlert: (id: string, enabled: boolean) => Promise<void>;
   isFavorite: (ticker: string) => boolean;
 
@@ -36,23 +31,21 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
   loading: false,
   pushToken: null,
 
-  fetchFavorites: async (userId) => {
+  fetchFavorites: async () => {
     set({ loading: true });
     try {
-      const data = await apiFetch<{ items: FavoriteItem[] }>(
-        `/api/tarot/favorites?userId=${userId}`
-      );
+      const data = await apiFetch<{ items: FavoriteItem[] }>("/api/tarot/favorites");
       set({ items: data.items, loading: false });
     } catch {
       set({ loading: false });
     }
   },
 
-  addFavorite: async (userId, ticker, market, label) => {
+  addFavorite: async (ticker, market, label) => {
     try {
       const fav = await apiFetch<FavoriteItem>("/api/tarot/favorites", {
         method: "POST",
-        body: JSON.stringify({ userId, ticker, market, label }),
+        body: JSON.stringify({ ticker, market, label }),
       });
       set((state) => ({
         items: [fav, ...state.items.filter((f) => f.ticker !== ticker)],
@@ -62,26 +55,19 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     }
   },
 
-  removeFavorite: async (userId, ticker) => {
-    // 낙관적 업데이트
+  removeFavorite: async (ticker) => {
     const prev = get().items;
     set({ items: prev.filter((f) => f.ticker !== ticker) });
     try {
-      await apiFetch(
-        `/api/tarot/favorites?userId=${userId}&ticker=${ticker}`,
-        { method: "DELETE" }
-      );
+      await apiFetch(`/api/tarot/favorites?ticker=${ticker}`, { method: "DELETE" });
     } catch {
-      set({ items: prev }); // 롤백
+      set({ items: prev });
     }
   },
 
   toggleAlert: async (id, enabled) => {
-    // 낙관적 업데이트
     set((state) => ({
-      items: state.items.map((f) =>
-        f.id === id ? { ...f, alertEnabled: enabled } : f
-      ),
+      items: state.items.map((f) => (f.id === id ? { ...f, alertEnabled: enabled } : f)),
     }));
     try {
       await apiFetch(`/api/tarot/favorites/${id}`, {
@@ -89,18 +75,13 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
         body: JSON.stringify({ alertEnabled: enabled }),
       });
     } catch {
-      // 실패 시 롤백
       set((state) => ({
-        items: state.items.map((f) =>
-          f.id === id ? { ...f, alertEnabled: !enabled } : f
-        ),
+        items: state.items.map((f) => (f.id === id ? { ...f, alertEnabled: !enabled } : f)),
       }));
     }
   },
 
-  isFavorite: (ticker) => {
-    return get().items.some((f) => f.ticker === ticker);
-  },
+  isFavorite: (ticker) => get().items.some((f) => f.ticker === ticker),
 
   registerPushToken: async (userId, token) => {
     try {
@@ -116,9 +97,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
 
   unregisterPushToken: async (userId) => {
     try {
-      await apiFetch(`/api/tarot/push?userId=${userId}`, {
-        method: "DELETE",
-      });
+      await apiFetch(`/api/tarot/push?userId=${userId}`, { method: "DELETE" });
       set({ pushToken: null });
     } catch {
       // silent

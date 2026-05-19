@@ -5,6 +5,8 @@ import Constants from "expo-constants";
 import { Colors } from "../constants/theme";
 import { initTracking } from "../lib/tracking";
 import { useUserStore } from "../lib/store";
+import { registerForPushNotificationsAsync } from "../lib/notifications";
+import { useFavoritesStore } from "../lib/favoritesStore";
 
 // expo-router가 자동으로 숨기는 걸 막고 splash에서 직접 제어
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -12,10 +14,30 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 const API_BASE =
   (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ?? "http://localhost:3000";
 
+async function initAdMob() {
+  try {
+    const { default: mobileAds } = await import("react-native-google-mobile-ads");
+    await mobileAds().initialize();
+  } catch {
+    // Expo Go or missing module — skip silently
+  }
+}
+
+async function initPushToken() {
+  const token = await registerForPushNotificationsAsync();
+  if (!token) return;
+  const userId = useUserStore.getState().userId;
+  if (userId) {
+    await useFavoritesStore.getState().registerPushToken(userId, token);
+  }
+}
+
 export default function RootLayout() {
   useEffect(() => {
     void SplashScreen.hideAsync();
     initTracking(API_BASE, () => useUserStore.getState().token);
+    void initAdMob();
+    void initPushToken();
   }, []);
 
   return (
