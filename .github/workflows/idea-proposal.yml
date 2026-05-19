@@ -52,9 +52,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
         run: |
-          echo "$BODY" > /tmp/body.md
+          printenv BODY > /tmp/body.md
           gh issue create \
-            --title "[PM] $(date '+%Y-%m-%d') 제품 개선 제안" \
+            --title "[PM] $(TZ=Asia/Seoul date '+%Y-%m-%d') 제품 개선 제안" \
             --body-file /tmp/body.md \
             --label "idea,agent-council,pm" \
             --repo "${{ github.repository }}"
@@ -91,9 +91,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
         run: |
-          echo "$BODY" > /tmp/body.md
+          printenv BODY > /tmp/body.md
           gh issue create \
-            --title "[Frontend] $(date '+%Y-%m-%d') 모바일 UX 개선 제안" \
+            --title "[Frontend] $(TZ=Asia/Seoul date '+%Y-%m-%d') 모바일 UX 개선 제안" \
             --body-file /tmp/body.md \
             --label "idea,agent-council,frontend,mobile" \
             --repo "${{ github.repository }}"
@@ -130,9 +130,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
         run: |
-          echo "$BODY" > /tmp/body.md
+          printenv BODY > /tmp/body.md
           gh issue create \
-            --title "[Backend] $(date '+%Y-%m-%d') API/인프라 개선 제안" \
+            --title "[Backend] $(TZ=Asia/Seoul date '+%Y-%m-%d') API/인프라 개선 제안" \
             --body-file /tmp/body.md \
             --label "idea,agent-council,backend" \
             --repo "${{ github.repository }}"
@@ -168,9 +168,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
         run: |
-          echo "$BODY" > /tmp/body.md
+          printenv BODY > /tmp/body.md
           gh issue create \
-            --title "[Designer] $(date '+%Y-%m-%d') UX/UI 개선 제안" \
+            --title "[Designer] $(TZ=Asia/Seoul date '+%Y-%m-%d') UX/UI 개선 제안" \
             --body-file /tmp/body.md \
             --label "idea,agent-council,design" \
             --repo "${{ github.repository }}"
@@ -190,7 +190,7 @@ jobs:
           model: openai/gpt-4o
           system-prompt: |
             당신은 타로 증권 앱의 QA 엔지니어입니다.
-            현재 테스트: packages/tarot-core vitest 31개. E2E 없음.
+            현재 테스트: packages/tarot-core vitest 61개+. E2E 없음.
             당신의 시각: 회귀 버그 예방, 엣지 케이스 발굴, 자동화 가능한 테스트 시나리오.
           prompt: |
             품질 보증 관점에서 개선할 아이디어 1개를 제안하세요.
@@ -206,9 +206,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
         run: |
-          echo "$BODY" > /tmp/body.md
+          printenv BODY > /tmp/body.md
           gh issue create \
-            --title "[QA] $(date '+%Y-%m-%d') 품질 개선 제안" \
+            --title "[QA] $(TZ=Asia/Seoul date '+%Y-%m-%d') 품질 개선 제안" \
             --body-file /tmp/body.md \
             --label "idea,agent-council,qa" \
             --repo "${{ github.repository }}"
@@ -228,7 +228,7 @@ jobs:
           model: openai/gpt-4o
           system-prompt: |
             당신은 타로 증권 앱의 CTO입니다.
-            알려진 기술 부채: AdMob 프로덕션 ID 미입력, 트래킹 console.log 수준, 서버 사이드 검증 미비.
+            알려진 기술 부채: AdMob 프로덕션 ID 미입력, TarotAnalyticsEvent 모델 db push 필요, 서버 사이드 IAP 검증 RevenueCat 연동 필요.
             당신의 시각: 장기적 확장성, 모노레포 건강도, 의존성 관리, 기술 선택의 미래 호환성.
           prompt: |
             기술 부채 또는 아키텍처 관점에서 개선할 아이디어 1개를 제안하세요.
@@ -244,9 +244,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
         run: |
-          echo "$BODY" > /tmp/body.md
+          printenv BODY > /tmp/body.md
           gh issue create \
-            --title "[CTO] $(date '+%Y-%m-%d') 기술 부채 개선 제안" \
+            --title "[CTO] $(TZ=Asia/Seoul date '+%Y-%m-%d') 기술 부채 개선 제안" \
             --body-file /tmp/body.md \
             --label "idea,agent-council,cto,tech-debt" \
             --repo "${{ github.repository }}"
@@ -283,9 +283,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
         run: |
-          echo "$BODY" > /tmp/body.md
+          printenv BODY > /tmp/body.md
           gh issue create \
-            --title "[Marketer] $(date '+%Y-%m-%d') 성장 전략 제안" \
+            --title "[Marketer] $(TZ=Asia/Seoul date '+%Y-%m-%d') 성장 전략 제안" \
             --body-file /tmp/body.md \
             --label "idea,agent-council,marketing" \
             --repo "${{ github.repository }}"
@@ -321,9 +321,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
         run: |
-          echo "$BODY" > /tmp/body.md
+          printenv BODY > /tmp/body.md
           gh issue create \
-            --title "[Security] $(date '+%Y-%m-%d') 보안 점검 제안" \
+            --title "[Security] $(TZ=Asia/Seoul date '+%Y-%m-%d') 보안 점검 제안" \
             --body-file /tmp/body.md \
             --label "idea,agent-council,security" \
             --repo "${{ github.repository }}"
@@ -343,7 +343,7 @@ jobs:
           model: openai/gpt-4o
           system-prompt: |
             당신은 타로 증권 앱의 AI 해석 품질 담당 프롬프트 엔지니어입니다.
-            현재: interpret-v1.1.0.ts (한국어 최적화, SINGLE/THREE_CARD 분기).
+            현재: interpret-v1.1.0.ts (한국어 최적화, 기술적 지표 MACD/BB/SMA 연결).
             3단 폴백(LLM→캐시→프리빌트). 출력: {headline, summary, detail}.
           prompt: |
             AI 해석 품질 개선 아이디어를 제안하세요.
@@ -359,9 +359,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
         run: |
-          echo "$BODY" > /tmp/body.md
+          printenv BODY > /tmp/body.md
           gh issue create \
-            --title "[Prompt Engineer] $(date '+%Y-%m-%d') AI 해석 품질 개선 제안" \
+            --title "[Prompt Engineer] $(TZ=Asia/Seoul date '+%Y-%m-%d') AI 해석 품질 개선 제안" \
             --body-file /tmp/body.md \
             --label "idea,agent-council,prompt" \
             --repo "${{ github.repository }}"
@@ -380,37 +380,96 @@ jobs:
         with:
           model: openai/gpt-4o
           system-prompt: |
-            당신은 타로 증권 앱 CEO의 수석 비서 AI입니다.
-            매일 아침 9개 팀 에이전트의 제안을 읽고 CEO가 5분 안에 판단할 수 있는 브리핑을 작성합니다.
+            당신은 Trading Taro (타로 증권 앱)의 **CEO**입니다. 비서가 아니라 최종 의사결정자입니다.
+            매일 아침 9개 팀 에이전트(PM, Frontend, Backend, Designer, QA, CTO, Marketer, Security, Prompt Engineer)가 각자 제안을 올립니다.
+
+            당신의 역할:
+            1. **검증**: 각 제안이 현실적인지, 우선순위가 맞는지 CEO 관점에서 판단합니다.
+            2. **교차 검증**: 에이전트 간 충돌하는 의견을 찾아내고, 어느 쪽이 맞는지 근거와 함께 결론을 냅니다.
+            3. **의사결정**: "좋은 아이디어" 나열이 아니라 "이번 주 이것만 하라"는 명확한 지시를 내립니다.
+            4. **리스크 판단**: Security/CTO 제안 중 당장 처리해야 할 것과 나중에 해도 되는 것을 구분합니다.
+            5. **킬(kill)할 것**: 지금 하면 안 되는 제안은 이유와 함께 명확히 거부합니다.
+
+            현재 제품 상태:
+            - 앱스토어 미출시 (개발 중)
+            - 1인 개발자 체제 (리소스 극히 제한)
+            - 핵심 기능: 타로 카드 뽑기 → AI 시장 해석, 크레딧(IAP+광고), 즐겨찾기, 푸시 알림
+            - 기술 스택: React Native Expo + Next.js API + PostgreSQL + Prisma
+
+            판단 기준 (우선순위 순):
+            1. 스토어 출시 차단 이슈 (없으면 출시 못함)
+            2. 법적/보안 리스크 (출시 후 문제 터짐)
+            3. 핵심 사용자 경험 (D1 리텐션에 직접 영향)
+            4. 수익화 (크레딧 소비 ↑)
+            5. 나머지는 백로그
           prompt: |
-            아래 9개 에이전트 제안을 읽고 CEO 일일 브리핑을 작성하세요.
+            아래 9개 에이전트의 오늘 제안을 읽고 CEO 일일 브리핑을 작성하세요.
+            단순 요약이 아니라 **당신의 판단과 지시**가 담겨야 합니다.
 
+            ---
             **PM:** ${{ needs.pm.outputs.proposal }}
+            ---
             **Frontend:** ${{ needs.frontend.outputs.proposal }}
+            ---
             **Backend:** ${{ needs.backend.outputs.proposal }}
+            ---
             **Designer:** ${{ needs.designer.outputs.proposal }}
+            ---
             **QA:** ${{ needs.qa.outputs.proposal }}
+            ---
             **CTO:** ${{ needs.cto.outputs.proposal }}
+            ---
             **Marketer:** ${{ needs.marketer.outputs.proposal }}
+            ---
             **Security:** ${{ needs.security.outputs.proposal }}
+            ---
             **Prompt Engineer:** ${{ needs.prompt_engineer.outputs.proposal }}
+            ---
 
-            ## 📋 CEO Daily Brief
-            ## 오늘의 핵심 3가지
-            ## 에이전트 공통 의견 (시너지)
-            ## 에이전트 간 충돌/논쟁 포인트
-            ## 즉시 실행 가능 (이번 주, 개발 없이)
-            ## 다음 스프린트 1순위
-            ## 무시해도 되는 것
+            아래 형식으로 작성하세요. 각 섹션을 충실히 채우세요:
+
+            ## 📋 CEO Daily Brief — $(TZ=Asia/Seoul date '+%Y-%m-%d')
+
+            ### 🚨 즉시 대응 (스토어 출시 차단 or 보안 리스크)
+            - 에이전트 제안 중 당장 처리 안 하면 출시 못하거나 법적 문제가 되는 것
+            - 없으면 "현재 차단 이슈 없음" 명시
+
+            ### ✅ 이번 주 실행 지시 (최대 2개)
+            - CEO로서 "이것만 해라"는 명확한 지시
+            - 왜 이것인지 근거, 담당 에이전트, 예상 소요 시간
+            - 1인 개발자 체제를 고려한 현실적 스코프
+
+            ### 🔍 에이전트 간 충돌 분석
+            - 서로 모순되거나 리소스가 겹치는 제안 식별
+            - CEO 판단: 어느 쪽을 택하고 왜인지
+
+            ### 💡 CEO 인사이트
+            - 에이전트들이 놓친 관점이나 더 큰 그림
+            - 제품 방향성에 대한 CEO의 생각
+
+            ### ❌ 지금 하지 않을 것 (Kill list)
+            - 좋은 아이디어지만 지금 타이밍이 아닌 것
+            - 구체적 이유 (리소스, 우선순위, 의존성 등)
+
+            ### 📊 에이전트별 제안 요약 (1줄씩)
+            | 에이전트 | 제안 핵심 | CEO 판정 |
+            |---------|----------|---------|
+            | PM | ... | ✅ 채택 / ⏸️ 보류 / ❌ 거부 |
+            | Frontend | ... | ... |
+            | (9개 모두) | | |
+
+            ### 📅 내일 체크포인트
+            - 내일 브리핑에서 확인할 것
+
       - name: Create CEO Brief Issue
         id: create_issue
         env:
           GH_TOKEN: ${{ github.token }}
           BRIEF: ${{ steps.brief.outputs.response }}
         run: |
-          echo "$BRIEF" > /tmp/ceo_body.md
+          printenv BRIEF > /tmp/ceo_body.md
           URL=$(gh issue create \
-            --title "📋 [CEO Brief] $(date '+%Y-%m-%d') 일일 에이전트 브리핑" \
+            --title "📋 [CEO Brief] $(TZ=Asia/Seoul date '+%Y-%m-%d') 일일 에이전트 브리핑" \
             --body-file /tmp/ceo_body.md \
             --label "ceo-brief,agent-council,daily" \
             --repo "${{ github.repository }}")
@@ -430,10 +489,11 @@ jobs:
             printf '%s\n' "아래 CEO Brief를 HTML 이메일 body로 변환하세요."
             printf '%s\n' "스타일: 배경 #0f0f0f, 카드 #1e1e1e, 강조색 #3ecf8e, 충돌은 #e07b3e."
             printf '%s\n' "핵심 3가지는 굵게 초록 강조. 섹션마다 border-left:3px solid #3ecf8e 카드 스타일."
+            printf '%s\n' "테이블은 border-collapse로 깔끔하게. CEO 판정 이모지 유지."
             printf '%s\n' "최하단에 GitHub 이슈 링크 포함."
             printf '%s\n' "HTML body 내용만 반환 (body 태그 제외)."
             printf '%s\n' ""
-            echo "$BRIEF"
+            printenv BRIEF
           } > /tmp/email_prompt.md
 
       - name: Format and Send Email
@@ -448,7 +508,7 @@ jobs:
         env:
           EMAIL_RAW: ${{ steps.email_html.outputs.response }}
         run: |
-          echo "$EMAIL_RAW" \
+          printenv EMAIL_RAW \
             | sed 's/^```html[[:space:]]*//' \
             | sed 's/^```[[:space:]]*//' \
             | sed 's/[[:space:]]*```$//' \
