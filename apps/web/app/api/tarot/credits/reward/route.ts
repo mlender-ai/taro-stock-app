@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/tarot/auth";
 import { addCredit, getCreditBalance } from "@/lib/tarot/credits";
 import { prisma } from "@/lib/tarot/prisma";
+import { verifyNonce } from "@/lib/tarot/rewardNonce";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,9 @@ const REWARD_AMOUNT = 1;
 const REWARD_COOLDOWN_MS = 30 * 60 * 1000; // 30분
 
 interface RewardBody {
-  idempotencyKey?: string;
+  adNonce?: string;
+  adToken?: string;
+  adExpiresAt?: number;
 }
 
 function errorJson(message: string, code: string, status: number) {
@@ -22,12 +25,19 @@ export async function POST(req: NextRequest) {
   const { userId } = auth;
 
   const body = (await req.json().catch(() => ({}))) as RewardBody;
-  const idempotencyKey = body.idempotencyKey?.trim();
-  if (!idempotencyKey) return errorJson("idempotencyKey is required", "MISSING_IDEMPOTENCY_KEY", 400);
+  const { adNonce, adToken, adExpiresAt } = body;
 
-  // 멱등성: 이미 처리된 리워드면 현재 잔액만 반환
+  if (!adNonce || !adToken || !adExpiresAt) {
+    return errorJson("광고 인증 정보가 필요합니다", "MISSING_AD_NONCE", 400);
+  }
+
+  if (!verifyNonce(adNonce, userId, adToken, adExpiresAt)) {
+    return errorJson("광고 인증이 유효하지 않습니다", "INVALID_AD_NONCE", 403);
+  }
+
+  // 멱등성: 동일 nonce로 이미 처리된 리워드면 현재 잔액만 반환
   const existing = await prisma.tarotCreditLedger.findFirst({
-    where: { userId, referenceId: idempotencyKey, reason: "REWARD_AD" },
+    where: { userId, referenceId: adNonce, reason: "REWARD_AD" },
   });
   if (existing) {
     const credits = await getCreditBalance(userId);
@@ -44,10 +54,9 @@ export async function POST(req: NextRequest) {
     orderBy: { createdAt: "desc" },
   });
   if (recentReward) {
-    const nextAvailableMs = recentReward.createdAt.getTime() + REWARD_COOLDOWN_MS;
     return errorJson("쿨다운 중입니다", "REWARD_COOLDOWN", 429);
   }
 
-  const credits = await addCredit(userId, REWARD_AMOUNT, "REWARD_AD", idempotencyKey);
+  const credits = await addCredit(userId, REWARD_AMOUNT, "REWARD_AD", adNonce);
   return NextResponse.json({ credits, rewarded: REWARD_AMOUNT });
 }

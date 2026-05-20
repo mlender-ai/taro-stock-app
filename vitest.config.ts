@@ -10,6 +10,8 @@ export default defineConfig({
     alias: {
       "@taro/core": path.resolve(__dirname, "packages/tarot-core/src"),
       "@trading/shared": path.resolve(__dirname, "packages/shared/src"),
+      "@/lib": path.resolve(__dirname, "apps/web/lib"),
+      "@/app": path.resolve(__dirname, "apps/web/app"),
     },
   },
 });
