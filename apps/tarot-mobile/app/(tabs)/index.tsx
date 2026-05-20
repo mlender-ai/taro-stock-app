@@ -10,6 +10,7 @@ import { useUserStore } from "../../lib/store";
 import { useDrawStore } from "../../lib/drawStore";
 import { apiFetch } from "../../lib/api";
 import { localSearch } from "../../lib/localEngine";
+import { TickerLogo } from "../../components/TickerLogo";
 
 
 const POPULAR: { ticker: string; label: string; market: string; flag: string }[] = [
@@ -180,7 +181,10 @@ export default function HomeScreen() {
                   onPress={() => handleSelect(r.ticker, r.label)}
                 >
                   <View style={styles.dropdownRow}>
-                    <Text variant="body-sm" color={Colors.whiteout}>{r.label}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                      <TickerLogo ticker={r.ticker} size={24} />
+                      <Text variant="body-sm" color={Colors.whiteout}>{r.label}</Text>
+                    </View>
                     <View style={styles.dropdownMeta}>
                       <Text variant="caption" color={Colors.taroEssence}>{r.ticker}</Text>
                       <Text variant="caption" color={Colors.ironOutline}>{r.market}</Text>
@@ -220,8 +224,8 @@ export default function HomeScreen() {
                 style={styles.chip}
                 onPress={() => handleSelect(p.ticker, p.label)}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <Text style={{ fontSize: 11 }}>{p.flag}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <TickerLogo ticker={p.ticker} size={20} />
                   <Text variant="caption" color={Colors.silverHighlight}>{p.label}</Text>
                 </View>
                 <Text variant="caption" color={Colors.ironOutline} style={{ fontSize: 10 }}>

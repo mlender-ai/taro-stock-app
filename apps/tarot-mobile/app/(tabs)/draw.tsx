@@ -15,6 +15,7 @@ import { localDraw, saveLocalDraw } from "../../lib/localEngine";
 import { AdBanner } from "../../components/AdBanner";
 import { trackEvent } from "../../lib/analytics";
 import { useStoreReview } from "../../lib/useStoreReview";
+import { TickerLogo } from "../../components/TickerLogo";
 
 const SPREAD_OPTIONS: { type: SpreadType; label: string; desc: string; cost: number }[] = [
   { type: "single",     label: "1장",  desc: "핵심 흐름",    cost: 1 },
@@ -177,14 +178,19 @@ export default function DrawScreen() {
 
         {/* 종목 */}
         <View style={styles.tickerRow}>
-          <Text variant="subheading" color={Colors.whiteout}>
-            {tickerName || "종목 미선택"}
-          </Text>
-          {ticker ? (
-            <Text variant="caption" color={Colors.taroEssence}>{ticker}</Text>
-          ) : (
-            <Text variant="caption" color={Colors.midGrayText}>홈에서 종목을 선택하세요</Text>
-          )}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            {ticker && <TickerLogo ticker={ticker} size={36} />}
+            <View>
+              <Text variant="subheading" color={Colors.whiteout}>
+                {tickerName || "종목 미선택"}
+              </Text>
+              {ticker ? (
+                <Text variant="caption" color={Colors.taroEssence}>{ticker}</Text>
+              ) : (
+                <Text variant="caption" color={Colors.midGrayText}>홈에서 종목을 선택하세요</Text>
+              )}
+            </View>
+          </View>
         </View>
 
         {/* 스프레드 선택 */}
