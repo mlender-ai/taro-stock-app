@@ -1,0 +1,175 @@
+name: Collect User Feedback
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  pull-requests: write
+  models: read
+
+jobs:
+  collect:
+    # PR 댓글에 /good 또는 /bad 가 있을 때만 실행
+    if: |
+      github.event.issue.pull_request != null &&
+      (contains(github.event.comment.body, '/good') ||
+       contains(github.event.comment.body, '/bad'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── 1. PR 정보 수집 ──────────────────────────────────────────
+      - name: Get PR Details
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ github.event.issue.number }}"
+          PR_JSON=$(gh pr view "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --json title,body,headRefName,state,files)
+
+          echo "title=$(echo "$PR_JSON" | jq -r '.title')" >> "$GITHUB_OUTPUT"
+          echo "branch=$(echo "$PR_JSON" | jq -r '.headRefName')" >> "$GITHUB_OUTPUT"
+          echo "state=$(echo "$PR_JSON" | jq -r '.state')" >> "$GITHUB_OUTPUT"
+
+          # 브랜치명(agent/ceo-brief-2026-05-20)에서 날짜 추출
+          BRIEF_DATE=$(echo "$PR_JSON" | jq -r '.headRefName' | grep -oP '\d{4}-\d{2}-\d{2}' | head -1)
+          if [ -z "$BRIEF_DATE" ]; then
+            BRIEF_DATE=$(TZ=Asia/Seoul date '+%Y-%m-%d')
+          fi
+          echo "brief_date=$BRIEF_DATE" >> "$GITHUB_OUTPUT"
+
+          echo "files<<__EOF__" >> "$GITHUB_OUTPUT"
+          echo "$PR_JSON" | jq -r '.files[].path' 2>/dev/null || echo "(파일 목록 없음)"
+          echo "__EOF__" >> "$GITHUB_OUTPUT"
+
+          echo "pr_body<<__EOF__" >> "$GITHUB_OUTPUT"
+          echo "$PR_JSON" | jq -r '.body // ""' >> "$GITHUB_OUTPUT"
+          echo "__EOF__" >> "$GITHUB_OUTPUT"
+
+      # ── 2. 연결된 CEO Brief 가져오기 ──────────────────────────────
+      - name: Get CEO Brief
+        id: brief
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRIEF_DATE="${{ steps.pr.outputs.brief_date }}"
+
+          BRIEF_BODY=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --label "ceo-brief" \
+            --state all \
+            --limit 10 \
+            --json title,body \
+            | jq -r "[.[] | select(.title | contains(\"$BRIEF_DATE\"))] | .[0].body // \"CEO Brief 없음\"")
+
+          echo "body<<__EOF__" >> "$GITHUB_OUTPUT"
+          echo "$BRIEF_BODY" >> "$GITHUB_OUTPUT"
+          echo "__EOF__" >> "$GITHUB_OUTPUT"
+
+      # ── 3. 평가 파싱 ─────────────────────────────────────────────
+      - name: Parse Rating
+        id: rating
+        run: |
+          COMMENT="${{ github.event.comment.body }}"
+          if echo "$COMMENT" | grep -qi '/good'; then
+            echo "rating=good"   >> "$GITHUB_OUTPUT"
+            echo "emoji=✅"      >> "$GITHUB_OUTPUT"
+          else
+            echo "rating=bad"    >> "$GITHUB_OUTPUT"
+            echo "emoji=❌"      >> "$GITHUB_OUTPUT"
+          fi
+          REASON=$(echo "$COMMENT" | sed -E 's|/good||Ig;s|/bad||Ig' | xargs)
+          echo "reason=$REASON" >> "$GITHUB_OUTPUT"
+
+      # ── 4. AI 피드백 분석 — 에이전트 자기 개선용 ─────────────────
+      - name: Generate Feedback Analysis
+        uses: actions/ai-inference@v1
+        id: analysis
+        with:
+          model: openai/gpt-4o
+          system: |
+            당신은 AI 에이전트 팀의 학습 관리자입니다.
+            사용자 평가를 분석하여 에이전트들이 다음 사이클에서 자기 개선에 활용할 수 있는
+            구조화된 피드백을 생성합니다.
+            핵심 원칙: 에이전트들이 "무엇을 바꿔야 하는가"를 명확히 이해할 수 있어야 합니다.
+          prompt: |
+            사용자가 아래 PR을 "${{ steps.rating.outputs.rating }}" 로 평가했습니다.
+
+            ## PR 정보
+            제목: ${{ steps.pr.outputs.title }}
+            브랜치: ${{ steps.pr.outputs.branch }}
+            변경 파일:
+            ${{ steps.pr.outputs.files }}
+
+            PR 본문 (구현 항목):
+            ${{ steps.pr.outputs.pr_body }}
+
+            ## 원본 CEO Brief
+            ${{ steps.brief.outputs.body }}
+
+            ## 사용자 평가
+            평가: ${{ steps.rating.outputs.rating }}
+            추가 코멘트: "${{ steps.rating.outputs.reason }}"
+
+            ---
+
+            아래 형식으로 에이전트 개선용 피드백을 작성하세요:
+
+            ## ${{ steps.rating.outputs.emoji }} 피드백 요약
+
+            **평가**: ${{ steps.rating.outputs.rating }} | **날짜**: ${{ steps.pr.outputs.brief_date }}
+
+            ### 판정 해석
+            (사용자가 good/bad를 누른 이유를 CEO Brief 맥락에서 해석)
+
+            ### 잘된 점
+            (good이면 구체적으로 — bad면 "전반적으로 부족" 또는 부분적으로 잘된 부분 명시)
+
+            ### 개선이 필요한 점
+            (bad면 구체적으로 — good이면 "없음" 또는 더 나아질 수 있는 부분)
+
+            ### 에이전트별 학습 포인트
+
+            **CEO 에이전트** (우선순위 판단 개선):
+            - (이번 실행 지시 선택이 적절했는가? 킬리스트가 올바르게 설정됐는가?)
+
+            **PM / Backend / Frontend / Designer / QA / CTO** (제안 품질 개선):
+            - (어떤 유형의 제안이 실제로 구현 가치가 있었는가?)
+
+            **구현 에이전트** (코드 품질 개선):
+            - (구현 방식, 범위, 코드 구조에 대한 피드백)
+
+            ### 다음 사이클 반영 권고
+            (에이전트들이 내일 제안/구현 시 이 피드백을 어떻게 반영해야 하는지 — 구체적 행동 지침)
+
+      # ── 5. feedback-log 이슈 생성 ────────────────────────────────
+      - name: Create Feedback Log Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DATE=$(TZ=Asia/Seoul date '+%Y-%m-%d')
+          RATING="${{ steps.rating.outputs.rating }}"
+          PR_NUMBER="${{ github.event.issue.number }}"
+
+          gh issue create \
+            --title "[$RATING] 피드백 로그 — $DATE — PR #$PR_NUMBER" \
+            --body "${{ steps.analysis.outputs.response }}" \
+            --label "feedback-log,agent-council" \
+            --repo "${{ github.repository }}"
+
+      # ── 6. PR에 수신 확인 댓글 ──────────────────────────────────
+      - name: Acknowledge on PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EMOJI="${{ steps.rating.outputs.emoji }}"
+          RATING="${{ steps.rating.outputs.rating }}"
+
+          gh pr comment "${{ github.event.issue.number }}" \
+            --body "${EMOJI} **${RATING}** 평가 기록됨 — 에이전트들이 내일 사이클에서 이 피드백을 학습합니다." \
+            --repo "${{ github.repository }}"

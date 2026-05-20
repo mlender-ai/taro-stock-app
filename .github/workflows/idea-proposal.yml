@@ -28,8 +28,36 @@ permissions:
 
 jobs:
 
+  # ── 0. Prepare — 최근 피드백 로그 수집 (모든 에이전트 공유) ────
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      feedback: ${{ steps.fetch.outputs.feedback }}
+    steps:
+      - name: Fetch Recent Feedback Logs
+        id: fetch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FEEDBACK=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --label "feedback-log" \
+            --state all \
+            --limit 7 \
+            --json title,body \
+            | jq -r '.[] | "---\n## " + .title + "\n" + .body' 2>/dev/null || true)
+
+          if [ -z "$FEEDBACK" ]; then
+            FEEDBACK="피드백 이력 없음 — 첫 번째 사이클입니다. 기본 판단으로 제안하세요."
+          fi
+
+          echo "feedback<<__EOF__" >> "$GITHUB_OUTPUT"
+          echo "$FEEDBACK" >> "$GITHUB_OUTPUT"
+          echo "__EOF__" >> "$GITHUB_OUTPUT"
+
   # ── 1. PM — 제품 전략 / 사용자 니즈 ──────────────────────────
   pm:
+    needs: [prepare]
     if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'pm' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     outputs:
@@ -47,6 +75,13 @@ jobs:
             KPI: DAU, 크레딧 소비량, 앱스토어 평점, D7/D30 리텐션.
             당신의 시각: 사용자 문제 → 측정 가능한 임팩트 순으로 사고한다.
           prompt: |
+            ## 📚 이전 사이클 사용자 피드백 (자기 개선 컨텍스트)
+            아래 피드백을 읽고, 사용자가 good으로 평가한 방향으로 제안하고 bad로 평가한 유형은 피하세요.
+
+            ${{ needs.prepare.outputs.feedback }}
+
+            ---
+
             오늘의 제품 개선 우선순위를 분석하고 가장 임팩트 높은 아이디어 1개를 제안하세요.
 
             ## 🎯 PM 제안
@@ -77,6 +112,7 @@ jobs:
 
   # ── 2. Frontend — React Native / Expo / 모바일 UX ────────────
   frontend:
+    needs: [prepare]
     if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'frontend' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     outputs:
@@ -94,6 +130,11 @@ jobs:
             현재 화면: 홈(종목 검색), 카드 뽑기, 결과, 히스토리/분석, 마이페이지, 즐겨찾기, 컬렉션.
             당신의 시각: 컴포넌트 재사용성, 번들 크기, 60fps 애니메이션, 접근성.
           prompt: |
+            ## 📚 이전 사이클 사용자 피드백 (자기 개선 컨텍스트)
+            ${{ needs.prepare.outputs.feedback }}
+
+            ---
+
             모바일 프런트엔드 관점에서 개선할 아이디어 1개를 제안하세요.
 
             ## 📱 Frontend 제안
@@ -124,6 +165,7 @@ jobs:
 
   # ── 3. Backend — API / DB / 인프라 ───────────────────────────
   backend:
+    needs: [prepare]
     if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'backend' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     outputs:
@@ -141,6 +183,11 @@ jobs:
             핵심 API: /api/tarot/draw, /api/tarot/analytics, /api/tarot/credits, /api/admin/*.
             당신의 시각: API 성능, DB 쿼리 최적화, 캐싱, 확장성, 데이터 정합성.
           prompt: |
+            ## 📚 이전 사이클 사용자 피드백 (자기 개선 컨텍스트)
+            ${{ needs.prepare.outputs.feedback }}
+
+            ---
+
             백엔드/인프라 관점에서 개선할 아이디어 1개를 제안하세요.
 
             ## ⚙️ Backend 제안
@@ -171,6 +218,7 @@ jobs:
 
   # ── 4. Designer — UX / UI / 비주얼 ──────────────────────────
   designer:
+    needs: [prepare]
     if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'designer' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     outputs:
@@ -188,6 +236,11 @@ jobs:
             현재 화면: 스플래시, 온보딩, 로그인, 홈, 카드 뽑기, 결과, 히스토리, 마이페이지.
             당신의 시각: 감성적 몰입감, 시각적 계층구조, 마이크로인터랙션, 접근성, 일관된 디자인 언어.
           prompt: |
+            ## 📚 이전 사이클 사용자 피드백 (자기 개선 컨텍스트)
+            ${{ needs.prepare.outputs.feedback }}
+
+            ---
+
             UX/UI 디자인 관점에서 개선할 아이디어 1개를 제안하세요.
 
             ## 🎨 Designer 제안
@@ -218,6 +271,7 @@ jobs:
 
   # ── 5. QA — 품질 / 테스트 / 버그 예방 ───────────────────────
   qa:
+    needs: [prepare]
     if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'qa' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     outputs:
@@ -234,6 +288,11 @@ jobs:
             현재 테스트: packages/tarot-core vitest 31개 (forbidden/draw/cache). E2E 없음.
             당신의 시각: 회귀 버그 예방, 엣지 케이스 발굴, 자동화 가능한 테스트 시나리오.
           prompt: |
+            ## 📚 이전 사이클 사용자 피드백 (자기 개선 컨텍스트)
+            ${{ needs.prepare.outputs.feedback }}
+
+            ---
+
             품질 보증 관점에서 개선할 아이디어 1개를 제안하세요.
 
             ## 🧪 QA 제안
@@ -266,6 +325,7 @@ jobs:
 
   # ── 6. CTO — 기술 부채 / 아키텍처 / 확장성 ──────────────────
   cto:
+    needs: [prepare]
     if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'cto' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     outputs:
@@ -282,6 +342,11 @@ jobs:
             알려진 기술 부채: AdMob 프로덕션 ID 미입력, 트래킹 console.log 수준, 서버 사이드 검증 미비.
             당신의 시각: 장기적 확장성, 모노레포 건강도, 의존성 관리, 기술 선택의 미래 호환성.
           prompt: |
+            ## 📚 이전 사이클 사용자 피드백 (자기 개선 컨텍스트)
+            ${{ needs.prepare.outputs.feedback }}
+
+            ---
+
             기술 부채 또는 아키텍처 관점에서 개선할 아이디어 1개를 제안하세요.
 
             ## 🏗️ CTO 제안
@@ -312,6 +377,7 @@ jobs:
 
   # ── 7. Marketer — 성장 / 바이럴 / 리텐션 ────────────────────
   marketer:
+    needs: [prepare]
     if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'marketer' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     outputs:
@@ -329,6 +395,11 @@ jobs:
             현재 수익화: 크레딧 IAP(유료) + AdMob 리워드 광고(무료).
             당신의 시각: 신규 유입, 바이럴 계수(K-factor), 크레딧 소비 증대, D7/D30 리텐션.
           prompt: |
+            ## 📚 이전 사이클 사용자 피드백 (자기 개선 컨텍스트)
+            ${{ needs.prepare.outputs.feedback }}
+
+            ---
+
             성장/마케팅 관점에서 개선할 아이디어 1개를 제안하세요.
 
             ## 📣 Marketer 제안
@@ -359,6 +430,7 @@ jobs:
 
   # ── 8. Security — 보안 / 규제 준수 ──────────────────────────
   security:
+    needs: [prepare]
     if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'security' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     outputs:
@@ -375,6 +447,11 @@ jobs:
             앱: 금융 AI 해석 서비스. Apple/Google 로그인, IAP, 크레딧 시스템, 시장 데이터 포함.
             주요 위험: JWT 관리, IAP 영수증 서버 검증, 개인정보 처리, 금융광고 규제(자본시장법).
           prompt: |
+            ## 📚 이전 사이클 사용자 피드백 (자기 개선 컨텍스트)
+            ${{ needs.prepare.outputs.feedback }}
+
+            ---
+
             현재 앱에서 점검하거나 강화해야 할 보안/컴플라이언스 항목 1개를 제안하세요.
 
             ## 🔒 Security 제안
@@ -405,6 +482,7 @@ jobs:
 
   # ── 9. Prompt Engineer — AI 해석 품질 ───────────────────────
   prompt_engineer:
+    needs: [prepare]
     if: ${{ github.event.inputs.agent == 'all' || github.event.inputs.agent == 'prompt_engineer' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     outputs:
@@ -422,6 +500,11 @@ jobs:
             구조: 3단 폴백(LLM→캐시→프리빌트). 출력: {headline, summary, detail}.
             금칙어: 매수/매도/수익보장 등 금융 권유 표현 차단.
           prompt: |
+            ## 📚 이전 사이클 사용자 피드백 (자기 개선 컨텍스트)
+            ${{ needs.prepare.outputs.feedback }}
+
+            ---
+
             현재 타로 카드 해석 프롬프트를 개선하거나 새 기능을 추가할 아이디어를 제안하세요.
 
             ## ✨ Prompt Engineer 제안
@@ -453,7 +536,7 @@ jobs:
 
   # ── 10. CEO Brief — 모든 에이전트 종합 + 교차 검증 ──────────
   ceo_brief:
-    needs: [pm, frontend, backend, designer, qa, cto, marketer, security, prompt_engineer]
+    needs: [prepare, pm, frontend, backend, designer, qa, cto, marketer, security, prompt_engineer]
     if: always() && (github.event.inputs.agent == 'all' || github.event_name == 'schedule')
     runs-on: ubuntu-latest
     steps:
@@ -509,30 +592,64 @@ jobs:
 
             ---
 
-            위 9개 제안을 분석하여 다음 형식으로 CEO 브리핑을 작성하세요:
+            ---
+
+            ## 📚 이전 사이클 사용자 피드백 (우선순위 판단 개선 컨텍스트)
+            아래 피드백을 반드시 반영하여 브리핑을 작성하세요.
+            사용자가 good으로 평가한 방향의 항목을 실행 지시로 선택하고,
+            bad로 평가된 유형의 항목은 킬리스트에 포함하세요.
+
+            ${{ needs.prepare.outputs.feedback }}
+
+            ---
+
+            위 9개 제안과 피드백 이력을 종합하여 다음 형식으로 CEO 브리핑을 작성하세요:
 
             ## 📋 CEO Daily Brief
 
-            ## 오늘의 핵심 3가지
-            (가장 중요한 것 3개 — 한 줄씩, 담당 에이전트 명시)
-            1.
-            2.
-            3.
+            ### 🚨 즉시 대응 (스토어 출시 차단 or 보안 리스크)
+            (없으면 생략)
 
-            ## 에이전트 공통 의견 (시너지)
-            (여러 에이전트가 같은 방향을 가리키는 것 — 강하게 실행해야 하는 시그널)
+            ---
 
-            ## 에이전트 간 충돌/논쟁 포인트
-            (의견이 갈리는 것 — CEO 결정이 필요한 트레이드오프)
+            ### ✅ 이번 주 실행 지시 (최대 2개)
+            (피드백 이력에서 good 평가를 받은 방향 우선)
 
-            ## 즉시 실행 가능 (이번 주, 개발 없이)
-            (설정 변경, 문서 업데이트, ASO 개선 등)
+            #### 1️⃣ **[항목명]**
+            - **담당 에이전트**:
+            - **근거**: (OKR 연결 + 피드백 반영 여부 명시)
+            - **예상 소요**:
+            - **대상 OKR**:
 
-            ## 다음 스프린트 1순위
-            (개발이 필요한 것 중 ROI가 가장 높은 것 1개 — 이유 포함)
+            ---
 
-            ## 무시해도 되는 것
-            (지금 시점에서 우선순위가 낮은 제안 — 이유 포함)
+            ### 🔍 에이전트 간 충돌 분석
+            (의견이 갈리는 트레이드오프 — CEO 판단 포함)
+
+            ---
+
+            ### 💡 CEO 인사이트
+            (피드백 이력에서 배운 패턴 + 오늘의 판단 근거)
+
+            ---
+
+            ### ❌ 지금 하지 않을 것 (Kill list)
+            (피드백 이력에서 bad 평가를 받은 유형 포함)
+
+            1. **[항목명]** ([에이전트]):
+               - **이유**:
+               - **재검토 조건**:
+
+            ---
+
+            ### 📊 에이전트별 제안 요약
+            | 에이전트 | 대상 OKR | 제안 핵심 | CEO 판정 | 사유 |
+            |---|---|---|---|---|
+
+            ---
+
+            ### 📅 내일 체크포인트
+            (오늘 실행 지시의 진행 상황 확인 항목)
       - name: Create CEO Brief Issue
         env:
           GH_TOKEN: ${{ github.token }}
