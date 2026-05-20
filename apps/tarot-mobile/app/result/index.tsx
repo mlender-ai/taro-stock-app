@@ -16,26 +16,45 @@ import { shareResult } from "../../lib/share";
 
 const DISCLAIMER = "본 해석은 오락 목적으로 제공되며 투자 조언이 아닙니다. 투자 결정은 본인의 판단과 책임 하에 이루어져야 합니다.";
 
+const SLOT_LABELS: Record<string, string> = {
+  past: "과거",
+  present: "현재",
+  future: "미래",
+};
+
 function CardReveal({ card, index }: { card: DrawnCard; index: number }) {
   const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(20)).current;
+  const translateY = useRef(new Animated.Value(32)).current;
+  const scale = useRef(new Animated.Value(0.96)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 500, delay: index * 200, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: 0, duration: 500, delay: index * 200, useNativeDriver: true }),
+      Animated.timing(opacity,     { toValue: 1,    duration: 600, delay: index * 250, useNativeDriver: true }),
+      Animated.timing(translateY,  { toValue: 0,    duration: 600, delay: index * 250, useNativeDriver: true }),
+      Animated.timing(scale,       { toValue: 1,    duration: 600, delay: index * 250, useNativeDriver: true }),
     ]).start();
   }, []);
 
+  const slotLabel = card.slot ? SLOT_LABELS[card.slot] ?? null : null;
+
   return (
-    <Animated.View style={[styles.cardReveal, { opacity, transform: [{ translateY }] }]}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardThumb}>
-          <Text style={styles.cardThumSymbol}>{card.symbol}</Text>
+    <Animated.View style={[styles.cardReveal, { opacity, transform: [{ translateY }, { scale }] }]}>
+      {/* 슬롯 레이블 (3장 스프레드용) */}
+      {slotLabel && (
+        <View style={styles.slotBadge}>
+          <Text variant="caption" color={Colors.taroEssence} style={styles.slotLabel}>{slotLabel}</Text>
         </View>
+      )}
+
+      <View style={styles.cardHeader}>
+        {/* 카드 아트 영역 — 역방향 시 회전 표시 */}
+        <Animated.View style={[styles.cardThumb, card.isReversed && styles.cardThumbReversed]}>
+          <Text style={styles.cardThumSymbol}>{card.symbol}</Text>
+          {card.isReversed && <Text style={styles.reversedMark}>▽</Text>}
+        </Animated.View>
         <View style={styles.cardMeta}>
-          <Text variant="subheading">{card.name}</Text>
-          <Text variant="body-sm">{card.nameKo}</Text>
+          <Text variant="subheading" color={Colors.whiteout}>{card.nameKo}</Text>
+          <Text variant="caption" color={Colors.midGrayText}>{card.name}</Text>
           {card.isReversed && (
             <View style={styles.reversedBadge}>
               <Text variant="caption" color={Colors.taroEssence}>역방향</Text>
@@ -44,8 +63,16 @@ function CardReveal({ card, index }: { card: DrawnCard; index: number }) {
         </View>
       </View>
 
-      <Text variant="heading" style={styles.headline}>{card.headline}</Text>
+      {/* 구분선 */}
+      <View style={styles.divider} />
+
+      {/* 헤드라인 — 가장 큰 계층 */}
+      <Text variant="subheading" style={styles.headline}>{card.headline}</Text>
+
+      {/* 요약 — 두 번째 계층 */}
       <Text variant="body-sm" style={styles.summary}>{card.summary}</Text>
+
+      {/* 상세 — 세 번째 계층, 약간 흐리게 */}
       <Text variant="body-sm" style={styles.detail}>{card.detail}</Text>
     </Animated.View>
   );
@@ -298,15 +325,20 @@ const styles = StyleSheet.create({
   spreadLabel:    { letterSpacing: 1, marginBottom: 4 },
   tickerTitle:    { color: Colors.whiteout },
   cards:          { gap: 16, marginBottom: Spacing.s24 },
-  cardReveal:     { backgroundColor: Colors.graphiteBase, borderRadius: Radius.cards, padding: Spacing.s24, borderWidth: 1, borderColor: Colors.carbonBorder },
-  cardHeader:     { flexDirection: "row", gap: 16, marginBottom: Spacing.s16 },
-  cardThumb:      { width: 56, height: 80, backgroundColor: Colors.ebonyCanvas, borderRadius: 8, borderWidth: 1, borderColor: Colors.taroEssence, alignItems: "center", justifyContent: "center" },
-  cardThumSymbol: { fontSize: 14, color: Colors.taroEssence, fontWeight: "700" },
-  cardMeta:       { flex: 1, justifyContent: "center", gap: 2 },
-  reversedBadge:  { marginTop: 4, alignSelf: "flex-start", borderWidth: 1, borderColor: Colors.taroEssence, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  headline:       { color: Colors.whiteout, marginBottom: Spacing.s8 },
-  summary:        { color: Colors.silverHighlight, marginBottom: Spacing.s8 },
-  detail:         { color: Colors.midGrayText, lineHeight: 22 },
+  cardReveal:     { backgroundColor: Colors.graphiteBase, borderRadius: Radius.cards, padding: Spacing.s24, borderWidth: 1, borderColor: Colors.carbonBorder, shadowColor: Colors.taroEssence, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8 },
+  slotBadge:      { alignSelf: "flex-start", backgroundColor: Colors.voidGreen, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 12 },
+  slotLabel:      { letterSpacing: 1.5, fontWeight: "700" },
+  cardHeader:     { flexDirection: "row", gap: 16, marginBottom: 12 },
+  cardThumb:      { width: 64, height: 92, backgroundColor: Colors.ebonyCanvas, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.taroEssence, alignItems: "center", justifyContent: "center", gap: 4 },
+  cardThumbReversed: { borderColor: Colors.ironOutline, opacity: 0.85 },
+  cardThumSymbol: { fontSize: 18, color: Colors.taroEssence, fontWeight: "700" },
+  reversedMark:   { fontSize: 9, color: Colors.ironOutline },
+  cardMeta:       { flex: 1, justifyContent: "center", gap: 4 },
+  reversedBadge:  { marginTop: 4, alignSelf: "flex-start", borderWidth: 1, borderColor: Colors.ironOutline, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  divider:        { height: 1, backgroundColor: Colors.carbonBorder, marginVertical: 14 },
+  headline:       { color: Colors.whiteout, marginBottom: 10, fontWeight: "700", lineHeight: 26 },
+  summary:        { color: Colors.silverHighlight, marginBottom: Spacing.s8, lineHeight: 22 },
+  detail:         { color: Colors.midGrayText, lineHeight: 22, opacity: 0.9 },
   disclaimer:     { backgroundColor: Colors.steelSurface, borderRadius: 10, padding: Spacing.s16, marginBottom: Spacing.s24, borderWidth: 1, borderColor: Colors.carbonBorder },
   disclaimerText: { lineHeight: 18 },
   shareSection:   { marginBottom: Spacing.s24, gap: 8 },
