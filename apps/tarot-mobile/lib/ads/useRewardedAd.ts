@@ -20,6 +20,12 @@ try {
   // Expo Go 환경 — 광고 모듈 없음
 }
 
+interface NonceResult {
+  nonce: string;
+  token: string;
+  expiresAt: number;
+}
+
 interface RewardResult {
   credits: number;
   rewarded: number;
@@ -29,15 +35,25 @@ interface RewardResult {
 
 export function useRewardedAd() {
   const adRef = useRef<ReturnType<typeof require> | null>(null);
+  const nonceRef = useRef<NonceResult | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const claimReward = useCallback(async () => {
+    const nonce = nonceRef.current;
+    if (!nonce) {
+      setStatus("error");
+      setErrorMessage("광고 인증 정보 없음");
+      return null;
+    }
     try {
-      const idempotencyKey = `reward_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const result = await apiFetch<RewardResult>("/api/tarot/credits/reward", {
         method: "POST",
-        body: JSON.stringify({ idempotencyKey }),
+        body: JSON.stringify({
+          adNonce: nonce.nonce,
+          adToken: nonce.token,
+          adExpiresAt: nonce.expiresAt,
+        }),
       });
       useUserStore.getState().setCredits(result.credits);
       setStatus("earned");
@@ -56,7 +72,7 @@ export function useRewardedAd() {
     }
   }, []);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     if (!RewardedAd) {
       setStatus("error");
       setErrorMessage("광고를 불러올 수 없습니다 (개발 환경)");
@@ -64,10 +80,26 @@ export function useRewardedAd() {
     }
     setStatus("loading");
     setErrorMessage(null);
+    nonceRef.current = null;
+
+    // 서버에서 광고 인증 nonce 발급 — 광고 로드 전 검증 토큰 획득
+    try {
+      const nonce = await apiFetch<NonceResult>("/api/tarot/credits/reward/nonce", {
+        method: "POST",
+      });
+      nonceRef.current = nonce;
+    } catch {
+      setStatus("error");
+      setErrorMessage("광고 인증 실패");
+      return;
+    }
 
     const { AD_UNIT_REWARDED } = require("./adIds");
     const ad = RewardedAd.createForAdRequest(AD_UNIT_REWARDED, {
       requestNonPersonalizedAdsOnly: true,
+      serverSideVerificationOptions: {
+        customData: nonceRef.current!.nonce,
+      },
     });
 
     const unsubLoaded = ad.addAdEventListener(RewardedAdEventType.LOADED, () => {
@@ -82,7 +114,6 @@ export function useRewardedAd() {
       unsubEarned();
       unsubClosed();
       adRef.current = null;
-      // earned 상태면 유지, 아니면 idle로
       setStatus((prev) => (prev === "earned" ? "earned" : "idle"));
     });
     ad.addAdEventListener(AdEventType.ERROR, () => {
