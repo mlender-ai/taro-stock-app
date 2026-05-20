@@ -14,6 +14,7 @@ import { apiFetch } from "../../lib/api";
 import { localDraw, saveLocalDraw } from "../../lib/localEngine";
 import { AdBanner } from "../../components/AdBanner";
 import { trackEvent } from "../../lib/analytics";
+import { useStoreReview } from "../../lib/useStoreReview";
 
 const SPREAD_OPTIONS: { type: SpreadType; label: string; desc: string; cost: number }[] = [
   { type: "single",     label: "1장",  desc: "핵심 흐름",    cost: 1 },
@@ -78,6 +79,7 @@ export default function DrawScreen() {
 
   const selectedOption = SPREAD_OPTIONS.find((o) => o.type === spread)!;
   const market = ticker?.endsWith(".KS") || ticker?.endsWith(".KQ") ? "KR" : "US";
+  const { onDrawComplete } = useStoreReview();
 
   const handleDraw = async () => {
     if (isDrawing) return;
@@ -140,6 +142,7 @@ export default function DrawScreen() {
       setResult(drawResult);
       setPhase("done");
       trackEvent("draw_complete", { spread, ticker: ticker || "AAPL", source: apiResult.status === "fulfilled" ? "server" : "local" });
+      onDrawComplete();
       setTimeout(() => router.push("/result"), 400);
     } catch {
       // 로컬 엔진도 실패하는 극단적 케이스

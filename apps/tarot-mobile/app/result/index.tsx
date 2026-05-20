@@ -13,6 +13,7 @@ import { useUserStore } from "../../lib/store";
 import { apiFetch } from "../../lib/api";
 import { trackEvent } from "../../lib/analytics";
 import { shareResult } from "../../lib/share";
+import { useStoreReview } from "../../lib/useStoreReview";
 
 const DISCLAIMER = "본 해석은 오락 목적으로 제공되며 투자 조언이 아닙니다. 투자 결정은 본인의 판단과 책임 하에 이루어져야 합니다.";
 
@@ -83,6 +84,7 @@ export default function ResultScreen() {
   const { result, reset } = useDrawStore();
   const { credits, isLoggedIn } = useUserStore();
   const { status: adStatus, errorMessage, load: loadAd, show: showAd, resetStatus } = useRewardedAd();
+  const { onPositiveFeedback } = useStoreReview();
   const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [shareLoading, setShareLoading] = useState(false);
@@ -102,6 +104,7 @@ export default function ResultScreen() {
   const handleFeedback = async (rating: number) => {
     setFeedbackRating(rating);
     trackEvent("feedback_submit", { rating, drawId: result.id ?? "" });
+    onPositiveFeedback(rating);
     if (!isLoggedIn || !result.id) return;
     try {
       const ratingMap = ["ONE", "TWO", "THREE", "FOUR", "FIVE"] as const;
