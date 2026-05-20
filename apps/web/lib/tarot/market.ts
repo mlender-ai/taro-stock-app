@@ -8,6 +8,10 @@ import {
 const YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
 const USER_AGENT = "Mozilla/5.0 (compatible; TarotStockBot/1.0)";
 
+// in-memory 시장 데이터 캐시 — Yahoo Finance 중복 호출 방지 (TTL: 5분)
+const MARKET_CACHE_TTL_MS = 5 * 60 * 1000;
+const marketCache = new Map<string, { snapshot: MarketSnapshot; expiresAt: number }>();
+
 interface YahooChartResult {
   meta?: {
     regularMarketPrice?: number;
@@ -95,6 +99,11 @@ export async function fetchMarketSnapshot(
   ticker: string,
   market: "US" | "KR"
 ): Promise<MarketSnapshot> {
+  const cacheKey = `${ticker}:${market}`;
+  const now = Date.now();
+  const hit = marketCache.get(cacheKey);
+  if (hit && hit.expiresAt > now) return hit.snapshot;
+
   const symbol = market === "KR" && !ticker.includes(".")
     ? `${ticker}.KS`
     : ticker;
@@ -178,5 +187,6 @@ export async function fetchMarketSnapshot(
   if (support20 !== undefined) snapshot.support20 = support20;
   if (resistance20 !== undefined) snapshot.resistance20 = resistance20;
 
+  marketCache.set(cacheKey, { snapshot, expiresAt: now + MARKET_CACHE_TTL_MS });
   return snapshot;
 }

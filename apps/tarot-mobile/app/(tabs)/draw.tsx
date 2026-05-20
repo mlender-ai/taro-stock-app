@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import * as ExpoDigest from "expo-crypto";
 import { Text } from "../../components/ui/Text";
 import { Button } from "../../components/ui/Button";
 import { Colors, Spacing, Radius } from "../../constants/theme";
@@ -13,6 +14,7 @@ import { apiFetch } from "../../lib/api";
 import { localDraw, saveLocalDraw } from "../../lib/localEngine";
 import { AdBanner } from "../../components/AdBanner";
 import { trackEvent } from "../../lib/analytics";
+import { useStoreReview } from "../../lib/useStoreReview";
 
 const SPREAD_OPTIONS: { type: SpreadType; label: string; desc: string; cost: number }[] = [
   { type: "single",     label: "1장",  desc: "핵심 흐름",    cost: 1 },
@@ -61,15 +63,35 @@ export default function DrawScreen() {
   const { spread, ticker, tickerName, isDrawing, setSpread, setDrawing, setResult } = useDrawStore();
   const { credits, setCredits, isLoggedIn } = useUserStore();
   const [phase, setPhase] = useState<"select" | "flipping" | "done">("select");
+  const [loadingLabel, setLoadingLabel] = useState("해석 중...");
+
+  // 로딩 단계 메시지 순환 — 사용자 체감 대기 시간 단축
+  useEffect(() => {
+    if (phase !== "flipping") return;
+    const steps = ["시장 분석 중...", "카드 배치 중...", "타로 해석 중...", "결과 생성 중..."];
+    let i = 0;
+    const id = setInterval(() => {
+      i = (i + 1) % steps.length;
+      setLoadingLabel(steps[i]!);
+    }, 900);
+    return () => clearInterval(id);
+  }, [phase]);
 
   const selectedOption = SPREAD_OPTIONS.find((o) => o.type === spread)!;
   const market = ticker?.endsWith(".KS") || ticker?.endsWith(".KQ") ? "KR" : "US";
+  const { onDrawComplete } = useStoreReview();
 
   const handleDraw = async () => {
     if (isDrawing) return;
     setDrawing(true);
     setPhase("flipping");
     trackEvent("draw_start", { spread, ticker: ticker || "AAPL", market });
+
+    // 멱등성 키 생성 (같은 뽑기가 중복 요청되어도 1회만 처리)
+    const idempotencyKey = await ExpoDigest.digestStringAsync(
+      ExpoDigest.CryptoDigestAlgorithm.SHA256,
+      `draw-${ticker || "AAPL"}-${spread}-${Date.now()}`
+    );
 
     try {
       // 애니메이션 + API 호출 병렬 (1.2초 최소 대기)
@@ -81,6 +103,7 @@ export default function DrawScreen() {
             ticker: ticker || "AAPL",
             market,
             spread: SPREAD_MAP[spread],
+            idempotencyKey,
           }),
         }),
       ]);
@@ -107,6 +130,7 @@ export default function DrawScreen() {
             headline: i === 0 ? api.interpretation.headline : c.nameKo,
             summary: api.interpretation.summary,
             detail: api.interpretation.detail,
+            slot: c.slot ?? null,
           })),
         };
       } else {
@@ -119,6 +143,7 @@ export default function DrawScreen() {
       setResult(drawResult);
       setPhase("done");
       trackEvent("draw_complete", { spread, ticker: ticker || "AAPL", source: apiResult.status === "fulfilled" ? "server" : "local" });
+      onDrawComplete();
       setTimeout(() => router.push("/result"), 400);
     } catch {
       // 로컬 엔진도 실패하는 극단적 케이스
@@ -203,7 +228,7 @@ export default function DrawScreen() {
         <View style={styles.ctaArea}>
           <Button
             variant="primary"
-            label={phase === "select" ? `카드 뽑기 (${selectedOption.cost} 크레딧)` : "해석 중..."}
+            label={phase === "select" ? `카드 뽑기 (${selectedOption.cost} 크레딧)` : loadingLabel}
             loading={isDrawing}
             disabled={phase !== "select"}
             onPress={handleDraw}

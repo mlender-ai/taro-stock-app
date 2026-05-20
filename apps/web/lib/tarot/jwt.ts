@@ -1,8 +1,9 @@
 // 서버 사이드 JWT — 경량 구현 (Node crypto 내장 모듈만 사용)
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 
 const SECRET = process.env["TAROT_API_SECRET"] ?? "dev-secret-change-me";
-const EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30일
+export const ACCESS_EXPIRY_MS  = 7  * 24 * 60 * 60 * 1000; // 7일 (기존 30일 → 단축)
+const REFRESH_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000; // 90일 리프레시 토큰
 
 interface JwtPayload {
   userId: string;
@@ -45,7 +46,16 @@ function verify(token: string): JwtPayload | null {
 
 export function issueToken(userId: string): string {
   const now = Date.now();
-  return sign({ userId, iat: now, exp: now + EXPIRY_MS });
+  return sign({ userId, iat: now, exp: now + ACCESS_EXPIRY_MS });
+}
+
+// 불투명 리프레시 토큰 — DB에 저장하여 회전/폐기 가능
+export function generateRefreshToken(): string {
+  return randomBytes(40).toString("base64url");
+}
+
+export function getRefreshExpiresAt(): Date {
+  return new Date(Date.now() + REFRESH_EXPIRY_MS);
 }
 
 export function verifyToken(token: string): string | null {
@@ -56,4 +66,19 @@ export function verifyToken(token: string): string | null {
 export function extractBearerToken(authHeader: string | null): string | null {
   if (!authHeader?.startsWith("Bearer ")) return null;
   return authHeader.slice(7);
+}
+
+// 쿠키 속성 — 웹 클라이언트용 HttpOnly 설정
+export const AUTH_COOKIE_NAME = "tarot_access_token";
+export const REFRESH_COOKIE_NAME = "tarot_refresh_token";
+export function cookieOptions(maxAgeMs: number): string {
+  const prod = process.env["NODE_ENV"] === "production";
+  const maxAge = Math.floor(maxAgeMs / 1000);
+  return [
+    `Max-Age=${maxAge}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Strict",
+    prod ? "Secure" : "",
+  ].filter(Boolean).join("; ");
 }
