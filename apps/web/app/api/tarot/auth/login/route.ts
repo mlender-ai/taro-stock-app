@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/tarot/prisma";
-import { issueToken } from "@/lib/tarot/jwt";
+import { issueToken, AUTH_COOKIE_NAME, cookieOptions, ACCESS_EXPIRY_MS } from "@/lib/tarot/jwt";
 import { grantSignupBonus, getCreditBalance } from "@/lib/tarot/credits";
 import {
   verifyAppleIdentityToken,
@@ -107,8 +107,8 @@ export async function POST(req: NextRequest) {
   const credits = await getCreditBalance(user.id);
   const token = issueToken(user.id);
 
-  return NextResponse.json({
-    token,
+  const resBody = NextResponse.json({
+    token, // 모바일 앱용: SecureStore에 저장
     user: {
       id: user.id,
       displayName: user.displayName,
@@ -117,4 +117,12 @@ export async function POST(req: NextRequest) {
       isNew,
     },
   });
+
+  // 웹 클라이언트 감지 시 HttpOnly 쿠키도 세팅
+  const clientType = req.headers.get("x-client-type");
+  if (clientType === "web") {
+    resBody.headers.set("Set-Cookie", `${AUTH_COOKIE_NAME}=${token}; ${cookieOptions(ACCESS_EXPIRY_MS)}`);
+  }
+
+  return resBody;
 }
