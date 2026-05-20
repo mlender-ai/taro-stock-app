@@ -71,7 +71,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "android.permission.RECEIVE_BOOT_COMPLETED",
       "android.permission.VIBRATE",
     ],
-    googleMobileAdsAppId: admobAppIdAndroid,
   },
   web: {
     favicon: "./assets/favicon.png",
