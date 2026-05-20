@@ -100,19 +100,46 @@ export async function POST(req: NextRequest) {
   const creditAmount = PRODUCT_CREDIT_MAP[productId];
   if (!creditAmount) return errorJson("Unknown product", "INVALID_PRODUCT", 400);
 
-  // 멱등성 1: 동일 idempotencyKey로 이미 크레딧 지급됐으면 현재 잔액만 반환 (빠른 경로)
-  const existing = await prisma.tarotCreditLedger.findFirst({
+  // 1차 중복 방지: idempotencyKey 기반 클라이언트 재시도 (빠른 경로)
+  const existingByKey = await prisma.tarotCreditLedger.findFirst({
     where: { userId, referenceId: idempotencyKey, reason: "PURCHASE" },
   });
-  if (existing) {
+  if (existingByKey) {
     const credits = await getCreditBalance(userId);
     return NextResponse.json({ credits, duplicate: true });
   }
 
+  // 2차 중복 방지: purchaseToken 글로벌 재사용 차단 — RevenueCat 호출 전에 처리해 API 비용 절감
+  const existingByToken = await prisma.tarotCreditLedger.findFirst({
+    where: { referenceId: purchaseToken, reason: "PURCHASE" },
+  });
+  if (existingByToken) {
+    console.warn(`[iap/purchase] token reuse attempt: userId=${userId} token=${purchaseToken} idempotencyKey=${idempotencyKey}`);
+    void prisma.adminAuditLog.create({
+      data: {
+        action: "iap.token_reuse",
+        targetId: userId,
+        targetType: "User",
+        after: { purchaseToken, productId, idempotencyKey, platform },
+      },
+    });
+    return errorJson("이미 사용된 구매 토큰입니다", "TOKEN_ALREADY_USED", 409);
+  }
+
   // RevenueCat Subscriber API로 실제 거래 검증
+  let isSandboxPurchase = false;
   try {
     const { valid, isSandbox } = await verifyRevenueCat(userId, purchaseToken, productId, platform);
+    isSandboxPurchase = isSandbox;
     if (!valid) {
+      void prisma.adminAuditLog.create({
+        data: {
+          action: isSandbox ? "iap.sandbox_rejected" : "iap.receipt_invalid",
+          targetId: userId,
+          targetType: "User",
+          after: { purchaseToken, productId, platform, idempotencyKey },
+        },
+      });
       if (isSandbox) return errorJson("테스트 결제는 프로덕션에서 사용할 수 없습니다", "SANDBOX_NOT_ALLOWED", 402);
       return errorJson("영수증 검증 실패: 해당 거래를 찾을 수 없습니다", "RECEIPT_INVALID", 402);
     }
@@ -121,16 +148,17 @@ export async function POST(req: NextRequest) {
     return errorJson("영수증 검증 서버 오류", "RECEIPT_ERROR", 502);
   }
 
-  // 멱등성 2: purchaseToken 글로벌 중복 사용 방지 (다른 userId 또는 다른 idempotencyKey로 재사용 차단)
-  const tokenUsed = await prisma.tarotCreditLedger.findFirst({
-    where: { referenceId: purchaseToken, reason: "PURCHASE" },
-  });
-  if (tokenUsed) {
-    console.warn(`[iap/purchase] duplicate purchaseToken detected: ${purchaseToken} userId=${userId}`);
-    return errorJson("이미 사용된 영수증입니다", "TOKEN_ALREADY_USED", 409);
-  }
-
-  // referenceId를 purchaseToken으로 저장해 글로벌 유일성 보장
+  // referenceId를 purchaseToken으로 저장 — 글로벌 유일성 보장 (2차 중복 방지와 일관성)
   const credits = await addCredit(userId, creditAmount, "PURCHASE", purchaseToken);
+
+  void prisma.adminAuditLog.create({
+    data: {
+      action: "iap.purchase_success",
+      targetId: userId,
+      targetType: "User",
+      after: { purchaseToken, productId, creditAmount, platform, isSandbox: isSandboxPurchase, idempotencyKey },
+    },
+  });
+
   return NextResponse.json({ credits, purchased: creditAmount });
 }

@@ -7,8 +7,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 //   2. 영수증 거래 없음 → 402 RECEIPT_INVALID
 //   3. 프로덕션 sandbox 구매 → 402 SANDBOX_NOT_ALLOWED
 //   4. idempotencyKey 중복 → 200 duplicate:true (크레딧 미지급)
-//   5. RevenueCat API 장애 → 502 RECEIPT_ERROR
-//   6. 필수 파라미터 누락 → 400
+//   5. purchaseToken 재사용 (다른 idempotencyKey) → 409 TOKEN_ALREADY_USED
+//   6. RevenueCat API 장애 → 502 RECEIPT_ERROR
+//   7. 필수 파라미터 누락 → 400
 
 // Prisma mock
 const mockFindFirst = vi.fn();
@@ -20,6 +21,9 @@ vi.mock("@/lib/tarot/prisma", () => ({
       findFirst: () => mockFindFirst(),
       create: () => mockCreate(),
       aggregate: () => mockAggregate(),
+    },
+    adminAuditLog: {
+      create: vi.fn().mockResolvedValue({}),
     },
   },
 }));
@@ -54,7 +58,8 @@ vi.mock("@/lib/tarot/credits", () => ({
 
 describe("POST /api/tarot/credits/purchase — IAP 검증", () => {
   beforeEach(() => {
-    mockFindFirst.mockResolvedValue(null); // 중복 없음 (기본값)
+    // 기본값: 두 번의 findFirst 모두 null (중복 없음)
+    mockFindFirst.mockResolvedValue(null);
     mockCreate.mockResolvedValue({});
     mockAggregate.mockResolvedValue({ _sum: { amount: 10 } });
   });
@@ -128,7 +133,8 @@ describe("POST /api/tarot/credits/purchase — IAP 검증", () => {
   });
 
   it("동일 idempotencyKey 중복 요청 → 200 duplicate:true (크레딧 미지급)", async () => {
-    mockFindFirst.mockResolvedValueOnce({ id: "existing-ledger" }); // 이미 지급됨
+    // 1차 체크(idempotencyKey)에서 기존 항목 발견
+    mockFindFirst.mockResolvedValueOnce({ id: "existing-ledger" });
 
     const { POST } = await import("../app/api/tarot/credits/purchase/route");
     const res = await POST(makeRequest({ productId: "tarot_credits_5", purchaseToken: "tx-abc123", idempotencyKey: "iap_tx-abc123", platform: "ios" }));
@@ -136,7 +142,23 @@ describe("POST /api/tarot/credits/purchase — IAP 검증", () => {
 
     expect(res.status).toBe(200);
     expect(body.duplicate).toBe(true);
-    // fetch(RevenueCat)는 호출되지 않아야 함
+    // RevenueCat은 호출되지 않아야 함
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("동일 purchaseToken 다른 idempotencyKey → 409 TOKEN_ALREADY_USED", async () => {
+    // 1차 체크(idempotencyKey) → null, 2차 체크(purchaseToken) → 기존 항목 발견
+    mockFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "existing-token-ledger" });
+
+    const { POST } = await import("../app/api/tarot/credits/purchase/route");
+    const res = await POST(makeRequest({ productId: "tarot_credits_5", purchaseToken: "tx-abc123", idempotencyKey: "iap_tx-abc123-retry", platform: "ios" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body.code).toBe("TOKEN_ALREADY_USED");
+    // RevenueCat은 호출되지 않아야 함
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
