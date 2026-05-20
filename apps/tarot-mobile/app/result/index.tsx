@@ -13,6 +13,7 @@ import { useUserStore } from "../../lib/store";
 import { apiFetch } from "../../lib/api";
 import { trackEvent } from "../../lib/analytics";
 import { shareResult } from "../../lib/share";
+import { TickerLogo } from "../../components/TickerLogo";
 import { useStoreReview } from "../../lib/useStoreReview";
 
 const DISCLAIMER = "본 해석은 오락 목적으로 제공되며 투자 조언이 아닙니다. 투자 결정은 본인의 판단과 책임 하에 이루어져야 합니다.";
@@ -226,10 +227,15 @@ export default function ResultScreen() {
           <Text variant="caption" color={Colors.taroEssence} style={styles.spreadLabel}>
             {result.spread === "single" ? "1장 스프레드" : "3장 스프레드"}
           </Text>
-          <Text variant="heading" style={styles.tickerTitle}>
-            {result.tickerName}
-          </Text>
-          <Text variant="caption" color={Colors.ironOutline}>{result.ticker}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 4 }}>
+            <TickerLogo ticker={result.ticker} size={44} />
+            <View>
+              <Text variant="heading" style={styles.tickerTitle}>
+                {result.tickerName}
+              </Text>
+              <Text variant="caption" color={Colors.ironOutline}>{result.ticker}</Text>
+            </View>
+          </View>
         </View>
 
         {/* 카드들 */}
