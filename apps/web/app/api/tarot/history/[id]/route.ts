@@ -32,7 +32,9 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(draw);
+    return NextResponse.json(draw, {
+      headers: { "Cache-Control": "private, max-age=300, stale-while-revalidate=60" },
+    });
   } catch (error) {
     return NextResponse.json(
       {

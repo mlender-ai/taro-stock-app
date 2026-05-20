@@ -9,5 +9,8 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const credits = await getCreditBalance(auth.userId);
-  return NextResponse.json({ userId: auth.userId, credits });
+  return NextResponse.json(
+    { userId: auth.userId, credits },
+    { headers: { "Cache-Control": "private, max-age=5" } }
+  );
 }
