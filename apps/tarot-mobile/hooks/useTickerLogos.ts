@@ -14,7 +14,7 @@ export function useTickerLogos() {
     if (_fetched) return;
     _fetched = true;
 
-    fetch(`${API_BASE}/api/tarot/ticker-logos`, { cache: "no-store" })
+    fetch(`${API_BASE}/api/tarot/ticker-logos`)
       .then((r) => r.json())
       .then((data: { overrides?: Record<string, string> }) => {
         if (data.overrides && typeof data.overrides === "object") {

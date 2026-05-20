@@ -96,12 +96,8 @@ export function getTickerLogoUrls(ticker: string, size = 48): string[] {
 
   if (!domain) return [];
 
-  return [
-    // Primary: Clearbit (high quality, sometimes rate-limited)
-    `https://logo.clearbit.com/${domain}?size=${size}`,
-    // Secondary: Google S2 Favicons (reliable, lower quality)
-    `https://www.google.com/s2/favicons?sz=${Math.min(size, 128)}&domain=${domain}`,
-  ];
+  // Clearbit: 고품질 PNG. 실패 시 colored-initial 폴백 (파비콘보다 훨씬 낫다)
+  return [`https://logo.clearbit.com/${domain}?size=${size}`];
 }
 
 /** Legacy single-URL helper — returns first candidate */

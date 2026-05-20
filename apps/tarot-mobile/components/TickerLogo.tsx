@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Image, View, Text, StyleSheet } from "react-native";
 import { getTickerLogoUrls, getTickerColor } from "../lib/tickerLogo";
 
@@ -8,9 +8,14 @@ interface Props {
 }
 
 export function TickerLogo({ ticker, size = 32 }: Props) {
-  const urls = getTickerLogoUrls(ticker, size * 2); // 2x for retina
+  const urls = getTickerLogoUrls(ticker, Math.max(size * 2, 128)); // 최소 128px
   const [urlIndex, setUrlIndex] = useState(0);
   const radius = size * 0.25;
+
+  // ticker 변경 시 항상 첫 URL부터 재시도
+  useEffect(() => {
+    setUrlIndex(0);
+  }, [ticker]);
 
   const currentUrl = urls[urlIndex] ?? null;
 
@@ -23,11 +28,8 @@ export function TickerLogo({ ticker, size = 32 }: Props) {
       source={{ uri: currentUrl }}
       style={{ width: size, height: size, borderRadius: radius }}
       onError={() => {
-        if (urlIndex + 1 < urls.length) {
-          setUrlIndex((i) => i + 1);
-        } else {
-          setUrlIndex(urls.length); // triggers fallback on next render
-        }
+        const next = urlIndex + 1;
+        setUrlIndex(next); // urls[next]가 없으면 null → Fallback
       }}
       resizeMode="contain"
     />
