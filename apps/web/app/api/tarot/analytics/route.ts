@@ -4,6 +4,10 @@ import { requireAuth } from "@/lib/tarot/auth";
 
 export const dynamic = "force-dynamic";
 
+// per-user 인메모리 캐시 — 6개 병렬 DB 쿼리 중복 실행 방지 (TTL: 60초)
+const ANALYTICS_CACHE_TTL_MS = 60_000;
+const analyticsCache = new Map<string, { data: unknown; expiresAt: number }>();
+
 interface AnalyticsEvent {
   event: string;
   properties?: Record<string, string | number | boolean>;
@@ -45,6 +49,15 @@ export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   const { userId } = auth;
+
+  // 캐시 히트: 60초 내 동일 유저 재요청은 DB 쿼리 생략
+  const now = Date.now();
+  const cached = analyticsCache.get(userId);
+  if (cached && cached.expiresAt > now) {
+    return NextResponse.json(cached.data, {
+      headers: { "X-Cache": "HIT", "Cache-Control": "private, max-age=60" },
+    });
+  }
 
   const [
     totalDraws,
@@ -112,7 +125,7 @@ export async function GET(req: NextRequest) {
 
   const cardMap = new Map(cardMeta.map((c) => [c.id, c]));
 
-  return NextResponse.json({
+  const payload = {
     totalDraws,
     spreadBreakdown: spreadBreakdown.map((s) => ({ spread: s.spread, count: s._count })),
     topCards: topCards.map((c) => ({
@@ -123,5 +136,11 @@ export async function GET(req: NextRequest) {
     topTickers: topTickers.map((t) => ({ ticker: t.ticker, count: t._count })),
     sourceBreakdown: sourceBreakdown.map((s) => ({ source: s.source, count: s._count })),
     recentActivity,
+  };
+
+  analyticsCache.set(userId, { data: payload, expiresAt: now + ANALYTICS_CACHE_TTL_MS });
+
+  return NextResponse.json(payload, {
+    headers: { "X-Cache": "MISS", "Cache-Control": "private, max-age=60" },
   });
 }

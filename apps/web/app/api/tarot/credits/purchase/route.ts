@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
   const creditAmount = PRODUCT_CREDIT_MAP[productId];
   if (!creditAmount) return errorJson("Unknown product", "INVALID_PRODUCT", 400);
 
-  // 멱등성: 동일 idempotencyKey로 이미 크레딧 지급됐으면 현재 잔액만 반환
+  // 멱등성 1: 동일 idempotencyKey로 이미 크레딧 지급됐으면 현재 잔액만 반환 (빠른 경로)
   const existing = await prisma.tarotCreditLedger.findFirst({
     where: { userId, referenceId: idempotencyKey, reason: "PURCHASE" },
   });
@@ -121,6 +121,16 @@ export async function POST(req: NextRequest) {
     return errorJson("영수증 검증 서버 오류", "RECEIPT_ERROR", 502);
   }
 
-  const credits = await addCredit(userId, creditAmount, "PURCHASE", idempotencyKey);
+  // 멱등성 2: purchaseToken 글로벌 중복 사용 방지 (다른 userId 또는 다른 idempotencyKey로 재사용 차단)
+  const tokenUsed = await prisma.tarotCreditLedger.findFirst({
+    where: { referenceId: purchaseToken, reason: "PURCHASE" },
+  });
+  if (tokenUsed) {
+    console.warn(`[iap/purchase] duplicate purchaseToken detected: ${purchaseToken} userId=${userId}`);
+    return errorJson("이미 사용된 영수증입니다", "TOKEN_ALREADY_USED", 409);
+  }
+
+  // referenceId를 purchaseToken으로 저장해 글로벌 유일성 보장
+  const credits = await addCredit(userId, creditAmount, "PURCHASE", purchaseToken);
   return NextResponse.json({ credits, purchased: creditAmount });
 }
