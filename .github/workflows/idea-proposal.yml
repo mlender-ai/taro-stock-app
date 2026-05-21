@@ -121,6 +121,8 @@ jobs:
       proposal: ${{ steps.proposal.outputs.response }}
     steps:
       - uses: actions/checkout@v4
+      - name: Rate limit stagger
+        run: sleep 15
       - name: "[Frontend] 모바일 UX / 성능 / 컴포넌트 개선 제안"
         uses: actions/ai-inference@v1
         id: proposal
@@ -176,6 +178,8 @@ jobs:
       proposal: ${{ steps.proposal.outputs.response }}
     steps:
       - uses: actions/checkout@v4
+      - name: Rate limit stagger
+        run: sleep 30
       - name: "[Backend] API / DB / 인프라 개선 제안"
         uses: actions/ai-inference@v1
         id: proposal
@@ -231,6 +235,8 @@ jobs:
       proposal: ${{ steps.proposal.outputs.response }}
     steps:
       - uses: actions/checkout@v4
+      - name: Rate limit stagger
+        run: sleep 45
       - name: "[Designer] UX/UI/비주얼 디자인 개선 제안"
         uses: actions/ai-inference@v1
         id: proposal
@@ -286,6 +292,8 @@ jobs:
       proposal: ${{ steps.proposal.outputs.response }}
     steps:
       - uses: actions/checkout@v4
+      - name: Rate limit stagger
+        run: sleep 60
       - name: "[QA] 품질 개선 / 테스트 커버리지 제안"
         uses: actions/ai-inference@v1
         id: proposal
@@ -342,6 +350,8 @@ jobs:
       proposal: ${{ steps.proposal.outputs.response }}
     steps:
       - uses: actions/checkout@v4
+      - name: Rate limit stagger
+        run: sleep 75
       - name: "[CTO] 기술 부채 / 아키텍처 개선 제안"
         uses: actions/ai-inference@v1
         id: proposal
@@ -396,6 +406,8 @@ jobs:
       proposal: ${{ steps.proposal.outputs.response }}
     steps:
       - uses: actions/checkout@v4
+      - name: Rate limit stagger
+        run: sleep 90
       - name: "[Marketer] 성장 / 바이럴 / 리텐션 개선 제안"
         uses: actions/ai-inference@v1
         id: proposal
@@ -451,6 +463,8 @@ jobs:
       proposal: ${{ steps.proposal.outputs.response }}
     steps:
       - uses: actions/checkout@v4
+      - name: Rate limit stagger
+        run: sleep 105
       - name: "[Security] 보안/컴플라이언스 점검 제안"
         uses: actions/ai-inference@v1
         id: proposal
@@ -505,6 +519,8 @@ jobs:
       proposal: ${{ steps.proposal.outputs.response }}
     steps:
       - uses: actions/checkout@v4
+      - name: Rate limit stagger
+        run: sleep 120
       - name: "[Prompt Engineer] AI 해석 품질 개선 제안"
         uses: actions/ai-inference@v1
         id: proposal
