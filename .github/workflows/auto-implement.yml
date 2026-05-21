@@ -1,0 +1,144 @@
+name: Auto Implement CEO Brief
+
+on:
+  workflow_run:
+    workflows: ["Daily Agent Council"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      brief_date:
+        description: "CEO Brief 날짜 (YYYY-MM-DD, 기본: 오늘)"
+        required: false
+
+concurrency:
+  group: auto-implement
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  models: read
+
+jobs:
+  implement:
+    # 스케줄 실행은 idea-proposal 성공 시에만, 수동은 항상
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── 1. 오늘 CEO Brief 이슈 가져오기 ───────────────────────
+      - name: Fetch CEO Brief
+        id: brief
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "${{ github.event.inputs.brief_date }}" ]; then
+            TODAY="${{ github.event.inputs.brief_date }}"
+          else
+            TODAY=$(TZ=Asia/Seoul date '+%Y-%m-%d')
+          fi
+          echo "today=$TODAY" >> "$GITHUB_OUTPUT"
+
+          BRIEF_JSON=$(gh issue list \
+            --label "ceo-brief" \
+            --state open \
+            --limit 5 \
+            --json number,title,body \
+            --repo "${{ github.repository }}" | \
+            jq "[.[] | select(.title | contains(\"$TODAY\"))] | .[0]")
+
+          if [ -z "$BRIEF_JSON" ] || [ "$BRIEF_JSON" = "null" ]; then
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "⚠️ $TODAY 날짜의 CEO Brief 이슈를 찾지 못했습니다."
+            exit 0
+          fi
+
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "number=$(echo "$BRIEF_JSON" | jq -r '.number')" >> "$GITHUB_OUTPUT"
+
+          echo "body<<__EOF__" >> "$GITHUB_OUTPUT"
+          echo "$BRIEF_JSON" | jq -r '.body' >> "$GITHUB_OUTPUT"
+          echo "__EOF__" >> "$GITHUB_OUTPUT"
+
+      # ── 2. 오늘 이미 Auto PR이 있는지 중복 체크 ───────────────
+      - name: Check Duplicate PR
+        id: dedup
+        if: steps.brief.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TODAY: ${{ steps.brief.outputs.today }}
+        run: |
+          COUNT=$(gh pr list \
+            --state open \
+            --limit 30 \
+            --json title \
+            --repo "${{ github.repository }}" | \
+            jq "[.[] | select(.title | test(\"\\\\[Auto\\\\].*$TODAY\"))] | length")
+          if [ "$COUNT" -gt 0 ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "오늘($TODAY) Auto PR이 이미 존재합니다. 건너뜁니다."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── 3. AI로 실행 지시 1개 추출 (Kill list 제외) ────────────
+      - name: Extract Top Execution Instruction
+        id: extract
+        if: steps.brief.outputs.found == 'true' && steps.dedup.outputs.exists == 'false'
+        uses: actions/ai-inference@v1
+        with:
+          model: openai/gpt-4o
+          system-prompt: |
+            당신은 CEO Brief를 파싱하여 개발팀에 전달할 실행 지시를 추출하는 파서입니다.
+            반드시 JSON만 반환하세요. 마크다운 코드 블록도 없이, 순수 JSON만.
+          prompt: |
+            아래 CEO Brief에서 "이번 주 실행 지시" 섹션의 첫 번째 항목만 추출하세요.
+
+            중요 규칙:
+            - Kill list, 보류, 무시 항목은 절대 선택하지 마세요.
+            - 카카오톡 공유, 사주팔자, 어드민 UI는 절대 선택하지 마세요.
+            - 타로앱 UX 몰입감과 관련된 항목을 최우선으로 선택하세요.
+
+            응답 형식 (JSON만, 다른 텍스트 없이):
+            {
+              "title": "기능 이름 (짧게)",
+              "agent": "담당 에이전트",
+              "description": "구현 내용 요약 (구체적으로, 3-5문장)",
+              "rationale": "선택 이유"
+            }
+
+            CEO Brief:
+            ${{ steps.brief.outputs.body }}
+
+      # ── 4. Claude Code로 구현 ─────────────────────────────────
+      - name: Implement via Claude Code
+        if: steps.brief.outputs.found == 'true' && steps.dedup.outputs.exists == 'false'
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: |
+            Trading Taro 앱의 CEO Brief 이슈 #${{ steps.brief.outputs.number }} (${{ steps.brief.outputs.today }})에서 실행 지시된 기능을 구현하세요.
+
+            ## 오늘 실행 지시
+            ${{ steps.extract.outputs.response }}
+
+            ## CEO Brief 전문 (컨텍스트)
+            ${{ steps.brief.outputs.body }}
+
+            ## 프로젝트 컨텍스트
+            - 모노레포: apps/tarot-mobile (React Native + Expo SDK 54), apps/web (Next.js 14 API), packages/shared (공용 타입), packages/tarot-core (비즈니스 로직)
+            - 디자인 토큰: apps/tarot-mobile/constants/theme.ts (Colors, Spacing, Radius)
+            - 애니메이션: React Native Animated API만 허용 (react-native-reanimated 사용 금지 — Expo Go 제약)
+            - AGENTS.md 최우선 지시사항 준수: UX 몰입감 > 모든 것
+            - Kill list (절대 구현 금지): 카카오톡 공유, 사주팔자, 어드민 UI
+
+            ## 구현 완료 후 반드시 할 것
+            1. 브랜치명: agent/ceo-brief-${{ steps.brief.outputs.today }}
+            2. PR 제목: [Auto] ${{ steps.brief.outputs.today }} — {구현한 기능명}
+            3. PR body: 구현 내용 + 원본 이슈 링크 https://github.com/${{ github.repository }}/issues/${{ steps.brief.outputs.number }}
+            4. PR 생성 후 CEO Brief 이슈 #${{ steps.brief.outputs.number }}에 댓글: "구현 PR: #{PR번호}"
