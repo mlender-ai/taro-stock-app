@@ -45,16 +45,38 @@ interface ApiDrawResponse {
 }
 
 function CardBack({ flipped, delay }: { flipped: boolean; delay: number }) {
-  const anim = useRef(new Animated.Value(0)).current;
+  const flipAnim = useRef(new Animated.Value(0)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0.5)).current;
+
+  useEffect(() => {
+    const floatLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, { toValue: -7, duration: 1300, useNativeDriver: true }),
+        Animated.timing(floatAnim, { toValue: 0, duration: 1300, useNativeDriver: true }),
+      ])
+    );
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0.5, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    floatLoop.start();
+    glowLoop.start();
+    return () => { floatLoop.stop(); glowLoop.stop(); };
+  }, []);
+
   useEffect(() => {
     if (flipped) {
-      Animated.timing(anim, { toValue: 1, duration: 600, delay, useNativeDriver: true }).start();
+      Animated.timing(flipAnim, { toValue: 1, duration: 600, delay, useNativeDriver: true }).start();
     }
   }, [flipped]);
-  const rotate = anim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "180deg"] });
+
+  const rotate = flipAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "180deg"] });
   return (
-    <Animated.View style={[styles.card, { transform: [{ rotateY: rotate }] }]}>
-      <Text style={styles.cardSymbol}>✦</Text>
+    <Animated.View style={[styles.card, { transform: [{ rotateY: rotate }, { translateY: floatAnim }] }]}>
+      <Animated.Text style={[styles.cardSymbol, { opacity: glowAnim }]}>✦</Animated.Text>
     </Animated.View>
   );
 }
@@ -66,6 +88,14 @@ export default function DrawScreen() {
   const [phase, setPhase] = useState<"select" | "selecting" | "flipping" | "done">("select");
   const [loadingLabel, setLoadingLabel] = useState("해석 중...");
 
+  // crossfade for loading text
+  const loadingOpacity = useRef(new Animated.Value(1)).current;
+  const [displayedLabel, setDisplayedLabel] = useState("해석 중...");
+
+  // entrance animation for spread options
+  const spreadEnterY = useRef(new Animated.Value(30)).current;
+  const spreadEnterOpacity = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     if (phase !== "flipping") return;
     const steps = ["시장 분석 중...", "카드 배치 중...", "타로 해석 중...", "결과 생성 중..."];
@@ -75,6 +105,26 @@ export default function DrawScreen() {
       setLoadingLabel(steps[i]!);
     }, 900);
     return () => clearInterval(id);
+  }, [phase]);
+
+  // crossfade loading label
+  useEffect(() => {
+    Animated.timing(loadingOpacity, { toValue: 0, duration: 160, useNativeDriver: true }).start(() => {
+      setDisplayedLabel(loadingLabel);
+      Animated.timing(loadingOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    });
+  }, [loadingLabel]);
+
+  // slide-up entrance for spread option cards
+  useEffect(() => {
+    if (phase === "select") {
+      spreadEnterY.setValue(30);
+      spreadEnterOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(spreadEnterY, { toValue: 0, duration: 420, useNativeDriver: true }),
+        Animated.timing(spreadEnterOpacity, { toValue: 1, duration: 380, useNativeDriver: true }),
+      ]).start();
+    }
   }, [phase]);
 
   const selectedOption = SPREAD_OPTIONS.find((o) => o.type === spread)!;
@@ -196,7 +246,12 @@ export default function DrawScreen() {
         {/* SELECT — 스프레드 선택이 CTA */}
         {phase === "select" && (
           <>
-            <View style={styles.spreadRow}>
+            <Animated.View
+              style={[
+                styles.spreadRow,
+                { opacity: spreadEnterOpacity, transform: [{ translateY: spreadEnterY }] },
+              ]}
+            >
               {SPREAD_OPTIONS.map((opt) => (
                 <TouchableOpacity
                   key={opt.type}
@@ -217,7 +272,7 @@ export default function DrawScreen() {
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </Animated.View>
             <View style={styles.cardsArea}>
               <Text variant="body-sm" style={styles.hint}>스프레드를 선택하면 카드가 펼쳐집니다</Text>
             </View>
@@ -246,9 +301,11 @@ export default function DrawScreen() {
                 ))}
               </View>
               <ActivityIndicator color={Colors.taroEssence} style={{ marginTop: 20 }} />
-              <Text variant="body-sm" color={Colors.taroEssence} style={styles.loadingText}>
-                {loadingLabel}
-              </Text>
+              <Animated.View style={{ opacity: loadingOpacity }}>
+                <Text variant="body-sm" color={Colors.taroEssence} style={styles.loadingText}>
+                  {displayedLabel}
+                </Text>
+              </Animated.View>
             </View>
             <AdBanner />
           </>

@@ -24,6 +24,7 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
   const [selected, setSelected] = useState<number[]>([]);
   const [revealedSet, setRevealedSet] = useState<ReadonlySet<number>>(new Set());
 
+  // --- original animation refs ---
   const enterYs = useRef(
     Array.from({ length: CARD_COUNT }, () => new Animated.Value(200))
   ).current;
@@ -70,6 +71,35 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
     )
   ).current;
 
+  // --- new micro-interaction refs ---
+
+  // shimmer sweep per card — starts at different phases so cards shimmer at offset times
+  const shimmerAnims = useRef(
+    Array.from({ length: CARD_COUNT }, (_, i) => new Animated.Value(i / CARD_COUNT))
+  ).current;
+
+  // press scale — springs on tap
+  const pressScales = useRef(
+    Array.from({ length: CARD_COUNT }, () => new Animated.Value(1))
+  ).current;
+
+  // glow pulse per card — starts looping when card is selected
+  const glowPulseAnims = useRef(
+    Array.from({ length: CARD_COUNT }, () => new Animated.Value(0))
+  ).current;
+
+  // instruction text crossfade
+  const instructionOpacity = useRef(new Animated.Value(1)).current;
+  const [displayedInstruction, setDisplayedInstruction] = useState(" ");
+
+  // reveal scale overshoot
+  const revealScales = useRef(
+    Array.from({ length: CARD_COUNT }, () => new Animated.Value(1))
+  ).current;
+
+  // --- effects ---
+
+  // entrance stagger
   useEffect(() => {
     const animations = Array.from({ length: CARD_COUNT }, (_, i) =>
       Animated.parallel([
@@ -89,6 +119,59 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
     Animated.stagger(70, animations).start(() => setSpreadPhase("picking"));
   }, []);
 
+  // shimmer sweep — loops across all card backs
+  useEffect(() => {
+    const loops = shimmerAnims.map((anim) => {
+      return Animated.loop(
+        Animated.timing(anim, {
+          toValue: anim.__getValue() > 0.5 ? 0 : 1,
+          duration: 2200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        })
+      );
+    });
+    loops.forEach((l) => l.start());
+    return () => loops.forEach((l) => l.stop());
+  }, []);
+
+  // crossfade instruction text when it changes
+  const instructionText = (): string => {
+    if (spreadPhase === "spreading") return " ";
+    if (spreadPhase === "revealing") return "운명의 카드가 공개됩니다...";
+    if (spreadType === "single") return "직관이 이끄는 카드를 선택하세요";
+    const labels = ["첫 번째", "두 번째", "세 번째"] as const;
+    return `${labels[selected.length] ?? "세 번째"} 카드를 선택하세요`;
+  };
+
+  const currentInstruction = instructionText();
+  const prevInstruction = useRef(currentInstruction);
+
+  useEffect(() => {
+    if (currentInstruction === prevInstruction.current) return;
+    prevInstruction.current = currentInstruction;
+
+    Animated.timing(instructionOpacity, {
+      toValue: 0,
+      duration: 140,
+      useNativeDriver: true,
+    }).start(() => {
+      setDisplayedInstruction(currentInstruction);
+      Animated.timing(instructionOpacity, {
+        toValue: 1,
+        duration: 220,
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [currentInstruction]);
+
+  // initialize displayed instruction
+  useEffect(() => {
+    setDisplayedInstruction(currentInstruction);
+  }, [spreadPhase]);
+
+  // --- handlers ---
+
   const handleCardTap = (cardIdx: number) => {
     if (spreadPhase !== "picking") return;
     if (selected.includes(cardIdx)) return;
@@ -96,12 +179,31 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
     const newSelected = [...selected, cardIdx];
     setSelected(newSelected);
 
+    // spring lift
     Animated.spring(liftYs[cardIdx]!, {
       toValue: -28,
       tension: 150,
       friction: 8,
       useNativeDriver: true,
     }).start();
+
+    // start glow pulse for selected card
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowPulseAnims[cardIdx]!, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowPulseAnims[cardIdx]!, {
+          toValue: 0,
+          duration: 700,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
 
     dimOpacities.forEach((anim, i) => {
       if (!newSelected.includes(i)) {
@@ -119,49 +221,92 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
     }
   };
 
+  const handlePressIn = (cardIdx: number) => {
+    if (spreadPhase !== "picking" || selected.includes(cardIdx)) return;
+    Animated.spring(pressScales[cardIdx]!, {
+      toValue: 0.91,
+      tension: 300,
+      friction: 10,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = (cardIdx: number) => {
+    Animated.spring(pressScales[cardIdx]!, {
+      toValue: 1,
+      tension: 200,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const startReveal = (indices: number[]) => {
     let done = 0;
     indices.forEach((cardIdx, i) => {
       setTimeout(() => {
+        // stop glow pulse
+        glowPulseAnims[cardIdx]!.stopAnimation();
+        glowPulseAnims[cardIdx]!.setValue(0);
+
+        // flip: scaleX → 0, swap face, scaleX → 1 with overshoot
         Animated.timing(flipScales[cardIdx]!, {
           toValue: 0,
           duration: 210,
           useNativeDriver: true,
         }).start(() => {
-          setRevealedSet(prev => new Set([...prev, cardIdx]));
-          Animated.timing(flipScales[cardIdx]!, {
+          setRevealedSet((prev) => new Set([...prev, cardIdx]));
+          Animated.spring(flipScales[cardIdx]!, {
             toValue: 1,
-            duration: 210,
+            tension: 180,
+            friction: 7,
             useNativeDriver: true,
           }).start(() => {
-            done++;
-            if (done === indices.length) {
-              setTimeout(onComplete, 700);
-            }
+            // subtle reveal scale pulse
+            Animated.sequence([
+              Animated.timing(revealScales[cardIdx]!, {
+                toValue: 1.07,
+                duration: 180,
+                useNativeDriver: true,
+              }),
+              Animated.timing(revealScales[cardIdx]!, {
+                toValue: 1,
+                duration: 220,
+                easing: Easing.out(Easing.quad),
+                useNativeDriver: true,
+              }),
+            ]).start(() => {
+              done++;
+              if (done === indices.length) {
+                setTimeout(onComplete, 700);
+              }
+            });
           });
         });
       }, i * 320);
     });
   };
 
-  const instructionText = (): string => {
-    if (spreadPhase === "spreading") return " ";
-    if (spreadPhase === "revealing") return "운명의 카드가 공개됩니다...";
-    if (spreadType === "single") return "직관이 이끄는 카드를 선택하세요";
-    const labels = ["첫 번째", "두 번째", "세 번째"] as const;
-    return `${labels[selected.length] ?? "세 번째"} 카드를 선택하세요`;
-  };
-
   return (
     <View style={styles.root}>
-      <Text variant="body-sm" style={styles.instruction}>
-        {instructionText()}
-      </Text>
+      <Animated.View style={{ opacity: instructionOpacity }}>
+        <Text variant="body-sm" style={styles.instruction}>
+          {displayedInstruction}
+        </Text>
+      </Animated.View>
 
       {spreadType === "three-card" && spreadPhase !== "spreading" && (
         <View style={styles.dotRow}>
-          {[0, 1, 2].map(i => (
-            <View key={i} style={[styles.dot, i < selected.length && styles.dotActive]} />
+          {[0, 1, 2].map((i) => (
+            <Animated.View
+              key={i}
+              style={[
+                styles.dot,
+                i < selected.length && styles.dotActive,
+                i < selected.length && {
+                  transform: [{ scale: 1.3 }],
+                },
+              ]}
+            />
           ))}
         </View>
       )}
@@ -174,6 +319,18 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
           const isRevealed = revealedSet.has(i);
           const tapEnabled = spreadPhase === "picking" && !isSelected;
 
+          // shimmer stripe position
+          const shimmerX = shimmerAnims[i]!.interpolate({
+            inputRange: [0, 1],
+            outputRange: [-CARD_W * 1.5, CARD_W * 1.5],
+          });
+
+          // glow ring opacity
+          const glowRingOpacity = glowPulseAnims[i]!.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, 0.75],
+          });
+
           return (
             <Animated.View
               key={i}
@@ -185,6 +342,7 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
                     { translateX: txValues[i]! },
                     { translateY: totalTranslateYs[i]! },
                     { rotate: angle },
+                    { scale: Animated.multiply(pressScales[i]!, revealScales[i]!) },
                   ],
                   zIndex: isSelected ? 20 : 10 - Math.abs(offset),
                 },
@@ -192,8 +350,10 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
             >
               <TouchableOpacity
                 onPress={() => handleCardTap(i)}
+                onPressIn={() => handlePressIn(i)}
+                onPressOut={() => handlePressOut(i)}
                 disabled={!tapEnabled}
-                activeOpacity={0.85}
+                activeOpacity={1}
               >
                 <Animated.View
                   style={[
@@ -203,6 +363,25 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
                     { transform: [{ scaleX: flipScales[i]! }] },
                   ]}
                 >
+                  {/* shimmer sweep overlay on card back */}
+                  {!isRevealed && !isSelected && (
+                    <Animated.View
+                      style={[
+                        styles.shimmerStripe,
+                        { transform: [{ translateX: shimmerX }, { rotate: "25deg" }] },
+                      ]}
+                      pointerEvents="none"
+                    />
+                  )}
+
+                  {/* glow ring for selected cards */}
+                  {isSelected && !isRevealed && (
+                    <Animated.View
+                      style={[styles.glowRing, { opacity: glowRingOpacity }]}
+                      pointerEvents="none"
+                    />
+                  )}
+
                   {isRevealed ? (
                     <View style={styles.frontFace}>
                       <Text style={styles.frontSymbol}>✦</Text>
@@ -287,6 +466,24 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.voidGreen,
     borderColor: Colors.taroEssence,
     borderWidth: 2,
+  },
+  shimmerStripe: {
+    position: "absolute",
+    width: 18,
+    height: CARD_H * 1.5,
+    backgroundColor: Colors.taroEssence,
+    opacity: 0.09,
+    top: -CARD_H * 0.25,
+  },
+  glowRing: {
+    position: "absolute",
+    top: -3,
+    left: -3,
+    right: -3,
+    bottom: -3,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: Colors.taroEssence,
   },
   backFace: {
     flex: 1,
