@@ -25,7 +25,7 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
   const [revealedSet, setRevealedSet] = useState<ReadonlySet<number>>(new Set());
 
   const enterYs = useRef(
-    Array.from({ length: CARD_COUNT }, () => new Animated.Value(200))
+    Array.from({ length: CARD_COUNT }, () => new Animated.Value(280))
   ).current;
 
   const enterOpacities = useRef(
@@ -70,6 +70,10 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
     )
   ).current;
 
+  const tapScales = useRef(
+    Array.from({ length: CARD_COUNT }, () => new Animated.Value(1))
+  ).current;
+
   useEffect(() => {
     const animations = Array.from({ length: CARD_COUNT }, (_, i) =>
       Animated.parallel([
@@ -103,6 +107,11 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
       useNativeDriver: true,
     }).start();
 
+    Animated.sequence([
+      Animated.timing(tapScales[cardIdx]!, { toValue: 1.12, duration: 90, useNativeDriver: true }),
+      Animated.spring(tapScales[cardIdx]!, { toValue: 1, tension: 200, friction: 8, useNativeDriver: true }),
+    ]).start();
+
     dimOpacities.forEach((anim, i) => {
       if (!newSelected.includes(i)) {
         Animated.timing(anim, {
@@ -125,13 +134,15 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
       setTimeout(() => {
         Animated.timing(flipScales[cardIdx]!, {
           toValue: 0,
-          duration: 210,
+          duration: 180,
+          easing: Easing.in(Easing.quad),
           useNativeDriver: true,
         }).start(() => {
           setRevealedSet(prev => new Set([...prev, cardIdx]));
-          Animated.timing(flipScales[cardIdx]!, {
+          Animated.spring(flipScales[cardIdx]!, {
             toValue: 1,
-            duration: 210,
+            tension: 200,
+            friction: 10,
             useNativeDriver: true,
           }).start(() => {
             done++;
@@ -200,7 +211,7 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
                     styles.card,
                     isSelected && !isRevealed && styles.cardSelected,
                     isRevealed && styles.cardRevealed,
-                    { transform: [{ scaleX: flipScales[i]! }] },
+                    { transform: [{ scaleX: flipScales[i]! }, { scale: tapScales[i]! }] },
                   ]}
                 >
                   {isRevealed ? (

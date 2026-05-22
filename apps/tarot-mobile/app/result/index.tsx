@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   SafeAreaView, View, ScrollView, TouchableOpacity,
-  StyleSheet, Animated, Alert,
+  StyleSheet, Animated, Alert, Easing,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Text } from "../../components/ui/Text";
@@ -26,15 +26,28 @@ const SLOT_LABELS: Record<string, string> = {
 
 function CardReveal({ card, index }: { card: DrawnCard; index: number }) {
   const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(32)).current;
-  const scale = useRef(new Animated.Value(0.96)).current;
+  const translateY = useRef(new Animated.Value(52)).current;
+  const scale = useRef(new Animated.Value(0.92)).current;
+  const shimmer = useRef(new Animated.Value(-80)).current;
 
   useEffect(() => {
+    const delay = index * 250;
     Animated.parallel([
-      Animated.timing(opacity,     { toValue: 1,    duration: 600, delay: index * 250, useNativeDriver: true }),
-      Animated.timing(translateY,  { toValue: 0,    duration: 600, delay: index * 250, useNativeDriver: true }),
-      Animated.timing(scale,       { toValue: 1,    duration: 600, delay: index * 250, useNativeDriver: true }),
+      Animated.timing(opacity,    { toValue: 1, duration: 600, delay, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 650, delay, easing: Easing.out(Easing.back(1.3)), useNativeDriver: true }),
+      Animated.timing(scale,      { toValue: 1, duration: 600, delay, easing: Easing.out(Easing.back(1.1)), useNativeDriver: true }),
     ]).start();
+
+    const timer = setTimeout(() => {
+      Animated.timing(shimmer, {
+        toValue: 80,
+        duration: 450,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start();
+    }, delay + 650);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const slotLabel = card.slot ? SLOT_LABELS[card.slot] ?? null : null;
@@ -53,6 +66,10 @@ function CardReveal({ card, index }: { card: DrawnCard; index: number }) {
         <Animated.View style={[styles.cardThumb, card.isReversed && styles.cardThumbReversed]}>
           <Text style={styles.cardThumSymbol}>{card.symbol}</Text>
           {card.isReversed && <Text style={styles.reversedMark}>▽</Text>}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.shimmerBarBase, { transform: [{ translateX: shimmer }, { rotate: '15deg' }] }]}
+          />
         </Animated.View>
         <View style={styles.cardMeta}>
           <Text variant="subheading" color={Colors.whiteout}>{card.nameKo}</Text>
@@ -89,6 +106,11 @@ export default function ResultScreen() {
   const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [shareLoading, setShareLoading] = useState(false);
+  const screenFade = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(screenFade, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+  }, []);
 
   useEffect(() => {
     if (adStatus === "earned") {
@@ -206,6 +228,7 @@ export default function ResultScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <Animated.View style={{ flex: 1, opacity: screenFade }}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -321,6 +344,7 @@ export default function ResultScreen() {
           />
         </View>
       </ScrollView>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -338,7 +362,8 @@ const styles = StyleSheet.create({
   slotBadge:      { alignSelf: "flex-start", backgroundColor: Colors.voidGreen, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 12 },
   slotLabel:      { letterSpacing: 1.5, fontWeight: "700" },
   cardHeader:     { flexDirection: "row", gap: 16, marginBottom: 12 },
-  cardThumb:      { width: 64, height: 92, backgroundColor: Colors.ebonyCanvas, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.taroEssence, alignItems: "center", justifyContent: "center", gap: 4 },
+  cardThumb:      { width: 64, height: 92, backgroundColor: Colors.ebonyCanvas, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.taroEssence, alignItems: "center", justifyContent: "center", gap: 4, overflow: "hidden" },
+  shimmerBarBase: { position: "absolute", top: -10, bottom: -10, width: 20, backgroundColor: Colors.taroEssence, opacity: 0.2 },
   cardThumbReversed: { borderColor: Colors.ironOutline, opacity: 0.85 },
   cardThumSymbol: { fontSize: 18, color: Colors.taroEssence, fontWeight: "700" },
   reversedMark:   { fontSize: 9, color: Colors.ironOutline },
