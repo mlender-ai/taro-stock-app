@@ -197,17 +197,8 @@ jobs:
           echo "Pushing branch: $BRANCH"
           git push origin "$BRANCH" --force 2>&1
 
-          # PR 생성 (heredoc으로 body 전달)
-          cat > /tmp/pr-body.md << PRBODY
-          ## 실행 지시
-          ${INSTRUCTION}
-
-          ## 구현 계획
-          ${PLAN}
-
-          ---
-          원본 이슈: #${BRIEF_NUMBER}
-          PRBODY
+          # PR 생성 (printf로 body 파일 생성 — shell 특수문자 안전)
+          printf '%s\n' "## 실행 지시" "" "$INSTRUCTION" "" "## 구현 계획" "" "$PLAN" "" "---" "원본 이슈: #${BRIEF_NUMBER}" > /tmp/pr-body.md
 
           PR_URL=$(gh pr create \
             --title "[Auto] ${TODAY} — ${TITLE}" \
@@ -215,6 +206,8 @@ jobs:
             --base main \
             --head "$BRANCH" \
             --repo "${{ github.repository }}" 2>&1)
+
+          echo "gh pr create output: $PR_URL"
 
           echo "PR created: $PR_URL"
 
