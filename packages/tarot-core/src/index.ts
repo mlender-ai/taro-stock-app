@@ -1,5 +1,6 @@
 export * from "./types.js";
 export * from "./cards.js";
+export { getCardNarrative } from "./cardNarratives.js";
 export * from "./draw.js";
 export * from "./cache.js";
 export { checkSafety, sanitizeInterpretation, REQUIRED_DISCLAIMER } from "./safety/forbidden.js";
