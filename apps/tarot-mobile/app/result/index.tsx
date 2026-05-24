@@ -76,6 +76,14 @@ function CardReveal({ card, index }: { card: DrawnCard; index: number }) {
 
       {/* 상세 — 세 번째 계층, 약간 흐리게 */}
       <Text variant="body-sm" style={styles.detail}>{card.detail}</Text>
+
+      {/* 카드 이야기 — 카드의 원형적 의미를 서사로 전달 */}
+      {card.cardNarrative ? (
+        <View style={styles.narrativeBlock}>
+          <Text variant="caption" color={Colors.taroEssence} style={styles.narrativeLabel}>✦ 카드 이야기</Text>
+          <Text variant="body-sm" style={styles.narrativeText}>{card.cardNarrative}</Text>
+        </View>
+      ) : null}
     </Animated.View>
   );
 }
@@ -350,6 +358,9 @@ const styles = StyleSheet.create({
   headline:       { color: Colors.whiteout, marginBottom: 10, fontWeight: "700", lineHeight: 26 },
   summary:        { color: Colors.silverHighlight, marginBottom: Spacing.s8, lineHeight: 22 },
   detail:         { color: Colors.midGrayText, lineHeight: 22, opacity: 0.9 },
+  narrativeBlock: { marginTop: Spacing.s16, backgroundColor: Colors.ebonyCanvas, borderRadius: 8, padding: Spacing.s16, borderWidth: 1, borderColor: Colors.deepInsight },
+  narrativeLabel: { letterSpacing: 1.5, fontWeight: "700", marginBottom: 8 },
+  narrativeText:  { color: Colors.silverHighlight, lineHeight: 20, fontStyle: "italic" },
   disclaimer:     { backgroundColor: Colors.steelSurface, borderRadius: 10, padding: Spacing.s16, marginBottom: Spacing.s24, borderWidth: 1, borderColor: Colors.carbonBorder },
   disclaimerText: { lineHeight: 18 },
   shareSection:   { marginBottom: Spacing.s24, gap: 8 },

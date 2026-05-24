@@ -40,7 +40,7 @@ interface ApiDrawResponse {
     summary: string;
     detail: string;
     disclaimer: string;
-    cards: Array<{ id: string; nameKo: string; orientation: string; slot: string | null; imageUrl: string }>;
+    cards: Array<{ id: string; nameKo: string; orientation: string; slot: string | null; imageUrl: string; narrative?: string }>;
   };
 }
 
@@ -134,6 +134,7 @@ export default function DrawScreen() {
             summary: api.interpretation.summary,
             detail: api.interpretation.detail,
             slot: c.slot ?? null,
+            cardNarrative: c.narrative,
           })),
         };
       } else {
