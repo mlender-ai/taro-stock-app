@@ -12,6 +12,8 @@ export interface DrawnCard {
   summary: string;
   detail: string;
   slot?: string | null;
+  /** 카드의 원형적 의미를 서사 형태로 전달하는 미니 스토리텍스트 (결과 화면 표시용) */
+  cardNarrative?: string;
 }
 
 export interface DrawResult {
