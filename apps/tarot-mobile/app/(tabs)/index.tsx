@@ -8,9 +8,11 @@ import { Text } from "../../components/ui/Text";
 import { Colors, Spacing, Typography } from "../../constants/theme";
 import { useUserStore } from "../../lib/store";
 import { useDrawStore } from "../../lib/drawStore";
+import { useFavoritesStore } from "../../lib/favoritesStore";
 import { apiFetch } from "../../lib/api";
 import { localSearch } from "../../lib/localEngine";
 import { TickerLogo } from "../../components/TickerLogo";
+import { DailyCard } from "../../components/DailyCard";
 import { cacheTickerName } from "../../lib/tickerLogo";
 
 
@@ -23,20 +25,13 @@ const POPULAR: { ticker: string; label: string; market: string; flag: string }[]
   { ticker: "000660.KS",  label: "SK하이닉스",  market: "KR", flag: "🇰🇷" },
 ];
 
-// 날짜 기반 고정 인사이트 (서버 없어도 항상 표시)
-const DAILY_INSIGHTS = [
-  { card: "✦", message: "불확실성은 기회의 다른 이름입니다" },
-  { card: "◈", message: "시장은 흔들려도, 방향은 잃지 마세요" },
-  { card: "⬡", message: "패턴을 읽는 자가 흐름을 만듭니다" },
-  { card: "◇", message: "두려움과 탐욕, 그 사이 어딘가에 진실이 있습니다" },
-  { card: "✸", message: "작은 신호가 큰 전환의 시작입니다" },
-  { card: "⟐", message: "시간이 시장의 가장 강한 편입니다" },
-  { card: "✦", message: "오늘도 시장은 이야기하고 있습니다" },
-];
-
-function getDailyInsight() {
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-  return DAILY_INSIGHTS[dayOfYear % DAILY_INSIGHTS.length]!;
+interface MiniQuote {
+  symbol: string;
+  shortName: string;
+  currentPrice: number;
+  change: number;
+  changePercent: number;
+  currency: string;
 }
 
 interface SearchResult {
@@ -50,11 +45,21 @@ export default function HomeScreen() {
   const router = useRouter();
   const { credits, isLoggedIn } = useUserStore();
   const { recentSearches, setTicker, addRecentSearch } = useDrawStore();
-  const dailyInsight = getDailyInsight();
+  const { items: favorites } = useFavoritesStore();
   const [query, setQuery] = useState("");
+  const [watchlistQuotes, setWatchlistQuotes] = useState<MiniQuote[]>([]);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 관심종목 실시간 가격 조회
+  useEffect(() => {
+    if (favorites.length === 0) return;
+    const symbols = favorites.slice(0, 10).map((f) => f.ticker).join(",");
+    apiFetch<{ quotes: MiniQuote[] }>(`/api/tarot/quotes?symbols=${symbols}`)
+      .then((data) => setWatchlistQuotes(data.quotes))
+      .catch(() => {});
+  }, [favorites]);
 
   // 검색 API debounce 300ms
   useEffect(() => {
@@ -132,19 +137,8 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {/* 오늘의 타로 인사이트 */}
-        <TouchableOpacity style={styles.insightCard} onPress={() => router.push("/(tabs)/draw")} activeOpacity={0.8}>
-          <View style={styles.insightIcon}>
-            <Text style={styles.insightSymbol}>{dailyInsight.card}</Text>
-          </View>
-          <View style={styles.insightText}>
-            <Text variant="caption" color={Colors.taroEssence} style={styles.insightLabel}>오늘의 타로 인사이트</Text>
-            <Text variant="body-sm" color={Colors.silverHighlight} style={styles.insightMessage}>
-              {dailyInsight.message}
-            </Text>
-          </View>
-          <Text variant="caption" color={Colors.ironOutline}>→</Text>
-        </TouchableOpacity>
+        {/* 오늘의 무료 카드 */}
+        <DailyCard />
 
         {/* 검색 */}
         <View style={styles.searchWrap}>
@@ -242,6 +236,49 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* 관심종목 */}
+        {watchlistQuotes.length > 0 && (
+          <View style={styles.section}>
+            <Text variant="caption" color={Colors.midGrayText} style={styles.sectionLabel}>
+              관심종목
+            </Text>
+            {watchlistQuotes.map((q) => {
+              const isPos = q.change >= 0;
+              const color = isPos ? Colors.taroEssence : "#f43f5e";
+              return (
+                <TouchableOpacity
+                  key={q.symbol}
+                  style={styles.watchlistItem}
+                  onPress={() => {
+                    setTicker(q.symbol, q.shortName);
+                    addRecentSearch(q.symbol);
+                    router.push(`/ticker/${encodeURIComponent(q.symbol)}`);
+                  }}
+                >
+                  <View style={styles.watchlistLeft}>
+                    <TickerLogo ticker={q.symbol} size={32} />
+                    <View>
+                      <Text variant="body-sm" color={Colors.whiteout}>{q.shortName}</Text>
+                      <Text variant="caption" color={Colors.midGrayText}>{q.symbol}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.watchlistRight}>
+                    <Text variant="body-sm" color={Colors.whiteout}>
+                      {q.currency === "KRW"
+                        ? `₩${q.currentPrice.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}`
+                        : `$${q.currentPrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      }
+                    </Text>
+                    <Text variant="caption" color={color}>
+                      {isPos ? "+" : ""}{q.changePercent.toFixed(2)}%
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
         {/* 사용 안내 */}
         <View style={styles.guide}>
           <Text variant="caption" color={Colors.midGrayText} style={{ letterSpacing: 0.5, marginBottom: 4 }}>처음이신가요?</Text>
@@ -298,10 +335,7 @@ const styles = StyleSheet.create({
   guide:        { backgroundColor: Colors.graphiteBase, borderRadius: 16, padding: Spacing.s24, borderWidth: 1, borderColor: Colors.carbonBorder, gap: 14 },
   guideRow:     { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   guideStep:    { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.arcaneCta, textAlign: "center", lineHeight: 24, fontSize: 12, color: Colors.whiteout, fontWeight: "700", marginTop: 2 },
-  insightCard:  { flexDirection: "row", alignItems: "center", backgroundColor: Colors.voidGreen, borderRadius: 14, padding: 16, marginBottom: Spacing.s24, borderWidth: 1, borderColor: Colors.deepInsight, gap: 12 },
-  insightIcon:  { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.arcaneCta, alignItems: "center", justifyContent: "center" },
-  insightSymbol:{ fontSize: 18, color: Colors.taroEssence },
-  insightText:  { flex: 1, gap: 2 },
-  insightLabel: { letterSpacing: 0.5, fontWeight: "700" },
-  insightMessage: { lineHeight: 20 },
+  watchlistItem:{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.carbonBorder },
+  watchlistLeft:{ flexDirection: "row", alignItems: "center", gap: 10 },
+  watchlistRight:{ alignItems: "flex-end", gap: 2 },
 });

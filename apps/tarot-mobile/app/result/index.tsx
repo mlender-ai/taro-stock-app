@@ -236,15 +236,20 @@ export default function ResultScreen() {
           <Text variant="caption" color={Colors.taroEssence} style={styles.spreadLabel}>
             {result.spread === "single" ? "1장 스프레드" : "3장 스프레드"}
           </Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 4 }}>
+          <TouchableOpacity
+            style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 4 }}
+            onPress={() => router.push(`/ticker/${encodeURIComponent(result.ticker)}`)}
+            activeOpacity={0.7}
+          >
             <TickerLogo ticker={result.ticker} size={44} />
-            <View>
+            <View style={{ flex: 1 }}>
               <Text variant="heading" style={styles.tickerTitle}>
                 {result.tickerName}
               </Text>
               <Text variant="caption" color={Colors.ironOutline}>{result.ticker}</Text>
             </View>
-          </View>
+            <Text variant="caption" color={Colors.midGrayText}>종목 상세 →</Text>
+          </TouchableOpacity>
         </View>
 
         {/* 카드들 */}

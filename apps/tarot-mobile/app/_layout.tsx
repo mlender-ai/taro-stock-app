@@ -65,6 +65,7 @@ export default function RootLayout() {
         <Stack.Screen name="favorites/index" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="history/[id]" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="history/analytics" options={{ animation: "slide_from_right" }} />
+        <Stack.Screen name="ticker/[symbol]" options={{ animation: "slide_from_right" }} />
       </Stack>
     </>
   );
