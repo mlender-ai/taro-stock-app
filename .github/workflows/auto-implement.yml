@@ -96,7 +96,7 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # ── 3. AI로 실행 지시 추출 ────────────────────────────────
+      # ── 3. AI로 실행 지시 추출 (GPT-4o 무료) ──────────────────
       - name: Extract Top Execution Instruction
         id: extract
         if: steps.brief.outputs.found == 'true' && steps.dedup.outputs.exists == 'false'
@@ -125,75 +125,100 @@ jobs:
             CEO Brief:
             ${{ steps.brief.outputs.body }}
 
-      # ── 4a. Claude Code로 실제 구현 시도 ──────────────────────
-      - name: Implement with Claude Code
-        id: claude
+      # ── 4. 프로젝트 구조 스냅샷 생성 (Claude에게 탐색 비용 제거) ──
+      - name: Generate project context
+        id: context
         if: steps.brief.outputs.found == 'true' && steps.dedup.outputs.exists == 'false'
-        continue-on-error: true
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt: |
-            아래 실행 지시를 구현하세요. 반드시 실제 코드를 작성하고 커밋하세요.
+        run: |
+          {
+            echo "=== 디렉토리 구조 ==="
+            find apps packages -maxdepth 3 -type f -name '*.ts' -o -name '*.tsx' | head -80
+            echo ""
+            echo "=== packages/shared 타입 ==="
+            for f in packages/shared/types/*.ts; do
+              [ -f "$f" ] && echo "--- $f ---" && head -30 "$f"
+            done
+            echo ""
+            echo "=== packages/tarot-core exports ==="
+            for f in packages/tarot-core/src/*.ts; do
+              [ -f "$f" ] && echo "--- $f ---" && head -20 "$f"
+            done
+            echo ""
+            echo "=== apps/tarot-mobile/constants/theme.ts ==="
+            head -50 apps/tarot-mobile/constants/theme.ts 2>/dev/null || echo "(없음)"
+          } > /tmp/project-context.txt
 
-            ## 실행 지시
-            ${{ steps.extract.outputs.response }}
+          echo "context<<__CTX_EOF__" >> "$GITHUB_OUTPUT"
+          head -300 /tmp/project-context.txt >> "$GITHUB_OUTPUT"
+          echo "__CTX_EOF__" >> "$GITHUB_OUTPUT"
 
-            ## 프로젝트 규칙
-            - 모노레포 구조: apps/tarot-mobile (React Native + Expo), apps/web (Next.js 14 API), packages/shared (공용 타입), packages/tarot-core (비즈니스 로직)
-            - 디자인 토큰: apps/tarot-mobile/constants/theme.ts (Colors, Spacing, Radius)
-            - 애니메이션: React Native Animated API만 허용 (react-native-reanimated 사용 금지)
-            - Kill list (절대 구현 금지): 카카오톡 공유, 사주팔자, 어드민 UI
-            - 모든 코드는 TypeScript로 작성
-            - packages/shared/의 기존 타입과 유틸을 최대한 재활용
-            - 새 환경변수 추가 시 .env.example에도 반영
-
-            ## 검증
-            구현 후 반드시 아래를 통과시키세요:
-            1. npm run lint
-            2. npm run typecheck
-            3. npm run build:web
-
-            lint/typecheck 에러가 있으면 수정하세요.
-
-            ## 커밋
-            - 브랜치명: agent/ceo-brief-${{ steps.brief.outputs.today }}
-            - 커밋 메시지: "[Auto] ${{ steps.brief.outputs.today }} — {기능명}"
-            - PR 제목: "[Auto] ${{ steps.brief.outputs.today }} — {기능명}"
-            - PR 본문에 CEO Brief #${{ steps.brief.outputs.number }} 참조 포함
-
-      # ── 4b. Claude Code 실패 시 GitHub Models 폴백 ────────────
-      - name: Generate Implementation Plan (fallback)
-        id: plan
-        if: steps.claude.outcome == 'failure' && steps.brief.outputs.found == 'true' && steps.dedup.outputs.exists == 'false'
+      # ── 5. GPT-4o로 전체 코드 생성 (무료) ─────────────────────
+      - name: Generate code with GPT-4o
+        id: codegen
+        if: steps.brief.outputs.found == 'true' && steps.dedup.outputs.exists == 'false'
         uses: actions/ai-inference@v1
         with:
           model: openai/gpt-4o
           system-prompt: |
             당신은 Trading Taro 앱의 시니어 풀스택 개발자입니다.
             모노레포 구조: apps/tarot-mobile (React Native + Expo), apps/web (Next.js 14 API), packages/shared (공용 타입), packages/tarot-core (비즈니스 로직)
-            디자인 토큰: apps/tarot-mobile/constants/theme.ts (Colors, Spacing, Radius)
-            애니메이션: React Native Animated API만 허용 (react-native-reanimated 사용 금지)
-            Kill list (절대 구현 금지): 카카오톡 공유, 사주팔자, 어드민 UI
 
-            반드시 아래 형식으로만 응답하세요:
-            1. 수정할 파일 경로와 변경 내용을 구체적으로
-            2. 새로 생성할 파일이 있다면 전체 내용
-            3. 모든 코드는 TypeScript로 작성
-            4. 기존 패턴과 컨벤션을 따를 것
+            중요 규칙:
+            - 애니메이션: React Native Animated API만 허용 (react-native-reanimated 사용 금지)
+            - Kill list (절대 구현 금지): 카카오톡 공유, 사주팔자, 어드민 UI
+            - 모든 코드는 TypeScript
+            - 기존 패턴과 컨벤션을 따를 것
 
-            응답은 ```diff 또는 ```typescript 코드 블록으로 구성하세요.
-            각 파일별로 === FILE: {경로} === 헤더를 붙이세요.
+            응답 형식 — 반드시 아래 형식만 사용:
+            각 파일마다:
+            === FILE: {상대경로} ===
+            ```typescript
+            (파일 전체 내용)
+            ```
+
+            기존 파일 수정 시에도 파일 전체 내용을 출력하세요.
+            설명 텍스트 없이 파일 블록만 출력하세요.
           prompt: |
             아래 실행 지시를 구현하세요.
 
             ## 실행 지시
             ${{ steps.extract.outputs.response }}
 
-            ## 프로젝트 파일 구조 참고
-            현재 레포의 주요 파일들을 참고하여 기존 패턴에 맞게 구현하세요.
-            packages/shared/의 기존 타입과 유틸을 최대한 재활용하세요.
+            ## 현재 프로젝트 구조
+            ${{ steps.context.outputs.context }}
 
+      # ── 6a. Claude Code로 코드 적용 + 검증 (Sonnet, 최소 토큰) ──
+      - name: Apply and verify with Claude
+        id: claude
+        if: steps.brief.outputs.found == 'true' && steps.dedup.outputs.exists == 'false'
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--model claude-sonnet-4-6 --max-turns 5"
+          prompt: |
+            아래 코드를 프로젝트에 적용하고 검증하세요. 코드베이스를 탐색하지 마세요.
+
+            ## 적용할 코드
+            ${{ steps.codegen.outputs.response }}
+
+            ## 지시사항 (토큰 절약을 위해 최소한의 작업만)
+            1. 위 코드의 각 === FILE: {경로} === 블록을 해당 경로에 Write하세요.
+            2. `npm run lint && npm run typecheck` 실행하세요.
+            3. 에러가 있으면 해당 파일만 수정하세요. 다른 파일은 읽지 마세요.
+            4. 에러가 없으면 바로 끝내세요.
+
+            절대 하지 말 것:
+            - 코드베이스 탐색 (Read로 다른 파일 읽기)
+            - 추가 기능 구현
+            - 리팩토링
+
+            ## 커밋/PR
+            - 브랜치: agent/ceo-brief-${{ steps.brief.outputs.today }}
+            - 커밋 메시지: "[Auto] ${{ steps.brief.outputs.today }} — ${{ steps.extract.outputs.response && fromJSON(steps.extract.outputs.response).title || 'CEO Brief 구현' }}"
+            - PR 본문: "CEO Brief #${{ steps.brief.outputs.number }} 자동 구현"
+
+      # ── 6b. Claude 실패 시 GitHub Models 폴백 ──────────────────
       - name: Restore git credentials (fallback)
         if: steps.claude.outcome == 'failure' && steps.brief.outputs.found == 'true' && steps.dedup.outputs.exists == 'false'
         run: |
@@ -203,7 +228,7 @@ jobs:
         if: steps.claude.outcome == 'failure' && steps.brief.outputs.found == 'true' && steps.dedup.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
-          PLAN: ${{ steps.plan.outputs.response }}
+          CODEGEN: ${{ steps.codegen.outputs.response }}
           INSTRUCTION: ${{ steps.extract.outputs.response }}
           TODAY: ${{ steps.brief.outputs.today }}
           BRIEF_NUMBER: ${{ steps.brief.outputs.number }}
@@ -219,7 +244,7 @@ jobs:
           TITLE=$(echo "$INSTRUCTION" | jq -r '.title // "CEO Brief 구현"' 2>/dev/null || echo "CEO Brief 구현")
 
           mkdir -p docs/auto-implement
-          echo "$PLAN" > "docs/auto-implement/${TODAY}-plan.md"
+          echo "$CODEGEN" > "docs/auto-implement/${TODAY}-codegen.md"
 
           git add -A
           git commit -m "[Auto] ${TODAY} — ${TITLE}
@@ -234,7 +259,8 @@ jobs:
             echo ""
             echo "원본 이슈: #${BRIEF_NUMBER}"
             echo ""
-            echo "> ⚠️ Claude Code Action 크레딧 부족으로 GitHub Models 폴백 사용"
+            echo "> ⚠️ Claude Code 크레딧 부족으로 GitHub Models 폴백 사용"
+            echo "> 생성된 코드가 \`docs/auto-implement/${TODAY}-codegen.md\`에 있습니다."
           } > /tmp/pr-body.md
 
           gh pr create \
@@ -247,7 +273,7 @@ jobs:
               exit 1
             }
 
-      # ── 5. PR 생성 코멘트 (CI는 workflow_run으로 자동 트리거) ──
+      # ── 7. PR 생성 코멘트 (CI는 workflow_run으로 자동 트리거) ──
       - name: Comment on CEO Brief
         if: steps.brief.outputs.found == 'true' && steps.dedup.outputs.exists == 'false'
         env:
@@ -258,7 +284,7 @@ jobs:
           PR_NUM=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' --repo "${{ github.repository }}" 2>/dev/null || echo "")
 
           if [ -n "$PR_NUM" ]; then
-            IMPL_MODE="Claude Code"
+            IMPL_MODE="Claude Sonnet (토큰 최적화)"
             if [ "${{ steps.claude.outcome }}" = "failure" ]; then
               IMPL_MODE="GitHub Models (폴백)"
             fi
@@ -268,7 +294,7 @@ jobs:
               --body "🤖 구현 PR: #${PR_NUM} — ${IMPL_MODE}로 자동 생성됨. CI가 자동으로 트리거됩니다." || true
           fi
 
-      # ── 6. 실패 시 CEO Brief 이슈에 코멘트 ───────────────────
+      # ── 8. 실패 시 CEO Brief 이슈에 코멘트 ───────────────────
       - name: Comment on failure
         if: failure() && steps.brief.outputs.found == 'true'
         env:
