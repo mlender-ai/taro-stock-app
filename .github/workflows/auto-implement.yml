@@ -193,41 +193,50 @@ jobs:
         env:
           CODEGEN: ${{ steps.codegen.outputs.response }}
         run: |
+          printf '%s\n' "$CODEGEN" > /tmp/codegen-raw.txt
+          echo "GPT-4o 출력 크기: $(wc -c < /tmp/codegen-raw.txt) bytes, $(wc -l < /tmp/codegen-raw.txt) lines"
+
           APPLIED=0
           CURRENT_FILE=""
           IN_CODE=false
+          FENCE='```'
 
           while IFS= read -r line; do
             if [[ "$line" =~ ^===\ FILE:\ (.+)\ ===$ ]]; then
               CURRENT_FILE="${BASH_REMATCH[1]}"
+              CURRENT_FILE=$(echo "$CURRENT_FILE" | xargs)
               IN_CODE=false
+              echo "📄 Found file block: $CURRENT_FILE"
               continue
             fi
-            if [[ "$line" =~ ^\`\`\`(typescript|tsx|ts|json|javascript|js|css|html|yaml|yml|sh|bash|text|markdown|md)$ ]] && [ -n "$CURRENT_FILE" ]; then
+
+            if [ -n "$CURRENT_FILE" ] && [ "$IN_CODE" = false ] && [[ "$line" == ${FENCE}* ]]; then
               mkdir -p "$(dirname "$CURRENT_FILE")"
               > "$CURRENT_FILE"
               IN_CODE=true
               continue
             fi
-            if [[ "$line" == '```' ]] && [ "$IN_CODE" = true ]; then
+
+            if [ "$IN_CODE" = true ] && [[ "$line" == "$FENCE" ]]; then
               IN_CODE=false
               APPLIED=$((APPLIED + 1))
-              echo "✅ Applied: $CURRENT_FILE"
+              echo "✅ Applied ($APPLIED): $CURRENT_FILE ($(wc -l < "$CURRENT_FILE") lines)"
               CURRENT_FILE=""
               continue
             fi
+
             if [ "$IN_CODE" = true ] && [ -n "$CURRENT_FILE" ]; then
               echo "$line" >> "$CURRENT_FILE"
             fi
-          done <<< "$CODEGEN"
+          done < /tmp/codegen-raw.txt
 
           echo "applied=$APPLIED" >> "$GITHUB_OUTPUT"
           echo "총 ${APPLIED}개 파일 적용 완료"
 
           if [ "$APPLIED" -eq 0 ]; then
             echo "⚠️ 적용된 파일이 없습니다. GPT-4o 출력 형식을 확인하세요."
-            echo "--- GPT-4o 출력 (처음 500자) ---"
-            echo "$CODEGEN" | head -c 500
+            echo "--- GPT-4o 출력 (처음 20줄) ---"
+            head -20 /tmp/codegen-raw.txt
             exit 1
           fi
 
@@ -294,33 +303,40 @@ jobs:
         env:
           CODEGEN: ${{ steps.fix.outputs.response }}
         run: |
+          printf '%s\n' "$CODEGEN" > /tmp/fix-raw.txt
+
           APPLIED=0
           CURRENT_FILE=""
           IN_CODE=false
+          FENCE='```'
 
           while IFS= read -r line; do
             if [[ "$line" =~ ^===\ FILE:\ (.+)\ ===$ ]]; then
               CURRENT_FILE="${BASH_REMATCH[1]}"
+              CURRENT_FILE=$(echo "$CURRENT_FILE" | xargs)
               IN_CODE=false
               continue
             fi
-            if [[ "$line" =~ ^\`\`\`(typescript|tsx|ts|json|javascript|js|css|html|yaml|yml|sh|bash|text|markdown|md)$ ]] && [ -n "$CURRENT_FILE" ]; then
+
+            if [ -n "$CURRENT_FILE" ] && [ "$IN_CODE" = false ] && [[ "$line" == ${FENCE}* ]]; then
               mkdir -p "$(dirname "$CURRENT_FILE")"
               > "$CURRENT_FILE"
               IN_CODE=true
               continue
             fi
-            if [[ "$line" == '```' ]] && [ "$IN_CODE" = true ]; then
+
+            if [ "$IN_CODE" = true ] && [[ "$line" == "$FENCE" ]]; then
               IN_CODE=false
               APPLIED=$((APPLIED + 1))
-              echo "✅ Fixed: $CURRENT_FILE"
+              echo "✅ Fixed ($APPLIED): $CURRENT_FILE"
               CURRENT_FILE=""
               continue
             fi
+
             if [ "$IN_CODE" = true ] && [ -n "$CURRENT_FILE" ]; then
               echo "$line" >> "$CURRENT_FILE"
             fi
-          done <<< "$CODEGEN"
+          done < /tmp/fix-raw.txt
 
           echo "applied=$APPLIED" >> "$GITHUB_OUTPUT"
           echo "수정된 파일 ${APPLIED}개 재적용 완료"
