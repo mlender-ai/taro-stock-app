@@ -186,15 +186,18 @@ export default function TickerDetailScreen() {
             </View>
           ) : quote ? (
             <View style={styles.priceSection}>
-              <Text style={[styles.currentPrice, { color: Colors.whiteout }]}>
+              <Text style={styles.currentPrice}>
                 {formatPrice(quote.currentPrice, currency)}
               </Text>
-              <View style={styles.changeRow}>
-                <Text style={[styles.changeText, { color: priceColor }]}>
-                  {isPositive ? "+" : ""}{formatPrice(Math.abs(quote.change), currency)}
-                </Text>
-                <Text style={[styles.changePercent, { color: priceColor }]}>
-                  ({isPositive ? "+" : ""}{quote.changePercent.toFixed(2)}%)
+              {/* 토스증권 패턴: 등락 알약 배지. 큰 헤더는 풀 배경(컬러 + 화이트 텍스트)으로 시인성 강조 */}
+              <View
+                style={[
+                  styles.changePill,
+                  { backgroundColor: priceColor },
+                ]}
+              >
+                <Text style={styles.changePillText}>
+                  {isPositive ? "+" : "−"}{formatPrice(Math.abs(quote.change), currency)} ({isPositive ? "+" : ""}{quote.changePercent.toFixed(2)}%)
                 </Text>
               </View>
             </View>
@@ -306,15 +309,25 @@ const styles = StyleSheet.create({
   favIcon:      { fontSize: 24, color: Colors.midGrayText },
   favIconActive:{ color: "#f43f5e" },
 
-  // [1] 큰 헤더
-  largeHeader:  { paddingHorizontal: Spacing.s24, marginBottom: Spacing.s16 },
+  // [1] 큰 헤더 — 토스증권 종목 상세 패턴: 32pt 현재가 + 알약 배지 등락
+  // 여백 그리드: 4의 배수 (4 / 8 / 16 / 24)
+  largeHeader:  { paddingHorizontal: Spacing.s24, marginBottom: Spacing.s24 },
   tickerRow:    { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: Spacing.s16 },
   tickerMeta:   { flex: 1, gap: 2 },
-  priceSection: { minHeight: 60 },
-  currentPrice: { fontSize: 32, fontWeight: "700" },
-  changeRow:    { flexDirection: "row", gap: 8, marginTop: 4 },
-  changeText:   { fontSize: 16, fontWeight: "600" },
-  changePercent:{ fontSize: 16, fontWeight: "600" },
+  priceSection: { minHeight: 64, gap: 8 },
+  currentPrice: { fontSize: 32, fontWeight: "700", color: Colors.whiteout, lineHeight: 36, letterSpacing: -0.5 },
+  changePill:   {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 9999,
+  },
+  changePillText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.1,
+  },
 
   // [2] Sticky 영역
   stickyArea:   { backgroundColor: Colors.ebonyCanvas, zIndex: 10 },
