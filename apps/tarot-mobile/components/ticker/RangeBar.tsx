@@ -18,6 +18,7 @@ export function RangeBar({ label, min, max, current, formatValue }: Props) {
 
   return (
     <View style={styles.container}>
+      {/* 라벨은 보조 정보 — 11pt, 미드 그레이로 가독성보다 부담 줄임 (토스 패턴: 주변 정보 위계 낮춤) */}
       <Text variant="caption" color={Colors.midGrayText} style={styles.label}>{label}</Text>
       <View style={styles.barContainer}>
         <Text variant="caption" color={Colors.midGrayText} style={styles.minMax}>{fmt(min)}</Text>
@@ -33,9 +34,11 @@ export function RangeBar({ label, min, max, current, formatValue }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    gap: 6,
+    gap: 8,
   },
   label: {
+    fontSize: 11,
+    fontWeight: "500",
     letterSpacing: 0.3,
   },
   barContainer: {
