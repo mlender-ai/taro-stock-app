@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { apiFetch } from "./api";
+import { classifyFreshness } from "@trading/shared/src/staleness";
 import type { StockQuote, StockChartBar, StockChartResponse } from "@trading/shared/src/stockTypes";
 
 export type ChartRange = "1d" | "5d" | "1mo" | "3mo" | "1y";
@@ -31,7 +32,25 @@ interface FinancialsResponse {
   annualFinancials: AnnualFinancial[];
 }
 
+interface FinancialsBundle {
+  profile: CompanyProfile;
+  quarterlyEarnings: QuarterlyEarning[];
+  annualFinancials: AnnualFinancial[];
+  cachedAt: number; // for staleness
+}
+
+interface ChartBundle {
+  bars: StockChartBar[];
+  range: ChartRange;
+  cachedAt: number;
+}
+
+// Stale-while-revalidate: data 60초 이내 → fresh (fetch 스킵), 5분 이내 → stale (즉시 표시 + 백그라운드 fetch), 그 외 → expired (정상 fetch)
+const FRESH_TTL_MS = 60 * 1000;
+const STALE_TTL_MS = 5 * 60 * 1000;
+
 interface StockState {
+  // 현재 화면 표시용 (셀렉터)
   quote: StockQuote | null;
   chartBars: StockChartBar[];
   chartRange: ChartRange;
@@ -39,17 +58,23 @@ interface StockState {
   chartLoading: boolean;
   error: string | null;
 
-  // Financials
+  // Financials (현재 표시)
   profile: CompanyProfile | null;
   quarterlyEarnings: QuarterlyEarning[];
   annualFinancials: AnnualFinancial[];
   financialsLoading: boolean;
 
-  fetchQuote: (symbol: string) => Promise<void>;
-  fetchChart: (symbol: string, range?: ChartRange) => Promise<void>;
-  fetchFinancials: (symbol: string) => Promise<void>;
+  // per-symbol 캐시 (stale-while-revalidate 지원)
+  quoteCache: Record<string, StockQuote>;
+  chartCache: Record<string, ChartBundle>;
+  financialsCache: Record<string, FinancialsBundle>;
+
+  fetchQuote: (symbol: string, opts?: { force?: boolean }) => Promise<void>;
+  fetchChart: (symbol: string, range?: ChartRange, opts?: { force?: boolean }) => Promise<void>;
+  fetchFinancials: (symbol: string, opts?: { force?: boolean }) => Promise<void>;
   setChartRange: (range: ChartRange) => void;
-  reset: () => void;
+  /** 현재 표시 상태만 비움 — 캐시는 유지 (다른 종목 진입 시 호출). */
+  clearActive: () => void;
 }
 
 export const useStockStore = create<StockState>((set, get) => ({
@@ -63,47 +88,127 @@ export const useStockStore = create<StockState>((set, get) => ({
   quarterlyEarnings: [],
   annualFinancials: [],
   financialsLoading: false,
+  quoteCache: {},
+  chartCache: {},
+  financialsCache: {},
 
-  fetchQuote: async (symbol) => {
-    set({ quoteLoading: true, error: null });
+  fetchQuote: async (symbol, opts) => {
+    const force = opts?.force === true;
+    const cached = get().quoteCache[symbol];
+    const now = Date.now();
+    const freshness = cached
+      ? classifyFreshness(cached.dataAt, now, FRESH_TTL_MS, STALE_TTL_MS)
+      : "expired";
+
+    // 캐시 hit: 즉시 표시 (fresh든 stale이든)
+    if (cached) {
+      set({ quote: cached, quoteLoading: false, error: null });
+    } else {
+      set({ quote: null, quoteLoading: true, error: null });
+    }
+
+    // fresh + !force → fetch 스킵
+    if (freshness === "fresh" && !force) {
+      return;
+    }
+
+    // stale 또는 expired 또는 force → fetch (백그라운드)
     try {
       const data = await apiFetch<StockQuote>(
         `/api/tarot/quote?symbol=${encodeURIComponent(symbol)}`
       );
-      set({ quote: data, quoteLoading: false });
+      set((s) => ({
+        quote: get().quote?.symbol === symbol || !get().quote ? data : s.quote,
+        quoteLoading: false,
+        quoteCache: { ...s.quoteCache, [symbol]: data },
+      }));
     } catch (err) {
+      // 캐시 hit이었으면 에러 무시하고 stale 데이터 유지 (백그라운드 재검증 실패)
+      const hadCache = !!cached;
       set({
         quoteLoading: false,
-        error: err instanceof Error ? err.message : "시세 조회 실패",
+        error: hadCache ? null : err instanceof Error ? err.message : "시세 조회 실패",
       });
     }
   },
 
-  fetchChart: async (symbol, range) => {
+  fetchChart: async (symbol, range, opts) => {
+    const force = opts?.force === true;
     const r = range ?? get().chartRange;
-    set({ chartLoading: true, chartRange: r });
+    const cacheKey = `${symbol}:${r}`;
+    const cached = get().chartCache[cacheKey];
+    const now = Date.now();
+    const cachedAtIso = cached ? new Date(cached.cachedAt).toISOString() : null;
+    const freshness = cachedAtIso
+      ? classifyFreshness(cachedAtIso, now, FRESH_TTL_MS, STALE_TTL_MS)
+      : "expired";
+
+    if (cached) {
+      set({ chartBars: cached.bars, chartRange: r, chartLoading: false });
+    } else {
+      set({ chartBars: [], chartRange: r, chartLoading: true });
+    }
+
+    if (freshness === "fresh" && !force) return;
+
     try {
       const data = await apiFetch<StockChartResponse>(
         `/api/tarot/chart?symbol=${encodeURIComponent(symbol)}&range=${r}`
       );
-      set({ chartBars: data.bars, chartLoading: false });
+      set((s) => ({
+        chartBars: get().chartRange === r ? data.bars : s.chartBars,
+        chartLoading: false,
+        chartCache: {
+          ...s.chartCache,
+          [cacheKey]: { bars: data.bars, range: r, cachedAt: Date.now() },
+        },
+      }));
     } catch {
-      set({ chartLoading: false, chartBars: [] });
+      set({ chartLoading: false });
     }
   },
 
-  fetchFinancials: async (symbol) => {
-    set({ financialsLoading: true });
+  fetchFinancials: async (symbol, opts) => {
+    const force = opts?.force === true;
+    const cached = get().financialsCache[symbol];
+    const now = Date.now();
+    const cachedAtIso = cached ? new Date(cached.cachedAt).toISOString() : null;
+    const freshness = cachedAtIso
+      ? classifyFreshness(cachedAtIso, now, FRESH_TTL_MS, STALE_TTL_MS)
+      : "expired";
+
+    if (cached) {
+      set({
+        profile: cached.profile,
+        quarterlyEarnings: cached.quarterlyEarnings,
+        annualFinancials: cached.annualFinancials,
+        financialsLoading: false,
+      });
+    } else {
+      set({ financialsLoading: true });
+    }
+
+    if (freshness === "fresh" && !force) return;
+
     try {
       const data = await apiFetch<FinancialsResponse>(
         `/api/tarot/financials?symbol=${encodeURIComponent(symbol)}`
       );
-      set({
+      set((s) => ({
         profile: data.profile,
         quarterlyEarnings: data.quarterlyEarnings,
         annualFinancials: data.annualFinancials,
         financialsLoading: false,
-      });
+        financialsCache: {
+          ...s.financialsCache,
+          [symbol]: {
+            profile: data.profile,
+            quarterlyEarnings: data.quarterlyEarnings,
+            annualFinancials: data.annualFinancials,
+            cachedAt: Date.now(),
+          },
+        },
+      }));
     } catch {
       set({ financialsLoading: false });
     }
@@ -111,7 +216,7 @@ export const useStockStore = create<StockState>((set, get) => ({
 
   setChartRange: (range) => set({ chartRange: range }),
 
-  reset: () =>
+  clearActive: () =>
     set({
       quote: null,
       chartBars: [],

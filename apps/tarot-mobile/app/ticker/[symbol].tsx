@@ -45,7 +45,7 @@ export default function TickerDetailScreen() {
   const {
     quote, chartBars, chartRange, quoteLoading, chartLoading,
     profile, quarterlyEarnings, annualFinancials, financialsLoading,
-    fetchQuote, fetchChart, fetchFinancials, reset,
+    fetchQuote, fetchChart, fetchFinancials, clearActive,
   } = useStockStore();
   const { isFavorite, addFavorite, removeFavorite } = useFavoritesStore();
   const { setTicker } = useDrawStore();
@@ -59,13 +59,17 @@ export default function TickerDetailScreen() {
     fetchQuote(symbol);
     fetchChart(symbol);
     fetchFinancials(symbol);
-    return () => reset();
+    return () => clearActive();
   }, [symbol]);
 
   const handleRefresh = useCallback(async () => {
     if (!symbol) return;
     setRefreshing(true);
-    await Promise.all([fetchQuote(symbol), fetchChart(symbol), fetchFinancials(symbol)]);
+    await Promise.all([
+      fetchQuote(symbol, { force: true }),
+      fetchChart(symbol, undefined, { force: true }),
+      fetchFinancials(symbol, { force: true }),
+    ]);
     setRefreshing(false);
   }, [symbol, fetchQuote, fetchChart, fetchFinancials]);
 
