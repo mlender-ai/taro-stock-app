@@ -1,7 +1,8 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import {
   SafeAreaView, View, ScrollView, TouchableOpacity,
   StyleSheet, Dimensions, ActivityIndicator, RefreshControl,
+  NativeSyntheticEvent, NativeScrollEvent,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Text } from "../../components/ui/Text";
@@ -16,6 +17,8 @@ import { CompanyInfo } from "../../components/ticker/CompanyInfo";
 import { FinancialChart } from "../../components/ticker/FinancialChart";
 import { NewsList } from "../../components/ticker/NewsList";
 import { TickerCardHistory } from "../../components/ticker/TickerCardHistory";
+import { CompactHeader } from "../../components/ticker/CompactHeader";
+import { planTabSwitch, shouldShowCompactHeader } from "@trading/shared/src/tabScrollPositions";
 import { useStockStore, type ChartRange } from "../../lib/stockStore";
 import { useFavoritesStore } from "../../lib/favoritesStore";
 import { useDrawStore } from "../../lib/drawStore";
@@ -23,6 +26,8 @@ import { useUserStore } from "../../lib/store";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const CHART_WIDTH = SCREEN_WIDTH - Spacing.s24 * 2;
+// 큰 헤더(현재가 영역)가 화면 위로 사라지는 임계값. 토스 패턴: 큰 가격 영역이 sticky 영역 위로 올라가면 압축 헤더 활성화.
+const COMPACT_THRESHOLD = 140;
 
 const RANGE_OPTIONS: { key: ChartRange; label: string }[] = [
   { key: "1d", label: "1일" },
@@ -52,6 +57,12 @@ export default function TickerDetailScreen() {
   const { setTicker } = useDrawStore();
   const [activeTab, setActiveTab] = useState<TickerTab>("chart");
   const [refreshing, setRefreshing] = useState(false);
+  const [showCompact, setShowCompact] = useState(false);
+
+  // 탭별 스크롤 위치 보존 — 탭 전환 시 이전 위치로 복원
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const scrollPositions = useRef<Record<TickerTab, number>>({ chart: 0, info: 0 });
+  const currentScrollY = useRef(0);
 
   const isFav = symbol ? isFavorite(symbol) : false;
 
@@ -98,6 +109,22 @@ export default function TickerDetailScreen() {
     router.push("/(tabs)/draw");
   }, [symbol, quote, setTicker, router]);
 
+  const handleTabChange = useCallback((tab: TickerTab) => {
+    const plan = planTabSwitch(activeTab, tab, scrollPositions.current, currentScrollY.current);
+    scrollPositions.current = plan.positionsAfter;
+    setActiveTab(tab);
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ y: plan.targetY, animated: false });
+    });
+  }, [activeTab]);
+
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    currentScrollY.current = y;
+    const shouldShow = shouldShowCompactHeader(y, COMPACT_THRESHOLD);
+    setShowCompact((prev) => (prev === shouldShow ? prev : shouldShow));
+  }, []);
+
   if (!symbol) {
     router.back();
     return null;
@@ -110,9 +137,13 @@ export default function TickerDetailScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        stickyHeaderIndices={[2]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -121,8 +152,8 @@ export default function TickerDetailScreen() {
           />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
+        {/* [0] Navigation Header — 일반 스크롤 */}
+        <View style={styles.navHeader}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Text variant="body-sm" color={Colors.midGrayText}>← 뒤로</Text>
           </TouchableOpacity>
@@ -135,8 +166,8 @@ export default function TickerDetailScreen() {
           )}
         </View>
 
-        {/* Ticker Info */}
-        <View style={styles.tickerInfo}>
+        {/* [1] 큰 헤더 — 스크롤되면 사라지는 종목 이름 + 큰 가격 */}
+        <View style={styles.largeHeader}>
           <View style={styles.tickerRow}>
             <TickerLogo ticker={symbol} size={48} />
             <View style={styles.tickerMeta}>
@@ -148,38 +179,48 @@ export default function TickerDetailScreen() {
               </Text>
             </View>
           </View>
-        </View>
 
-        {/* Price */}
-        {quoteLoading ? (
-          <View style={styles.priceSection}>
-            <ActivityIndicator size="small" color={Colors.taroEssence} />
-          </View>
-        ) : quote ? (
-          <View style={styles.priceSection}>
-            <Text style={[styles.currentPrice, { color: Colors.whiteout }]}>
-              {formatPrice(quote.currentPrice, currency)}
-            </Text>
-            <View style={styles.changeRow}>
-              <Text style={[styles.changeText, { color: priceColor }]}>
-                {isPositive ? "+" : ""}{formatPrice(Math.abs(quote.change), currency)}
-              </Text>
-              <Text style={[styles.changePercent, { color: priceColor }]}>
-                ({isPositive ? "+" : ""}{quote.changePercent.toFixed(2)}%)
-              </Text>
+          {quoteLoading ? (
+            <View style={styles.priceSection}>
+              <ActivityIndicator size="small" color={Colors.taroEssence} />
             </View>
-          </View>
-        ) : null}
-
-        {/* Tab Bar */}
-        <View style={styles.tabSection}>
-          <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
+          ) : quote ? (
+            <View style={styles.priceSection}>
+              <Text style={[styles.currentPrice, { color: Colors.whiteout }]}>
+                {formatPrice(quote.currentPrice, currency)}
+              </Text>
+              <View style={styles.changeRow}>
+                <Text style={[styles.changeText, { color: priceColor }]}>
+                  {isPositive ? "+" : ""}{formatPrice(Math.abs(quote.change), currency)}
+                </Text>
+                <Text style={[styles.changePercent, { color: priceColor }]}>
+                  ({isPositive ? "+" : ""}{quote.changePercent.toFixed(2)}%)
+                </Text>
+              </View>
+            </View>
+          ) : null}
         </View>
 
-        {/* Tab Content */}
-        {activeTab === "chart" ? (
-          <>
-            {/* Chart */}
+        {/* [2] STICKY — 압축 헤더(opacity 토글) + TabBar */}
+        <View style={styles.stickyArea}>
+          {showCompact && quote && (
+            <CompactHeader
+              symbol={symbol}
+              shortName={quote.shortName ?? symbol}
+              currentPrice={quote.currentPrice}
+              change={quote.change}
+              changePercent={quote.changePercent}
+              currency={currency}
+            />
+          )}
+          <View style={styles.tabBarWrapper}>
+            <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
+          </View>
+        </View>
+
+        {/* [3] Tab Content */}
+        <View style={styles.tabContent}>
+          {activeTab === "chart" ? (
             <View style={styles.chartSection}>
               <PriceChart
                 bars={chartBars}
@@ -208,40 +249,39 @@ export default function TickerDetailScreen() {
                 ))}
               </View>
             </View>
-          </>
-        ) : (
-          <>
-            {/* Info Tab: PriceStats + MetricsGrid + CompanyInfo + Financials */}
-            {quote && (
-              <>
-                <PriceStats quote={quote} />
-                <MetricsGrid quote={quote} />
-              </>
-            )}
-            {profile && (
-              <CompanyInfo
-                symbol={symbol}
-                name={quote?.longName ?? quote?.shortName ?? symbol}
-                exchange={quote?.exchange ?? ""}
-                profile={profile}
-              />
-            )}
-            {(quarterlyEarnings.length > 0 || annualFinancials.length > 0) && (
-              <FinancialChart
-                quarterlyEarnings={quarterlyEarnings}
-                annualFinancials={annualFinancials}
-                width={SCREEN_WIDTH}
-                currency={currency}
-              />
-            )}
-            {isLoggedIn && userId && (
-              <TickerCardHistory symbol={symbol} userId={userId} />
-            )}
-            <NewsList symbol={symbol} />
-          </>
-        )}
+          ) : (
+            <>
+              {quote && (
+                <>
+                  <PriceStats quote={quote} />
+                  <MetricsGrid quote={quote} />
+                </>
+              )}
+              {profile && (
+                <CompanyInfo
+                  symbol={symbol}
+                  name={quote?.longName ?? quote?.shortName ?? symbol}
+                  exchange={quote?.exchange ?? ""}
+                  profile={profile}
+                />
+              )}
+              {(quarterlyEarnings.length > 0 || annualFinancials.length > 0) && (
+                <FinancialChart
+                  quarterlyEarnings={quarterlyEarnings}
+                  annualFinancials={annualFinancials}
+                  width={SCREEN_WIDTH}
+                  currency={currency}
+                />
+              )}
+              {isLoggedIn && userId && (
+                <TickerCardHistory symbol={symbol} userId={userId} />
+              )}
+              <NewsList symbol={symbol} />
+            </>
+          )}
+        </View>
 
-        {/* CTA */}
+        {/* [4] CTA */}
         <View style={styles.ctaSection}>
           <Button
             variant="primary"
@@ -257,25 +297,31 @@ export default function TickerDetailScreen() {
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: Colors.ebonyCanvas },
   scrollView:   { flex: 1 },
-  scroll:       { paddingHorizontal: Spacing.s24, paddingBottom: 48 },
+  scroll:       { paddingBottom: 48 },
 
-  header:       { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: Spacing.s16, marginBottom: Spacing.s16 },
+  // [0] Navigation header
+  navHeader:    { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: Spacing.s24, paddingTop: Spacing.s16, marginBottom: Spacing.s16 },
   backBtn:      { padding: 4 },
   favBtn:       { padding: 4 },
   favIcon:      { fontSize: 24, color: Colors.midGrayText },
   favIconActive:{ color: "#f43f5e" },
 
-  tickerInfo:   { marginBottom: Spacing.s16 },
-  tickerRow:    { flexDirection: "row", alignItems: "center", gap: 12 },
+  // [1] 큰 헤더
+  largeHeader:  { paddingHorizontal: Spacing.s24, marginBottom: Spacing.s16 },
+  tickerRow:    { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: Spacing.s16 },
   tickerMeta:   { flex: 1, gap: 2 },
-
-  priceSection: { marginBottom: Spacing.s16, minHeight: 60 },
+  priceSection: { minHeight: 60 },
   currentPrice: { fontSize: 32, fontWeight: "700" },
   changeRow:    { flexDirection: "row", gap: 8, marginTop: 4 },
   changeText:   { fontSize: 16, fontWeight: "600" },
   changePercent:{ fontSize: 16, fontWeight: "600" },
 
-  tabSection:   { marginBottom: Spacing.s24 },
+  // [2] Sticky 영역
+  stickyArea:   { backgroundColor: Colors.ebonyCanvas, zIndex: 10 },
+  tabBarWrapper:{ paddingHorizontal: Spacing.s24 },
+
+  // [3] Tab content — sticky 아래 여백 보장
+  tabContent:   { paddingHorizontal: Spacing.s24, paddingTop: Spacing.s24 },
 
   chartSection: { marginBottom: Spacing.s24 },
   rangeRow:     { flexDirection: "row", justifyContent: "space-around", marginTop: Spacing.s16 },
@@ -283,5 +329,5 @@ const styles = StyleSheet.create({
   rangeTabActive: { backgroundColor: Colors.voidGreen },
   rangeTextActive: { fontWeight: "700" },
 
-  ctaSection:   { marginTop: Spacing.s8 },
+  ctaSection:   { paddingHorizontal: Spacing.s24, marginTop: Spacing.s8 },
 });
