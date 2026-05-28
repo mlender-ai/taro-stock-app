@@ -155,6 +155,7 @@ jobs:
         if: steps.ctx.outputs.exists == 'false'
         uses: actions/ai-inference@v1
         id: proposal
+        continue-on-error: true
         with:
           model: openai/gpt-4o
           max-tokens: 4096
@@ -267,7 +268,7 @@ jobs:
 
             ${{ needs.prepare.outputs.scoring_guide }}
       - name: Create Issue
-        if: steps.ctx.outputs.exists == 'false'
+        if: steps.ctx.outputs.exists == 'false' && steps.proposal.outputs.response != ''
         env:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
@@ -313,6 +314,7 @@ jobs:
         if: steps.ctx.outputs.exists == 'false'
         uses: actions/ai-inference@v1
         id: proposal
+        continue-on-error: true
         with:
           model: openai/gpt-4o
           max-tokens: 4096
@@ -393,7 +395,7 @@ jobs:
             ### 위험/대안
             ${{ needs.prepare.outputs.scoring_guide }}
       - name: Create Issue
-        if: steps.ctx.outputs.exists == 'false'
+        if: steps.ctx.outputs.exists == 'false' && steps.proposal.outputs.response != ''
         env:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
@@ -439,6 +441,7 @@ jobs:
         if: steps.ctx.outputs.exists == 'false'
         uses: actions/ai-inference@v1
         id: proposal
+        continue-on-error: true
         with:
           model: openai/gpt-4o
           max-tokens: 4096
@@ -513,7 +516,7 @@ jobs:
             (없음 / 낮음 / 중간 / 높음 — `db push` 기준)
             ${{ needs.prepare.outputs.scoring_guide }}
       - name: Create Issue
-        if: steps.ctx.outputs.exists == 'false'
+        if: steps.ctx.outputs.exists == 'false' && steps.proposal.outputs.response != ''
         env:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
@@ -559,6 +562,7 @@ jobs:
         if: steps.ctx.outputs.exists == 'false'
         uses: actions/ai-inference@v1
         id: proposal
+        continue-on-error: true
         with:
           model: openai/gpt-4o
           max-tokens: 4096
@@ -635,7 +639,7 @@ jobs:
             (자기 직전 이력에서 다룬 차원과 다른가? — 사운드 / 햅틱 / 타이포 / 컬러 / 여백 / 정보 위계 / 트랜지션 중 어느 것?)
             ${{ needs.prepare.outputs.scoring_guide }}
       - name: Create Issue
-        if: steps.ctx.outputs.exists == 'false'
+        if: steps.ctx.outputs.exists == 'false' && steps.proposal.outputs.response != ''
         env:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
@@ -681,6 +685,7 @@ jobs:
         if: steps.ctx.outputs.exists == 'false'
         uses: actions/ai-inference@v1
         id: proposal
+        continue-on-error: true
         with:
           model: openai/gpt-4o
           max-tokens: 4096
@@ -755,7 +760,7 @@ jobs:
             ### 자동화 가능 여부
             ${{ needs.prepare.outputs.scoring_guide }}
       - name: Create Issue
-        if: steps.ctx.outputs.exists == 'false'
+        if: steps.ctx.outputs.exists == 'false' && steps.proposal.outputs.response != ''
         env:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
@@ -801,6 +806,7 @@ jobs:
         if: steps.ctx.outputs.exists == 'false'
         uses: actions/ai-inference@v1
         id: proposal
+        continue-on-error: true
         with:
           model: openai/gpt-4o
           max-tokens: 4096
@@ -874,7 +880,7 @@ jobs:
             ### 마이그레이션 전략 (`db push` 가정)
             ${{ needs.prepare.outputs.scoring_guide }}
       - name: Create Issue
-        if: steps.ctx.outputs.exists == 'false'
+        if: steps.ctx.outputs.exists == 'false' && steps.proposal.outputs.response != ''
         env:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
@@ -920,6 +926,7 @@ jobs:
         if: steps.ctx.outputs.exists == 'false'
         uses: actions/ai-inference@v1
         id: proposal
+        continue-on-error: true
         with:
           model: openai/gpt-4o
           max-tokens: 4096
@@ -994,7 +1001,7 @@ jobs:
             ### 비용/리소스
             ${{ needs.prepare.outputs.scoring_guide }}
       - name: Create Issue
-        if: steps.ctx.outputs.exists == 'false'
+        if: steps.ctx.outputs.exists == 'false' && steps.proposal.outputs.response != ''
         env:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
@@ -1040,6 +1047,7 @@ jobs:
         if: steps.ctx.outputs.exists == 'false'
         uses: actions/ai-inference@v1
         id: proposal
+        continue-on-error: true
         with:
           model: openai/gpt-4o
           max-tokens: 4096
@@ -1093,7 +1101,7 @@ jobs:
             ### North Star 정렬 (1문장)
             ${{ needs.prepare.outputs.scoring_guide }}
       - name: Create Issue
-        if: steps.ctx.outputs.exists == 'false'
+        if: steps.ctx.outputs.exists == 'false' && steps.proposal.outputs.response != ''
         env:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
@@ -1139,6 +1147,7 @@ jobs:
         if: steps.ctx.outputs.exists == 'false'
         uses: actions/ai-inference@v1
         id: proposal
+        continue-on-error: true
         with:
           model: openai/gpt-4o
           max-tokens: 4096
@@ -1209,7 +1218,7 @@ jobs:
             ### 토큰 비용 영향
             ${{ needs.prepare.outputs.scoring_guide }}
       - name: Create Issue
-        if: steps.ctx.outputs.exists == 'false'
+        if: steps.ctx.outputs.exists == 'false' && steps.proposal.outputs.response != ''
         env:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.proposal.outputs.response }}
