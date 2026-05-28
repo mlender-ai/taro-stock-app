@@ -11,11 +11,14 @@ export default defineConfig({
   retries: process.env["CI"] ? 1 : 0,
   workers: 1,
   reporter: process.env["CI"] ? [["github"], ["list"]] : "list",
-  timeout: 30_000,
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
   use: {
     baseURL: "http://127.0.0.1:3200",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    // production build에서 외부 폰트/리소스 prefetch가 'load' 이벤트를 지연시킬 수 있어 domcontentloaded 기준으로 navigation 평가
+    navigationTimeout: 30_000,
   },
   projects: [
     {

@@ -40,11 +40,13 @@ function realErrors(errors: string[]): string[] {
 test.describe("smoke — 공개 라우트 시각/인터랙션 회귀 검증", () => {
   test("/ 홈 페이지", async ({ page }) => {
     const cons = collectConsole(page);
-    const res = await page.goto("/");
+    const res = await page.goto("/", { waitUntil: "domcontentloaded" });
     expect(res?.status(), "HTTP 200 응답").toBe(200);
 
     // body 실제 렌더링
-    const bodyBox = await page.locator("body").boundingBox();
+    const body = page.locator("body");
+    await expect(body, "body 가시").toBeVisible();
+    const bodyBox = await body.boundingBox();
     expect(bodyBox, "body 박스 존재").not.toBeNull();
     expect(bodyBox!.height, "body 높이 > 0").toBeGreaterThan(0);
 
@@ -58,10 +60,12 @@ test.describe("smoke — 공개 라우트 시각/인터랙션 회귀 검증", ()
 
   test("/login 사용자 로그인 페이지", async ({ page }) => {
     const cons = collectConsole(page);
-    const res = await page.goto("/login");
+    const res = await page.goto("/login", { waitUntil: "domcontentloaded" });
     expect(res?.status()).toBe(200);
 
-    const bodyBox = await page.locator("body").boundingBox();
+    const body = page.locator("body");
+    await expect(body).toBeVisible();
+    const bodyBox = await body.boundingBox();
     expect(bodyBox!.height).toBeGreaterThan(0);
 
     // 로그인 페이지의 핵심 입력 필드 또는 인풋 형태 존재
@@ -73,10 +77,12 @@ test.describe("smoke — 공개 라우트 시각/인터랙션 회귀 검증", ()
 
   test("/admin/login 어드민 로그인 페이지", async ({ page }) => {
     const cons = collectConsole(page);
-    const res = await page.goto("/admin/login");
+    const res = await page.goto("/admin/login", { waitUntil: "domcontentloaded" });
     expect(res?.status()).toBe(200);
 
-    const bodyBox = await page.locator("body").boundingBox();
+    const body = page.locator("body");
+    await expect(body).toBeVisible();
+    const bodyBox = await body.boundingBox();
     expect(bodyBox!.height).toBeGreaterThan(0);
 
     // 어드민 로그인은 기본 비밀번호 인풋 + 제출 버튼 또는 폼 요소가 있어야 함
@@ -88,7 +94,7 @@ test.describe("smoke — 공개 라우트 시각/인터랙션 회귀 검증", ()
 
   test("/admin 비로그인 접근 → 로그인 페이지로 리다이렉트 또는 401/403", async ({ page }) => {
     // middleware 가 인증 안 된 요청을 적절히 처리하는지 회귀
-    const res = await page.goto("/admin");
+    const res = await page.goto("/admin", { waitUntil: "domcontentloaded" });
     const status = res?.status() ?? 0;
     const url = page.url();
 
