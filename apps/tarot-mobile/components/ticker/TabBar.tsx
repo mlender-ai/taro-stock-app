@@ -23,18 +23,20 @@ export function TabBar({ activeTab, onTabChange }: Props) {
         return (
           <TouchableOpacity
             key={tab.key}
-            style={[styles.tab, isActive && styles.tabActive]}
+            style={styles.tab}
             onPress={() => onTabChange(tab.key)}
             activeOpacity={0.7}
           >
-            <Text
-              variant="body-sm"
-              color={isActive ? Colors.taroEssence : Colors.midGrayText}
-              style={isActive ? styles.labelActive : styles.labelInactive}
-            >
-              {tab.label}
-            </Text>
-            {isActive && <View style={styles.activeDot} />}
+            <View style={[styles.labelWrapper, isActive && styles.labelWrapperActive]}>
+              <Text
+                variant="body-sm"
+                color={isActive ? Colors.taroEssence : Colors.midGrayText}
+                style={isActive ? styles.labelActive : styles.labelInactive}
+              >
+                {tab.label}
+              </Text>
+            </View>
+            <View style={[styles.indicator, isActive && styles.indicatorActive]} />
           </TouchableOpacity>
         );
       })}
@@ -52,30 +54,33 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-    gap: 4,
+    paddingTop: 10,
   },
-  tabActive: {
-    borderBottomColor: Colors.taroEssence,
+  labelWrapper: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  labelWrapperActive: {
     backgroundColor: Colors.voidGreen,
   },
   labelActive: {
     fontWeight: "700",
     fontSize: 14,
+    letterSpacing: 0.2,
   },
   labelInactive: {
     fontWeight: "400",
     fontSize: 14,
   },
-  activeDot: {
-    width: 4,
-    height: 4,
+  indicator: {
+    height: 3,
+    width: "60%",
+    marginTop: 6,
     borderRadius: 2,
+    backgroundColor: "transparent",
+  },
+  indicatorActive: {
     backgroundColor: Colors.taroEssence,
-    position: "absolute",
-    bottom: 2,
   },
 });
