@@ -26,15 +26,16 @@ export function TabBar({ activeTab, onTabChange }: Props) {
             style={[styles.tab, isActive && styles.tabActive]}
             onPress={() => onTabChange(tab.key)}
             activeOpacity={0.7}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}
           >
             <Text
               variant="body-sm"
-              color={isActive ? Colors.taroEssence : Colors.midGrayText}
+              color={isActive ? Colors.taroEssence : Colors.ironOutline}
               style={isActive ? styles.labelActive : styles.labelInactive}
             >
               {tab.label}
             </Text>
-            {isActive && <View style={styles.activeDot} />}
           </TouchableOpacity>
         );
       })}
@@ -52,15 +53,14 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 8,
-    borderBottomWidth: 2,
+    borderBottomWidth: 3,
     borderBottomColor: "transparent",
-    gap: 4,
   },
   tabActive: {
     borderBottomColor: Colors.taroEssence,
-    backgroundColor: Colors.voidGreen,
+    backgroundColor: `${Colors.taroEssence}10`,
   },
   labelActive: {
     fontWeight: "700",
@@ -69,13 +69,6 @@ const styles = StyleSheet.create({
   labelInactive: {
     fontWeight: "400",
     fontSize: 14,
-  },
-  activeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.taroEssence,
-    position: "absolute",
-    bottom: 2,
+    opacity: 0.55,
   },
 });
