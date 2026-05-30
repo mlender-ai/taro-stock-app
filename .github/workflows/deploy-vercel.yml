@@ -17,6 +17,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
@@ -27,40 +28,55 @@ jobs:
         with:
           node-version: 20
 
-      # ── 1. 프로젝트 조회/생성 + 설정 리셋 ──────────────────────
-      #    잘못된 installCommand("cd ../.. && npm ci")를 null로 초기화하여
-      #    Vercel 네이티브 npm-workspace 감지(루트 lockfile)로 설치되도록 함.
-      - name: Resolve & configure Vercel project
+      # ── 1. 프로젝트 ID 취득 (없으면 생성) ──────────────────────
+      #    ID 취득만 필수. 설정 PATCH는 best-effort (원격 빌드는
+      #    전체 레포 접근 가능 → stored installCommand 도 정상 동작).
+      - name: Resolve Vercel project
         run: |
-          ORG_ID=$(curl -sf "https://api.vercel.com/v2/user" \
-            -H "Authorization: Bearer $VERCEL_TOKEN" | jq -r '.user.id')
-          echo "VERCEL_ORG_ID=$ORG_ID" >> "$GITHUB_ENV"
+          set +e
 
-          PROJ=$(curl -s "https://api.vercel.com/v9/projects/taro-stock-web" \
+          USER_JSON=$(curl -s --max-time 30 "https://api.vercel.com/v2/user" \
             -H "Authorization: Bearer $VERCEL_TOKEN")
-          PROJ_ID=$(echo "$PROJ" | jq -r '.id // empty')
+          ORG_ID=$(echo "$USER_JSON" | jq -r '.user.id // .id // empty')
+          if [ -z "$ORG_ID" ]; then
+            echo "::error::Vercel 사용자 조회 실패 (토큰 확인). 응답: $USER_JSON"
+            exit 1
+          fi
+          echo "VERCEL_ORG_ID=$ORG_ID" >> "$GITHUB_ENV"
+          echo "ORG_ID=$ORG_ID"
+
+          PROJ_JSON=$(curl -s --max-time 30 \
+            "https://api.vercel.com/v9/projects/taro-stock-web" \
+            -H "Authorization: Bearer $VERCEL_TOKEN")
+          PROJ_ID=$(echo "$PROJ_JSON" | jq -r '.id // empty')
 
           if [ -z "$PROJ_ID" ]; then
-            PROJ=$(curl -sf "https://api.vercel.com/v10/projects" \
+            CREATE_JSON=$(curl -s --max-time 30 -X POST \
+              "https://api.vercel.com/v10/projects" \
               -H "Authorization: Bearer $VERCEL_TOKEN" \
               -H "Content-Type: application/json" \
               -d '{"name":"taro-stock-web","framework":"nextjs","rootDirectory":"apps/web"}')
-            PROJ_ID=$(echo "$PROJ" | jq -r '.id')
-            echo "프로젝트 생성됨: $PROJ_ID"
+            PROJ_ID=$(echo "$CREATE_JSON" | jq -r '.id // empty')
+            echo "프로젝트 생성 시도 → $PROJ_ID"
           else
-            echo "기존 프로젝트: $PROJ_ID"
+            echo "기존 프로젝트 → $PROJ_ID"
+          fi
+
+          if [ -z "$PROJ_ID" ]; then
+            echo "::error::프로젝트 조회/생성 실패. GET: $PROJ_JSON"
+            exit 1
           fi
           echo "VERCEL_PROJECT_ID=$PROJ_ID" >> "$GITHUB_ENV"
 
-          # 설정을 기본값으로 리셋 (커스텀 install/build 명령 제거)
-          curl -sf -X PATCH "https://api.vercel.com/v9/projects/$PROJ_ID" \
+          # 설정 리셋 (best-effort — 실패해도 진행)
+          PATCH_CODE=$(curl -s --max-time 30 -o /dev/null -w "%{http_code}" \
+            -X PATCH "https://api.vercel.com/v9/projects/$PROJ_ID" \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"framework":"nextjs","rootDirectory":"apps/web","installCommand":null,"buildCommand":null,"devCommand":null,"outputDirectory":".next-build"}' \
-            > /dev/null
-          echo "프로젝트 설정 리셋 완료"
+            -d '{"framework":"nextjs","rootDirectory":"apps/web","outputDirectory":".next-build","installCommand":null,"buildCommand":null}')
+          echo "설정 PATCH HTTP $PATCH_CODE"
 
-      # ── 2. 환경변수 동기화 (REST API upsert) ───────────────────
+      # ── 2. 환경변수 동기화 (best-effort) ───────────────────────
       - name: Sync environment variables
         env:
           SLACK_BOT_TOKEN:      ${{ secrets.SLACK_BOT_TOKEN }}
@@ -70,16 +86,17 @@ jobs:
           JWT_SECRET:           ${{ secrets.JWT_SECRET }}
           DATABASE_URL:         ${{ secrets.DATABASE_URL }}
         run: |
+          set +e
           sync_env() {
             local key=$1 val=$2
             [ -z "$val" ] && return
-            curl -s -X POST \
+            CODE=$(curl -s --max-time 30 -o /dev/null -w "%{http_code}" -X POST \
               "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?upsert=true" \
               -H "Authorization: Bearer $VERCEL_TOKEN" \
               -H "Content-Type: application/json" \
               -d "$(jq -n --arg k "$key" --arg v "$val" \
-                '{key:$k,value:$v,type:"encrypted",target:["production","preview","development"]}')" \
-              > /dev/null && echo "  ✓ $key"
+                '{key:$k,value:$v,type:"encrypted",target:["production","preview","development"]}')")
+            echo "  $key → HTTP $CODE"
           }
           sync_env SLACK_BOT_TOKEN      "$SLACK_BOT_TOKEN"
           sync_env SLACK_SIGNING_SECRET "$SLACK_SIGNING_SECRET"
@@ -90,11 +107,9 @@ jobs:
           sync_env AI_MODEL             "openai/gpt-4.1"
           sync_env JWT_SECRET           "$JWT_SECRET"
           sync_env DATABASE_URL         "$DATABASE_URL"
+          exit 0
 
-      # ── 3. 원격 빌드 배포 (레포 루트에서 업로드) ───────────────
-      #    --prebuilt 없이 → Vercel이 원격에서 빌드.
-      #    rootDirectory=apps/web 가 프로젝트에 설정되어 있으므로
-      #    루트 lockfile로 workspace 설치 후 apps/web 빌드.
+      # ── 3. 원격 빌드 배포 ──────────────────────────────────────
       - name: Deploy
         id: deploy
         run: |
@@ -104,10 +119,10 @@ jobs:
           URL=$(echo "$OUTPUT" | grep -Eo "https://[a-zA-Z0-9.-]+\.vercel\.app" | tail -1)
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           if [ -z "$URL" ]; then
-            echo "::error::배포 URL을 찾을 수 없음 — 배포 실패"
+            echo "::error::배포 URL 없음 — 배포 실패"
             exit 1
           fi
-          echo "배포 완료: $URL"
+          echo "DEPLOYED → $URL"
 
       # ── 4. Slack 알림 ──────────────────────────────────────────
       - name: Notify Slack
