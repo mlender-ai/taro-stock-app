@@ -170,3 +170,63 @@ describe("/api/tarot/news (메타데이터 확장)", () => {
     expect(body.items).toEqual([]);
   });
 });
+
+// QA 제안 #252 — 뉴스 섹션 데이터 정합성 (결측치 / 잘못된 형식 / 중복)
+describe("/api/tarot/news (데이터 정합성)", () => {
+  it("시나리오 1: title 결측 항목 → 제외 (화면 깨짐 없음)", async () => {
+    const xml = buildRss([
+      "<item><link>https://example.com/no-title</link><description><![CDATA[본문]]></description></item>",
+      rssItem({ title: "정상 기사", link: "https://example.com/ok", description: "정상" }),
+    ]);
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, text: async () => xml });
+
+    const res = await GET(makeRequest("http://localhost/api/tarot/news?symbol=INTEG_NOTITLE"));
+    const body = await res.json();
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0].title).toBe("정상 기사");
+  });
+
+  it("시나리오 1-b: link 결측 항목 → 제외", async () => {
+    const xml = buildRss([
+      "<item><title><![CDATA[링크 없는 기사]]></title><description><![CDATA[본문]]></description></item>",
+    ]);
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, text: async () => xml });
+
+    const res = await GET(makeRequest("http://localhost/api/tarot/news?symbol=INTEG_NOLINK"));
+    const body = await res.json();
+    expect(body.items).toEqual([]);
+  });
+
+  it("시나리오 2: 잘못된 형식의 pubDate → 크래시 없이 유효한 ISO 시각으로 폴백", async () => {
+    const xml = buildRss([
+      rssItem({
+        title: "날짜 깨진 기사",
+        link: "https://example.com/bad-date",
+        description: "본문",
+        pubDate: "완전-잘못된-날짜",
+      }),
+    ]);
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, text: async () => xml });
+
+    const res = await GET(makeRequest("http://localhost/api/tarot/news?symbol=INTEG_BADDATE"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.items).toHaveLength(1);
+    expect(Number.isNaN(new Date(body.items[0].publishedAt).getTime())).toBe(false);
+  });
+
+  it("시나리오 3: 동일 link 중복 기사 → 한 번만 표시", async () => {
+    const dup = rssItem({
+      title: "중복 기사",
+      link: "https://example.com/dup",
+      description: "본문",
+    });
+    const xml = buildRss([dup, dup, dup]);
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, text: async () => xml });
+
+    const res = await GET(makeRequest("http://localhost/api/tarot/news?symbol=INTEG_DUP"));
+    const body = await res.json();
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0].link).toBe("https://example.com/dup");
+  });
+});
