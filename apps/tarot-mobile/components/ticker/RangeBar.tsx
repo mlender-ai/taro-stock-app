@@ -5,41 +5,16 @@ import { Colors } from "../../constants/theme";
 
 interface Props {
   label: string;
-  min: number | null | undefined;
-  max: number | null | undefined;
-  current: number | null | undefined;
+  min: number;
+  max: number;
+  current: number;
   formatValue?: (v: number) => string;
 }
 
-/** 숫자가 유효한지 판단 — null, undefined, NaN, Infinity 모두 거부 */
-function isValidNum(v: unknown): v is number {
-  return typeof v === "number" && Number.isFinite(v);
-}
-
 export function RangeBar({ label, min, max, current, formatValue }: Props) {
-  const fmt = formatValue ?? ((v: number) => v.toLocaleString());
-  const PLACEHOLDER = "—";
-
-  // 결측치 안전 렌더: min, max, current 중 하나라도 유효하지 않으면 비활성 표시
-  const hasValidData = isValidNum(min) && isValidNum(max) && isValidNum(current);
-
-  if (!hasValidData) {
-    return (
-      <View style={styles.container}>
-        <Text variant="caption" color={Colors.midGrayText} style={styles.label}>{label}</Text>
-        <View style={styles.barContainer}>
-          <Text variant="caption" color={Colors.midGrayText} style={styles.minMax}>{PLACEHOLDER}</Text>
-          <View style={styles.track}>
-            <View style={styles.trackFill} />
-          </View>
-          <Text variant="caption" color={Colors.midGrayText} style={styles.minMax}>{PLACEHOLDER}</Text>
-        </View>
-      </View>
-    );
-  }
-
   const range = max - min;
   const position = range > 0 ? Math.max(0, Math.min(1, (current - min) / range)) : 0.5;
+  const fmt = formatValue ?? ((v: number) => v.toLocaleString());
 
   return (
     <View style={styles.container}>
