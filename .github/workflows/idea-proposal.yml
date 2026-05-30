@@ -65,10 +65,12 @@ jobs:
           echo "__EOF__" >> "$GITHUB_OUTPUT"
 
           # 어제 CEO Brief — 채택 항목 진척 추적용
+          # 이슈 번호(#NNN)를 마스킹하여 오늘 브리핑에서 어제 번호를 재인용하는 사고 방지
           YB=$(gh issue list --label "ceo-brief" --state all --limit 5 \
             --json title,body \
             --repo "${{ github.repository }}" | \
-            jq -r ".[] | select(.title | contains(\"$YESTERDAY\")) | .body" 2>/dev/null | head -c 2000)
+            jq -r ".[] | select(.title | contains(\"$YESTERDAY\")) | .body" 2>/dev/null | head -c 2000 | \
+            sed -E 's/#([0-9]+)/[이전이슈]/g')
           if [ -z "$YB" ]; then
             YB="어제 CEO Brief 없음 — 진척 추적 불가, 새 사이클로 시작."
           fi
@@ -188,7 +190,12 @@ jobs:
             5. 모든 "현재 문제"는 파일경로/메트릭/사용자 피드백 인용 중 1개 이상 포함. 추측 금지.
             6. 자기 직전 이력에서 다룬 영역과 같은 주제 금지.
             7. 종목 상세/차트/재무 관련 제안의 UX 레퍼런스는 **토스증권**. 토스와 동떨어진 금융 UX 제안은 근거 필요.
-            8. 다른 에이전트가 이미 비슷한 제안을 열어놨으면 (오늘자 open issues 확인) 그 주제 회피. PM은 직군 침범하지 않는다.
+            8. **데이터 정합성 UX 절대 규칙 (2026-05-30 CEO 직접 피드백)**:
+               - 데이터 불일치/결측/오류를 **사용자에게 직접 알리는 UI(배너, 경고, "데이터가 일치하지 않습니다" 등) 제안은 절대 금지**.
+               - 이유: 증권 앱에서 "데이터가 안 맞다"고 사용자에게 말하면 **신뢰가 즉시 붕괴**된다. 토스증권도 그런 배너를 띄우지 않는다.
+               - 올바른 접근: 정합성 문제는 **로딩 상태를 유지하면서 백엔드에서 자동으로 해결**하고, 사용자에게는 **항상 정합된 데이터만 보여준다**. 데이터가 아직 정합되지 않았으면 로딩 스켈레톤을 유지한다.
+               - "DataMismatchBanner", "실시간 데이터 일치 알림", "데이터 불일치 감지 로직" 같은 제안은 자동 폐기.
+            9. 다른 에이전트가 이미 비슷한 제안을 열어놨으면 (오늘자 open issues 확인) 그 주제 회피. PM은 직군 침범하지 않는다.
 
             === RICE + 5 Whys 강제 (simulo pm-reviewer 차용, 2026-05-27) ===
             PM 제안은 출력에 RICE 점수 + 5 Whys 필수 포함. 다른 직군과 차별화되는 PM 고유 의사결정 프레임워크.
@@ -1239,6 +1246,11 @@ jobs:
             5. 토큰 비용 영향(평균 입력/출력 토큰 변화) 명시.
             6. 종목 상세 데이터(시세·재무·뉴스 헤드라인)를 해석에 녹여낼 때는 토스증권 수준의 정량성을 가진 입력을 가정.
             7. 금융 규제 금칙어(매수/매도/수익보장/확정 예측) 누설 금지.
+            8. **투자 권유 뉘앙스 표현 절대 금지 (2026-05-30 CEO 직접 지시)**:
+               - 금지 표현: "투자해도 될까요", "투자해도 괜찮을까요", "사도 될까요", "매수 타이밍", "지금 들어가도", "수익 기대", "투자 적합", "투자 추천"
+               - Before/After 샘플의 UserQuestion에도 위 표현 사용 금지. 투자 판단을 구하는 질문 형식 자체가 리걸 리스크.
+               - 대안 UserQuestion 예시: "이 종목의 에너지는?", "이 종목과 나의 궁합은?", "이 종목의 흐름을 읽어줘"
+               - 이 규칙을 위반한 제안은 점수와 무관하게 **자동 폐기**.
           prompt: |
             ## 🌟 North Star
             ${{ needs.prepare.outputs.north_star }}
@@ -1409,15 +1421,19 @@ jobs:
           LIST=$(gh issue list --label "agent-council" --state open --limit 30 \
             --json number,title,labels --repo "${{ github.repository }}" | \
             jq -r --arg today "$TODAY" '.[] | select(.title | contains($today)) | "#" + (.number|tostring) + " " + .title + " [labels: " + (.labels | map(.name) | join(",")) + "]"')
-          echo "list<<__EOF__" >> $GITHUB_OUTPUT
           if [ -z "$LIST" ]; then
-            echo "(오늘 신규 이슈 없음)"
+            echo "has_issues=false" >> $GITHUB_OUTPUT
+            echo "list<<__EOF__" >> $GITHUB_OUTPUT
+            echo "(오늘 신규 이슈 없음 — CEO Brief 생성 중단)" >> $GITHUB_OUTPUT
+            echo "__EOF__" >> $GITHUB_OUTPUT
           else
-            echo "$LIST"
+            echo "has_issues=true" >> $GITHUB_OUTPUT
+            echo "list<<__EOF__" >> $GITHUB_OUTPUT
+            echo "$LIST" >> $GITHUB_OUTPUT
+            echo "__EOF__" >> $GITHUB_OUTPUT
           fi
-          echo "__EOF__" >> $GITHUB_OUTPUT
       - name: "[CEO Brief]"
-        if: steps.dedup.outputs.exists == 'false'
+        if: steps.dedup.outputs.exists == 'false' && steps.today_issues.outputs.has_issues == 'true'
         uses: actions/ai-inference@v1
         id: brief
         continue-on-error: true
@@ -1442,6 +1458,8 @@ jobs:
                - North Star 4축(UX·콘텐츠·백엔드 인프라·토스증권 멘탈모델)과 완전히 무관한 제안 — 정렬도 0점 사유로 킬리스트.
                - 이미 구현됨 / 잘못된 가설 (예: 캐싱이 적용되지 않은 엔드포인트의 캐시 제거) — 사실 오류 사유로 킬리스트.
                - 금지 어휘 사용 ("가능성", "우려됩니다", "수도", "보입니다", "할 것 같습니다") — 표현 위반 사유로 킬리스트.
+                - **(2026-05-30 추가)** 투자 권유 뉘앙스 표현("투자해도 될까요", "사도 될까요", "매수 타이밍" 등) 포함 → 리걸 위협 사유로 킬리스트. Before/After 샘플의 UserQuestion도 검사 대상.
+                - **(2026-05-30 추가)** 데이터 불일치/결측/오류를 사용자에게 직접 알리는 UI 제안(배너, 경고 등) → 사용자 신뢰 저하 사유로 킬리스트. 정합성은 로딩으로 해결, 사용자에게는 항상 정합된 데이터만 표시.
             6. **킬리스트가 아닌 모든 제안은 "오늘 처리 우선순위" 리스트에 우선순위만 매겨 정렬**. "다음 주 후보"·"미루기" 섹션 없음. 정렬도 4+ 만 채택하고 나머지 미루는 구조 금지. 킬리스트 빠진 나머지 전부를 우선순위 1, 2, 3, ... 으로 노출.
             7. Security 제안은 North Star 정렬도가 낮더라도 Critical/High면 우선순위 상단. Medium/Low 또는 "이번 주 없음" 보고는 일반 우선순위로 정렬.
             8. 콘텐츠 품질(해석 깊이·카드 서사·종목 데이터 표시 품질)과 사용자 경험(플로우 간소화·정보 위계·접근성)에 관한 제안은 가점 부여 — 우선순위 상단.
@@ -1570,7 +1588,7 @@ jobs:
             ### 🧭 사용자 결정 필요 항목
             (북스타 갱신, 반복 주제 종결, 임계값 조정 등 CEO가 직접 판단할 것)
       - name: Create CEO Brief Issue
-        if: steps.dedup.outputs.exists == 'false' && steps.brief.outputs.response != ''
+        if: steps.dedup.outputs.exists == 'false' && steps.today_issues.outputs.has_issues == 'true' && steps.brief.outputs.response != ''
         env:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.brief.outputs.response }}
