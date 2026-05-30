@@ -29,12 +29,13 @@ export function TabBar({ activeTab, onTabChange }: Props) {
           >
             <Text
               variant="body-sm"
-              color={isActive ? Colors.taroEssence : Colors.midGrayText}
+              color={isActive ? Colors.whiteout : Colors.midGrayText}
               style={isActive ? styles.labelActive : styles.labelInactive}
             >
               {tab.label}
             </Text>
-            {isActive && <View style={styles.activeDot} />}
+            {/* 활성 탭 인디케이터 — 토스증권 패턴: 선택 상태를 하단 바로 명확히 표시 */}
+            {isActive && <View style={styles.activeIndicator} />}
           </TouchableOpacity>
         );
       })}
@@ -52,30 +53,30 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 8,
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
-    gap: 4,
   },
   tabActive: {
     borderBottomColor: Colors.taroEssence,
-    backgroundColor: Colors.voidGreen,
   },
   labelActive: {
     fontWeight: "700",
-    fontSize: 14,
+    fontSize: 15,
   },
   labelInactive: {
     fontWeight: "400",
-    fontSize: 14,
+    fontSize: 15,
   },
-  activeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.taroEssence,
+  activeIndicator: {
     position: "absolute",
-    bottom: 2,
+    bottom: 0,
+    left: "20%",
+    right: "20%",
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.taroEssence,
   },
 });
+
