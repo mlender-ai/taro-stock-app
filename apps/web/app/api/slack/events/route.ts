@@ -82,7 +82,7 @@ async function handleMentionAsync(
   }
 }
 
-// ── Agent Chat — OpenAI-compatible, 스레드 멀티턴 대화 ───────────────
+// ── Agent Chat — OpenAI-compatible, 스레드 멀티턴 대화 ───────────────────
 // AI_API_URL / AI_API_KEY / AI_MODEL 환경변수로 모델 교체 가능
 // 추천: Gemini (무료) → aistudio.google.com 에서 API 키 발급
 //   AI_API_URL = https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
@@ -103,8 +103,7 @@ async function handleAgentChat(
   if (!AI_API_URL || !AI_API_KEY) {
     await postMessage(
       channel,
-      "❌ `AI_API_URL` / `AI_API_KEY` 환경변수가 설정되지 않았습니다.
-Vercel → Settings → Environment Variables에서 추가해주세요.",
+      "❌ `AI_API_URL` / `AI_API_KEY` 환경변수가 설정되지 않았습니다.\nVercel → Settings → Environment Variables에서 추가해주세요.",
       replyThreadTs
     );
     return;
@@ -113,7 +112,6 @@ Vercel → Settings → Environment Variables에서 추가해주세요.",
   try {
     await postMessage(channel, `🤔 생각 중...`, replyThreadTs);
 
-    // 스레드 히스토리 + 프로젝트 컨텍스트 병렬 조회
     const [threadHistory, prs, briefs, runs] = await Promise.allSettled([
       getThreadHistory(channel, rootThreadTs),
       getOpenPRs(5),
@@ -121,7 +119,6 @@ Vercel → Settings → Environment Variables에서 추가해주세요.",
       getWorkflowRuns("auto-implement.yml", 5),
     ]);
 
-    // 스레드 히스토리 → conversation messages 변환
     const historyMessages: { role: "user" | "assistant"; content: string }[] = [];
     if (threadHistory.status === "fulfilled") {
       for (const msg of threadHistory.value) {
@@ -135,21 +132,18 @@ Vercel → Settings → Environment Variables에서 추가해주세요.",
       }
     }
 
-    // 프로젝트 컨텍스트 구성
     const prList =
       prs.status === "fulfilled"
         ? (prs.value as { number: number; title: string }[])
             .map((p) => `- #${p.number}: ${p.title}`)
-            .join("
-")
+            .join("\n")
         : "(조회 실패)";
 
     const briefList =
       briefs.status === "fulfilled"
         ? (briefs.value as { number: number; title: string }[])
             .map((b) => `- #${b.number}: ${b.title}`)
-            .join("
-")
+            .join("\n")
         : "(조회 실패)";
 
     const runList =
@@ -162,8 +156,7 @@ Vercel → Settings → Environment Variables에서 추가해주세요.",
             ).workflow_runs || []
           )
             .map((r) => `- ${r.conclusion || "running"} (${r.head_branch}) — ${r.created_at}`)
-            .join("
-")
+            .join("\n")
         : "(조회 실패)";
 
     const systemPrompt = `당신은 Trading Taro 프로젝트의 Hermes 에이전트입니다.
@@ -183,7 +176,7 @@ ${runList || "(없음)"}
 규칙:
 - 이전 대화를 참고해 맥락 있는 답변
 - 3-5문장 이내로 간결하게
-- Slack mrkdwn 포맷 사용 (*볼드*, _이탤릭_, \`코드\`)
+- Slack mrkdwn 포맷 사용 (*볼드*, _이탈릭_, \`코드\`)
 - 확실하지 않은 것은 솔직하게 모른다고 답변`;
 
     const messages = [
