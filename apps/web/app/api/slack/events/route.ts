@@ -82,7 +82,12 @@ async function handleMentionAsync(
   }
 }
 
-// ── Agent Chat — Anthropic Claude, 스레드 멀티턴 대화 ────────────────
+// ── Agent Chat — OpenAI-compatible, 스레드 멀티턴 대화 ───────────────
+// AI_API_URL / AI_API_KEY / AI_MODEL 환경변수로 모델 교체 가능
+// 추천: Gemini (무료) → aistudio.google.com 에서 API 키 발급
+//   AI_API_URL = https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+//   AI_API_KEY = <Gemini API key>
+//   AI_MODEL   = gemini-1.5-flash
 async function handleAgentChat(
   currentText: string,
   _userId: string,
@@ -91,13 +96,15 @@ async function handleAgentChat(
   rootThreadTs: string,
   currentMsgTs: string
 ) {
-  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  const AI_API_URL = process.env.AI_API_URL;
+  const AI_API_KEY = process.env.AI_API_KEY;
+  const AI_MODEL = process.env.AI_MODEL || "gemini-1.5-flash";
 
-  if (!ANTHROPIC_API_KEY) {
+  if (!AI_API_URL || !AI_API_KEY) {
     await postMessage(
       channel,
-      "❌ `ANTHROPIC_API_KEY` 환경변수가 설정되지 않았습니다.
-Vercel 대시보드 → Settings → Environment Variables에서 추가해주세요.",
+      "❌ `AI_API_URL` / `AI_API_KEY` 환경변수가 설정되지 않았습니다.
+Vercel → Settings → Environment Variables에서 추가해주세요.",
       replyThreadTs
     );
     return;
@@ -184,33 +191,34 @@ ${runList || "(없음)"}
       { role: "user" as const, content: currentText },
     ];
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch(AI_API_URL, {
       method: "POST",
       headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+        Authorization: `Bearer ${AI_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
+        model: AI_MODEL,
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
         max_tokens: 600,
-        system: systemPrompt,
-        messages,
+        temperature: 0.3,
       }),
     });
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error(`Anthropic API ${res.status}: ${errText}`);
+      throw new Error(`AI API ${res.status}: ${errText.slice(0, 200)}`);
     }
 
     const aiData = (await res.json()) as {
-      content: { type: string; text: string }[];
       error?: { message: string };
+      choices: { message: { content: string } }[];
     };
 
-    const reply = aiData.content?.find((c) => c.type === "text")?.text?.trim();
-    if (!reply) throw new Error("Claude 응답이 비어있습니다");
+    if (aiData.error) throw new Error(aiData.error.message);
+
+    const reply = aiData.choices?.[0]?.message?.content?.trim();
+    if (!reply) throw new Error("AI 응답이 비어있습니다");
 
     await postMessage(channel, reply, replyThreadTs);
   } catch (err) {
