@@ -45,7 +45,6 @@ export async function POST(req: NextRequest) {
 
   if (event.type === "app_mention" && event.text && event.channel) {
     const channel = event.channel;
-    // 현재 메시지 ts (답장에 사용) / 스레드 루트 ts (히스토리 조회에 사용)
     const replyTs = event.thread_ts || event.ts;
     const rootThreadTs = event.thread_ts || event.ts;
 
@@ -83,7 +82,7 @@ async function handleMentionAsync(
   }
 }
 
-// ── Agent Chat — 스레드 대화 이력 기반 멀티턴 대화 ───────────────────
+// ── Agent Chat — Anthropic Claude, 스레드 멀티턴 대화 ────────────────
 async function handleAgentChat(
   currentText: string,
   _userId: string,
@@ -92,12 +91,15 @@ async function handleAgentChat(
   rootThreadTs: string,
   currentMsgTs: string
 ) {
-  const AI_API_URL = process.env.AI_API_URL;
-  const AI_API_KEY = process.env.AI_API_KEY;
-  const AI_MODEL = process.env.AI_MODEL || "openai/gpt-4.1";
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
-  if (!AI_API_URL || !AI_API_KEY) {
-    await postMessage(channel, "❌ AI_API_URL / AI_API_KEY 환경변수가 설정되지 않았습니다.", replyThreadTs);
+  if (!ANTHROPIC_API_KEY) {
+    await postMessage(
+      channel,
+      "❌ `ANTHROPIC_API_KEY` 환경변수가 설정되지 않았습니다.
+Vercel 대시보드 → Settings → Environment Variables에서 추가해주세요.",
+      replyThreadTs
+    );
     return;
   }
 
@@ -116,7 +118,6 @@ async function handleAgentChat(
     const historyMessages: { role: "user" | "assistant"; content: string }[] = [];
     if (threadHistory.status === "fulfilled") {
       for (const msg of threadHistory.value) {
-        // 현재 메시지 및 빈 텍스트 제외
         if (!msg.text || msg.ts === currentMsgTs) continue;
         const cleaned = msg.text.replace(/<@[A-Z0-9]+>/g, "").trim();
         if (!cleaned) continue;
@@ -178,45 +179,45 @@ ${runList || "(없음)"}
 - Slack mrkdwn 포맷 사용 (*볼드*, _이탤릭_, \`코드\`)
 - 확실하지 않은 것은 솔직하게 모른다고 답변`;
 
-    // 히스토리 + 현재 질문으로 messages 배열 구성
     const messages = [
       ...historyMessages,
       { role: "user" as const, content: currentText },
     ];
 
-    const res = await fetch(AI_API_URL, {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${AI_API_KEY}`,
-        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: AI_MODEL,
-        messages: [{ role: "system", content: systemPrompt }, ...messages],
+        model: "claude-sonnet-4-6",
         max_tokens: 600,
-        temperature: 0.3,
+        system: systemPrompt,
+        messages,
       }),
     });
 
-    if (!res.ok) throw new Error(`AI API ${res.status}`);
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Anthropic API ${res.status}: ${errText}`);
+    }
 
     const aiData = (await res.json()) as {
+      content: { type: string; text: string }[];
       error?: { message: string };
-      choices: { message: { content: string } }[];
     };
 
-    if (aiData.error) throw new Error(aiData.error.message || "AI API error");
-
-    const reply = aiData.choices?.[0]?.message?.content?.trim();
-    if (!reply) throw new Error("AI 응답이 비어있습니다");
+    const reply = aiData.content?.find((c) => c.type === "text")?.text?.trim();
+    if (!reply) throw new Error("Claude 응답이 비어있습니다");
 
     await postMessage(channel, reply, replyThreadTs);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await postMessage(
       channel,
-      `❌ 답변 생성 실패: ${msg}
-커맨드는 \`/taro help\`를 입력하세요.`,
+      `❌ 답변 생성 실패: ${msg}`,
       replyThreadTs
     ).catch(() => {});
   }
