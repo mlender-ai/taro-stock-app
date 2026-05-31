@@ -2,6 +2,14 @@ import { create } from "zustand";
 import { apiFetch } from "./api";
 import { decideSwrAction } from "@trading/shared/src/swrPolicy";
 import type { StockQuote, StockChartBar, StockChartResponse } from "@trading/shared/src/stockTypes";
+import {
+  SWR_QUOTE_FRESH_TTL_MS,
+  SWR_QUOTE_STALE_TTL_MS,
+  SWR_CHART_FRESH_TTL_MS,
+  SWR_CHART_STALE_TTL_MS,
+  SWR_FINANCIALS_FRESH_TTL_MS,
+  SWR_FINANCIALS_STALE_TTL_MS,
+} from "./swrConfig";
 
 export type ChartRange = "1d" | "5d" | "1mo" | "3mo" | "1y";
 
@@ -67,9 +75,7 @@ interface ChartBundle {
   cachedAt: number;
 }
 
-// Stale-while-revalidate: data 60초 이내 → fresh (fetch 스킵), 5분 이내 → stale (즉시 표시 + 백그라운드 fetch), 그 외 → expired (정상 fetch)
-const FRESH_TTL_MS = 60 * 1000;
-const STALE_TTL_MS = 5 * 60 * 1000;
+// TTL 상수는 swrConfig.ts에서 중앙 관리 (데이터 유형별로 분리)
 
 interface StockState {
   // 현재 화면 표시용 (셀렉터)
@@ -126,8 +132,8 @@ export const useStockStore = create<StockState>((set, get) => ({
       cachedDataAt: cached?.dataAt,
       force,
       now,
-      freshTtlMs: FRESH_TTL_MS,
-      staleTtlMs: STALE_TTL_MS,
+      freshTtlMs: SWR_QUOTE_FRESH_TTL_MS,
+      staleTtlMs: SWR_QUOTE_STALE_TTL_MS,
     });
 
     // 캐시 hit: 즉시 표시 (fresh든 stale이든)
@@ -170,8 +176,8 @@ export const useStockStore = create<StockState>((set, get) => ({
       cachedDataAt: cachedAtIso,
       force,
       now,
-      freshTtlMs: FRESH_TTL_MS,
-      staleTtlMs: STALE_TTL_MS,
+      freshTtlMs: SWR_CHART_FRESH_TTL_MS,
+      staleTtlMs: SWR_CHART_STALE_TTL_MS,
     });
 
     if (cached) {
@@ -208,8 +214,8 @@ export const useStockStore = create<StockState>((set, get) => ({
       cachedDataAt: cachedAtIso,
       force,
       now,
-      freshTtlMs: FRESH_TTL_MS,
-      staleTtlMs: STALE_TTL_MS,
+      freshTtlMs: SWR_FINANCIALS_FRESH_TTL_MS,
+      staleTtlMs: SWR_FINANCIALS_STALE_TTL_MS,
     });
 
     if (cached) {
@@ -262,15 +268,15 @@ export const useStockStore = create<StockState>((set, get) => ({
       cachedDataAt: cachedQuote?.dataAt,
       force,
       now,
-      freshTtlMs: FRESH_TTL_MS,
-      staleTtlMs: STALE_TTL_MS,
+      freshTtlMs: SWR_QUOTE_FRESH_TTL_MS,
+      staleTtlMs: SWR_QUOTE_STALE_TTL_MS,
     });
     const finAction = decideSwrAction({
       cachedDataAt: cachedFinancials ? new Date(cachedFinancials.cachedAt).toISOString() : null,
       force,
       now,
-      freshTtlMs: FRESH_TTL_MS,
-      staleTtlMs: STALE_TTL_MS,
+      freshTtlMs: SWR_FINANCIALS_FRESH_TTL_MS,
+      staleTtlMs: SWR_FINANCIALS_STALE_TTL_MS,
     });
 
     if (cachedQuote) {
