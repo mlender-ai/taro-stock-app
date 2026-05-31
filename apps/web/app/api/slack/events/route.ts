@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { verifySlackRequest } from "@/lib/slack/verify";
-import { postMessage } from "@/lib/slack/client";
+import { postMessage, getThreadHistory } from "@/lib/slack/client";
 import { dispatchCommand, KNOWN_COMMANDS } from "@/lib/slack/commands";
 import {
   getOpenPRs,
@@ -49,7 +49,9 @@ export async function POST(req: NextRequest) {
   // app_mention: @taro-bot <text>
   if (event.type === "app_mention" && event.text && event.channel) {
     const channel = event.channel;
-    const threadTs = event.ts;
+    const replyTs = event.thread_ts || event.ts;
+    const rootThreadTs = event.thread_ts || event.ts;
+    const currentMsgTs = event.ts || "";
 
     // 봇 멘션 제거 후 파싱
     const text = event.text.replace(/<@[A-Z0-9]+>/g, "").trim();
@@ -59,9 +61,9 @@ export async function POST(req: NextRequest) {
 
     // 알려진 커맨드 → 기존 dispatch
     if (KNOWN_COMMANDS.has(cmdName)) {
-      waitUntil(handleMentionAsync(cmdName, args, event.user || "", channel, threadTs));
+      waitUntil(handleMentionAsync(cmdName, args, event.user || "", channel, replyTs));
     } else {
-      waitUntil(handleAgentChat(text, event.user || "", channel, threadTs));
+      waitUntil(handleAgentChat(text, event.user || "", channel, replyTs, rootThreadTs, currentMsgTs));
     }
   }
 
@@ -91,7 +93,9 @@ async function handleAgentChat(
   question: string,
   _userId: string,
   channel: string,
-  threadTs?: string
+  threadTs: string | undefined,
+  rootThreadTs: string,
+  currentMsgTs: string
 ) {
   const AI_API_URL = process.env.AI_API_URL;
   const AI_API_KEY = process.env.AI_API_KEY;
@@ -162,6 +166,7 @@ ${runList || "(없음)"}
         model: AI_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
+          ...historyMessages,
           { role: "user", content: question },
         ],
         max_tokens: 500,
