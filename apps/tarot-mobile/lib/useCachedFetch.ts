@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { apiFetch } from "./api";
 
 interface CacheEntry<T> {
@@ -12,11 +12,14 @@ const fetchCache = new Map<string, CacheEntry<unknown>>();
 interface UseCachedFetchResult<T> {
   data: T | null;
   loading: boolean;
+  error: string | null;
+  refetch: () => void;
 }
 
 /**
  * apiFetch를 래핑하는 SWR 스타일 훅.
  * ttlMs 이내 동일 URL은 캐시에서 즉시 반환 — 탭 전환 시 재fetch 없음.
+ * 실패 시 error 메시지를 노출하고 refetch()로 캐시 무효화 후 재시도 가능.
  */
 export function useCachedFetch<T>(path: string, ttlMs = 15 * 60 * 1000): UseCachedFetchResult<T> {
   const [data, setData] = useState<T | null>(() => {
@@ -27,7 +30,15 @@ export function useCachedFetch<T>(path: string, ttlMs = 15 * 60 * 1000): UseCach
     const hit = fetchCache.get(path);
     return !(hit && hit.expiresAt > Date.now());
   });
+  const [error, setError] = useState<string | null>(null);
+  // refetch 트리거 — 증가 시 effect 재실행
+  const [reloadKey, setReloadKey] = useState(0);
   const mountedRef = useRef(true);
+
+  const refetch = useCallback(() => {
+    fetchCache.delete(path);
+    setReloadKey((k) => k + 1);
+  }, [path]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -37,28 +48,35 @@ export function useCachedFetch<T>(path: string, ttlMs = 15 * 60 * 1000): UseCach
     if (hit && hit.expiresAt > now) {
       setData(hit.data as T);
       setLoading(false);
+      setError(null);
       return;
     }
 
     setLoading(true);
+    setError(null);
 
     apiFetch<T>(path)
       .then((result) => {
         fetchCache.set(path, { data: result, expiresAt: Date.now() + ttlMs });
         if (mountedRef.current) {
           setData(result);
+          setError(null);
           setLoading(false);
         }
       })
       .catch((err) => {
-        console.warn("[useCachedFetch] error:", err instanceof Error ? err.message : err);
-        if (mountedRef.current) setLoading(false);
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn("[useCachedFetch] error:", message);
+        if (mountedRef.current) {
+          setError(message);
+          setLoading(false);
+        }
       });
 
     return () => {
       mountedRef.current = false;
     };
-  }, [path, ttlMs]);
+  }, [path, ttlMs, reloadKey]);
 
-  return { data, loading };
+  return { data, loading, error, refetch };
 }
