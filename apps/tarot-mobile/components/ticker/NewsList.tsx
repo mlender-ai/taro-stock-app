@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Text } from "../ui/Text";
 import { Colors, Spacing, Radius } from "../../constants/theme";
 import { useCachedFetch } from "../../lib/useCachedFetch";
 import { NewsDetailModal } from "./NewsDetailModal";
+import { NewsTarotCta } from "./NewsTarotCta";
 
 interface NewsItem {
   title: string;
@@ -38,6 +39,20 @@ export function NewsList({ symbol }: Props) {
   const news = data?.items ?? [];
   const [selected, setSelected] = useState<NewsItem | null>(null);
 
+  // 가장 빈도 높은 카테고리 — CTA 카피 개인화 (PM #263).
+  const topCategory = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const n of news) {
+      if (n.category) counts.set(n.category, (counts.get(n.category) ?? 0) + 1);
+    }
+    let best: string | undefined;
+    let bestN = 0;
+    for (const [cat, n] of counts) {
+      if (n > bestN) { best = cat; bestN = n; }
+    }
+    return best;
+  }, [news]);
+
   if (loading) return null;
   if (news.length === 0) return null;
 
@@ -51,7 +66,7 @@ export function NewsList({ symbol }: Props) {
         {news.map((item, i) => (
           <TouchableOpacity
             key={item.link || i}
-            style={[styles.newsItem, i < news.length - 1 && styles.newsItemBorder]}
+            style={[styles.newsItem, styles.newsItemBorder]}
             onPress={() => setSelected(item)}
             activeOpacity={0.7}
           >
@@ -73,6 +88,8 @@ export function NewsList({ symbol }: Props) {
             </View>
           </TouchableOpacity>
         ))}
+        {/* PM #263: 뉴스 컨텍스트에서 이 종목 타로 뽑기 유도 */}
+        <NewsTarotCta symbol={symbol} topCategory={topCategory} />
       </View>
 
       <NewsDetailModal
