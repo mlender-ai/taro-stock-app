@@ -97,13 +97,13 @@ async function handleAgentChat(
   rootThreadTs: string | undefined,
   currentMsgTs: string
 ) {
-  // GitHub Models (무료, GITHUB_PAT 재사용) — OpenAI-compat 포맷
-  const GITHUB_PAT = process.env.GITHUB_PAT;
-  const AI_URL = "https://models.github.ai/inference/chat/completions";
-  const AI_MODEL = "openai/gpt-4o";
+  // Groq (무료, OpenAI-compat) — console.groq.com에서 무료 발급
+  const GROQ_API_KEY = process.env.GROQ_API_KEY;
+  const AI_URL = "https://api.groq.com/openai/v1/chat/completions";
+  const AI_MODEL = "llama-3.3-70b-versatile";
 
-  if (!GITHUB_PAT) {
-    await postMessage(channel, "GITHUB_PAT 환경변수가 설정되지 않았습니다.", threadTs);
+  if (!GROQ_API_KEY) {
+    await postMessage(channel, "GROQ_API_KEY 환경변수가 설정되지 않았습니다. console.groq.com에서 무료 발급 후 Vercel에 추가해주세요.", threadTs);
     return;
   }
 
@@ -170,7 +170,7 @@ ${runList || "(없음)"}
     const res = await fetch(AI_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${GITHUB_PAT}`,
+        Authorization: `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
