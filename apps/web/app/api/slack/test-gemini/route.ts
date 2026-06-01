@@ -12,7 +12,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "AI_API_KEY not set" }, { status: 500 });
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${AI_API_KEY}`;
+  const model = req.nextUrl.searchParams.get("model") || "gemini-2.0-flash-lite";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${AI_API_KEY}`;
 
   try {
     const res = await fetch(url, {
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     const data = JSON.parse(body);
     const reply = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "(empty)";
-    return NextResponse.json({ ok: true, reply, model: "gemini-2.0-flash" });
+    return NextResponse.json({ ok: true, reply, model });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 200 });
   }
