@@ -1439,16 +1439,41 @@ jobs:
             --json title --repo "${{ github.repository }}" | \
             jq "[.[] | select(.title | contains(\"$TODAY\"))] | length")
           echo "exists=$([ "$COUNT" -gt 0 ] && echo true || echo false)" >> $GITHUB_OUTPUT
-      - name: Fetch today's new agent issues (실제 번호)
+      - name: Fetch today's new agent issues (실제 번호) + compact digest
         id: today_issues
         if: steps.dedup.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
           TODAY: ${{ needs.prepare.outputs.today }}
         run: |
-          LIST=$(gh issue list --label "agent-council" --state open --limit 30 \
-            --json number,title,labels --repo "${{ github.repository }}" | \
-            jq -r --arg today "$TODAY" '.[] | select(.title | contains($today)) | "#" + (.number|tostring) + " " + .title + " [labels: " + (.labels | map(.name) | join(",")) + "]"')
+          # 오늘 사이클 agent-council open 이슈 원본 (번호·제목·라벨·본문)
+          gh issue list --label "agent-council" --state open --limit 30 \
+            --json number,title,labels,body --repo "${{ github.repository }}" \
+            > /tmp/today_raw.json
+
+          # ── 우선순위 인용용 number 목록 (rule #14 — 기존 list 출력 유지) ──
+          LIST=$(jq -r --arg today "$TODAY" '.[] | select(.title | contains($today)) | "#" + (.number|tostring) + " " + .title + " [labels: " + (.labels | map(.name) | join(",")) + "]"' /tmp/today_raw.json)
+
+          # ── compact digest_json (폴백 스크립트 입력) ──
+          # lane: 알려진 lane 라벨 우선, scoreLabel: score-* 라벨, rationale: ### 근거 첫 줄 또는 본문 120자
+          jq --arg today "$TODAY" '
+            def lane: ([.labels[].name] - ["idea","agent-council","mobile","tech-debt","daily","score-strong","score-conditional","score-missing"]) | (.[0] // "unknown");
+            def scorelabel: ([.labels[].name] | map(select(test("^score-(strong|conditional|missing)$"))) | (.[0] // "score-none"));
+            def rationale:
+              (.body // "") as $b
+              | ($b | split("\n")) as $lines
+              | ([range(0; ($lines|length)) | select($lines[.] | test("^#{1,4}[[:space:]]*근거"))] | (.[0] // -1)) as $idx
+              | (if $idx >= 0
+                 then ([ $lines[($idx+1):][] | select(test("\\S")) ] | (.[0] // ""))
+                 else "" end) as $found
+              | (if ($found | test("\\S")) then $found else ($b | gsub("\n";" ")) end)
+              | gsub("\n";" ") | .[0:120];
+            [ .[] | select(.title | contains($today)) | {number, lane: lane, title, scoreLabel: scorelabel, rationale: rationale} ]
+          ' /tmp/today_raw.json > /tmp/digest.json
+
+          # ── markdown_digest (LLM 브리핑 프롬프트 입력 — 사람이 읽는 형태) ──
+          MD=$(jq -r '.[] | "- #\(.number) [\(.lane)] [\(.scoreLabel)] \(.title)\n  근거: \(.rationale)"' /tmp/digest.json)
+
           if [ -z "$LIST" ]; then
             echo "has_issues=false" >> $GITHUB_OUTPUT
             echo "list<<__EOF__" >> $GITHUB_OUTPUT
@@ -1458,6 +1483,9 @@ jobs:
             echo "has_issues=true" >> $GITHUB_OUTPUT
             echo "list<<__EOF__" >> $GITHUB_OUTPUT
             echo "$LIST" >> $GITHUB_OUTPUT
+            echo "__EOF__" >> $GITHUB_OUTPUT
+            echo "markdown_digest<<__EOF__" >> $GITHUB_OUTPUT
+            echo "$MD" >> $GITHUB_OUTPUT
             echo "__EOF__" >> $GITHUB_OUTPUT
           fi
       - name: "[CEO Brief]"
@@ -1511,33 +1539,8 @@ jobs:
             ${{ needs.prepare.outputs.yesterday_brief }}
 
             ---
-            ## 9개 에이전트 오늘 제안
-
-            **PM:** ${{ needs.pm.outputs.proposal }}
-
-            ---
-            **Frontend:** ${{ needs.frontend.outputs.proposal }}
-
-            ---
-            **Backend:** ${{ needs.backend.outputs.proposal }}
-
-            ---
-            **Designer:** ${{ needs.designer.outputs.proposal }}
-
-            ---
-            **QA:** ${{ needs.qa.outputs.proposal }}
-
-            ---
-            **CTO:** ${{ needs.cto.outputs.proposal }}
-
-            ---
-            **Marketer:** ${{ needs.marketer.outputs.proposal }}
-
-            ---
-            **Security:** ${{ needs.security.outputs.proposal }}
-
-            ---
-            **Prompt Engineer:** ${{ needs.prompt_engineer.outputs.proposal }}
+            ## 📊 오늘 제안 다이제스트 (이슈번호·lane·점수라벨·근거 1줄)
+            ${{ steps.today_issues.outputs.markdown_digest }}
 
             ---
             ## 💬 피드백 이력
@@ -1616,16 +1619,41 @@ jobs:
 
             ### 🧭 사용자 결정 필요 항목
             (북스타 갱신, 반복 주제 종결, 임계값 조정 등 CEO가 직접 판단할 것)
+      - name: Setup Node (폴백용)
+        if: steps.dedup.outputs.exists == 'false' && steps.today_issues.outputs.has_issues == 'true' && (steps.brief.outcome == 'failure' || steps.brief.outputs.response == '')
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: CEO Brief deterministic 폴백 (LLM 실패/빈응답 시)
+        id: fallback
+        if: steps.dedup.outputs.exists == 'false' && steps.today_issues.outputs.has_issues == 'true' && (steps.brief.outcome == 'failure' || steps.brief.outputs.response == '')
+        env:
+          MERGED_PRS: ${{ needs.prepare.outputs.merged_prs }}
+          CLOSED_ISSUES: ${{ needs.prepare.outputs.closed_issues }}
+          TODAY: ${{ needs.prepare.outputs.today }}
+        run: |
+          printf '%s' "$MERGED_PRS" > /tmp/merged.txt
+          printf '%s' "$CLOSED_ISSUES" > /tmp/done.txt
+          npx -y tsx@4.19.2 scripts/ceo-brief-fallback.ts \
+            /tmp/digest.json /tmp/merged.txt /tmp/done.txt "$TODAY" /tmp/brief.md
+          echo "used=true" >> $GITHUB_OUTPUT
       - name: Create CEO Brief Issue
-        if: steps.dedup.outputs.exists == 'false' && steps.today_issues.outputs.has_issues == 'true' && steps.brief.outputs.response != ''
+        if: steps.dedup.outputs.exists == 'false' && steps.today_issues.outputs.has_issues == 'true' && (steps.brief.outputs.response != '' || steps.fallback.outputs.used == 'true')
         env:
           GH_TOKEN: ${{ github.token }}
           BODY: ${{ steps.brief.outputs.response }}
+          USED_FALLBACK: ${{ steps.fallback.outputs.used }}
           TODAY: ${{ needs.prepare.outputs.today }}
         run: |
-          printf '%s' "$BODY" > /tmp/body.md
+          if [ "$USED_FALLBACK" = "true" ]; then
+            # 폴백 스크립트가 /tmp/brief.md 에 작성함. 제목에 식별 접미사.
+            TITLE="📋 [CEO Brief] $TODAY 일일 에이전트 브리핑 (자동 폴백)"
+          else
+            printf '%s' "$BODY" > /tmp/brief.md
+            TITLE="📋 [CEO Brief] $TODAY 일일 에이전트 브리핑"
+          fi
           gh issue create \
-            --title "📋 [CEO Brief] $TODAY 일일 에이전트 브리핑" \
-            --body-file /tmp/body.md \
+            --title "$TITLE" \
+            --body-file /tmp/brief.md \
             --label "ceo-brief,agent-council,daily" \
             --repo "${{ github.repository }}"
