@@ -3,6 +3,7 @@ import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Text } from "../ui/Text";
 import { Colors, Spacing, Radius } from "../../constants/theme";
 import { useCachedFetch } from "../../lib/useCachedFetch";
+import { DataFetchError } from "../ui/DataFetchError";
 import { NewsDetailModal } from "./NewsDetailModal";
 import { NewsTarotCta } from "./NewsTarotCta";
 
@@ -32,7 +33,7 @@ function timeAgo(dateStr: string): string {
 
 export function NewsList({ symbol }: Props) {
   // SWR 캐시: 동일 종목 뉴스는 10분 내 재요청 없이 캐시 재사용 (탭 전환/재진입 시 호출 절감)
-  const { data, loading } = useCachedFetch<{ items: NewsItem[] }>(
+  const { data, loading, error, refetch } = useCachedFetch<{ items: NewsItem[] }>(
     `/api/tarot/news?symbol=${encodeURIComponent(symbol)}&limit=8`,
     10 * 60 * 1000
   );
@@ -54,6 +55,16 @@ export function NewsList({ symbol }: Props) {
   }, [news]);
 
   if (loading) return null;
+  // 결측/실패 시 조용히 사라지지 않고 재시도 경로 제공 (#292)
+  if (error && news.length === 0) {
+    return (
+      <DataFetchError
+        label="관련 뉴스"
+        message="뉴스를 불러오지 못했어요"
+        onRetry={refetch}
+      />
+    );
+  }
   if (news.length === 0) return null;
 
   return (

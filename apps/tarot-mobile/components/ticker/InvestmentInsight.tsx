@@ -3,6 +3,7 @@ import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { Text } from "../ui/Text";
 import { Colors, Spacing, Radius } from "../../constants/theme";
 import { useCachedFetch } from "../../lib/useCachedFetch";
+import { DataFetchError } from "../ui/DataFetchError";
 
 interface InsightResponse {
   headline: string;
@@ -18,7 +19,10 @@ interface Props {
 export function InvestmentInsight({ symbol }: Props) {
   const path = `/api/tarot/news-insight?symbol=${encodeURIComponent(symbol)}`;
   // 15분 캐시 — 탭 전환 시 재fetch 없음 (서버 캐시 TTL과 일치)
-  const { data: insight, loading } = useCachedFetch<InsightResponse>(path, 15 * 60 * 1000);
+  const { data: insight, loading, error, refetch } = useCachedFetch<InsightResponse>(
+    path,
+    15 * 60 * 1000
+  );
 
   if (loading) {
     return (
@@ -35,6 +39,17 @@ export function InvestmentInsight({ symbol }: Props) {
           </Text>
         </View>
       </View>
+    );
+  }
+
+  // 결측/실패 시 재시도 경로 제공 (#292)
+  if (error && !insight) {
+    return (
+      <DataFetchError
+        label="타로 시장 인사이트"
+        message="인사이트를 불러오지 못했어요"
+        onRetry={refetch}
+      />
     );
   }
 
