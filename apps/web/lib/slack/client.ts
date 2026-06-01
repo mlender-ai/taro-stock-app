@@ -52,6 +52,9 @@ export async function getThreadHistory(
     limit: 20,
   })) as SlackResponse & { messages?: SlackMessage[] };
 
-  if (!res.ok || !res.messages) return [];
+  if (!res.ok || !res.messages) {
+    console.warn("[slack] conversations.replies failed:", res.error || "no messages");
+    return [];
+  }
   return res.messages;
 }
