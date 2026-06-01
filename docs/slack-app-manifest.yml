@@ -32,12 +32,16 @@ oauth_config:
       - chat:write
       - app_mentions:read
       - commands
+      - channels:history # 공개 채널 스레드 댓글 읽기 (멘션 없이 이어서 응답)
+      - groups:history # 비공개 채널 스레드 댓글 읽기
 
 settings:
   event_subscriptions:
     request_url: https://{DOMAIN}/api/slack/events
     bot_events:
       - app_mention
+      - message.channels # 공개 채널 메시지 (봇 참여 스레드 댓글 감지)
+      - message.groups # 비공개 채널 메시지
   org_deploy_enabled: false
   socket_mode_enabled: false
   token_rotation_enabled: false
