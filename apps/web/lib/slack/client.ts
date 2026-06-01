@@ -53,7 +53,9 @@ export async function getThreadHistory(
   })) as SlackResponse & { messages?: SlackMessage[] };
 
   if (!res.ok || !res.messages) {
-    console.warn(`SLACK_REPLIES_ERR=${res.error || "empty"} ch=${channel}`);
+    console.warn("SLACK_ERR=" + (res.error || "empty"));
+    console.warn("SLACK_CH=" + channel);
+    console.warn("SLACK_TS=" + threadTs);
     return [];
   }
   return res.messages;
