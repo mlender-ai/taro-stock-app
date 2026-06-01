@@ -13,17 +13,24 @@ export async function GET(req: NextRequest) {
   }
 
   const model = req.nextUrl.searchParams.get("model") || "gemini-2.0-flash-lite";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${AI_API_KEY}`;
+  const useOpenAI = req.nextUrl.searchParams.get("compat") === "1";
+
+  let url: string;
+  let body: string;
+  let headers: Record<string, string>;
+
+  if (useOpenAI) {
+    url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+    headers = { "Content-Type": "application/json", Authorization: `Bearer ${AI_API_KEY}` };
+    body = JSON.stringify({ model, messages: [{ role: "user", content: "Respond with exactly: OK" }], max_tokens: 10 });
+  } else {
+    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${AI_API_KEY}`;
+    headers = { "Content-Type": "application/json" };
+    body = JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Respond with exactly: OK" }] }], generationConfig: { maxOutputTokens: 10 } });
+  }
 
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: "Respond with exactly: OK" }] }],
-        generationConfig: { maxOutputTokens: 10 },
-      }),
-    });
+    const res = await fetch(url, { method: "POST", headers, body });
 
     const body = await res.text();
     if (!res.ok) {
@@ -31,8 +38,10 @@ export async function GET(req: NextRequest) {
     }
 
     const data = JSON.parse(body);
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "(empty)";
-    return NextResponse.json({ ok: true, reply, model });
+    const reply = useOpenAI
+      ? (data.choices?.[0]?.message?.content ?? "(empty)")
+      : (data.candidates?.[0]?.content?.parts?.[0]?.text ?? "(empty)");
+    return NextResponse.json({ ok: true, reply, model, compat: useOpenAI });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 200 });
   }
