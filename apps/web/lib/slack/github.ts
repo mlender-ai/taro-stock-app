@@ -51,6 +51,13 @@ export async function addLabel(issueNumber: number, labels: string[]) {
   });
 }
 
+export async function addIssueComment(issueNumber: number, body: string) {
+  return githubApi(`/repos/${REPO}/issues/${issueNumber}/comments`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  });
+}
+
 export async function mergePR(prNumber: number) {
   return githubApi(`/repos/${REPO}/pulls/${prNumber}/merge`, {
     method: "PUT",
