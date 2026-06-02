@@ -5,7 +5,7 @@ import { buildInterpretationPromptV2_2, type FinancialContext } from "./interpre
 // 핵심 변경: THREE_CARD 스프레드 전용 슬롯-시장데이터 매핑 + 스토리텔링 강화
 // - 과거 슬롯: 52주 위치·SMA200·매출 성장 → "이 종목과의 인연"
 // - 현재 슬롯: RSI·MACD·볼린저 → "지금 이 순간"
-// - 미래 슬롯: 지지/저항·부채·현금흐름·ROE → 리스크·회복력 심리
+// - 미래 슬롯: 지지/저항·부채·현금흐름·유동비율·ROE → 리스크·회복력 심리
 // v2.2.0 대비: 단일 카드는 v2.2.0과 동일. 3장 스프레드에서만 강화 적용.
 export const PROMPT_VERSION_2_3 = "2.3.0";
 
@@ -85,6 +85,11 @@ function buildFutureContext(market: MarketSnapshot, ctx?: FinancialContext): str
   if (ctx?.freeCashflow != null) {
     if (ctx.freeCashflow > 0) signals.push("현금이 들어오는 구조 — 위기에도 버틸 체력이 있습니다");
     else signals.push("현금을 쓰는 시기 — 성장에 베팅 중이지만 여유가 줄어드는 국면");
+  }
+
+  if (ctx?.currentRatio != null) {
+    if (ctx.currentRatio >= 2) signals.push("단기 지불 여력이 넉넉해 갑작스러운 충격도 흡수하는 회복력");
+    else if (ctx.currentRatio < 1) signals.push("단기 유동성에 여유가 없어 외부 충격에 흔들리기 쉬운 앞날");
   }
 
   if (ctx?.returnOnEquity != null) {
