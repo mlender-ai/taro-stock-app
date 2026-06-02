@@ -18,6 +18,12 @@ import {
   getTodayAutoPRs,
 } from "@/lib/slack/github";
 import { classifyIntent, truncate } from "@/lib/slack/intent";
+import { resolveAgent, axisIdentity } from "@/lib/slack/agents";
+import {
+  isCeoDecisionThread,
+  classifyDecision,
+  decisionGuidance,
+} from "@/lib/slack/decision";
 import { parseActions, type ParsedAction } from "@/lib/slack/actions";
 
 interface SlackEvent {
@@ -152,8 +158,12 @@ async function handleAgentChat(
     return;
   }
 
+  // 발화 축 결정 (Agent Team Stage A) — @CTO/@PM/@Security 또는 키워드, 없으면 Hermes
+  const axis = resolveAgent(question);
+  const identity = axisIdentity(axis);
+
   try {
-    await postMessage(channel, `🤔 생각 중...`, threadTs);
+    await postMessage(channel, `🤔 생각 중...`, threadTs, identity);
 
     // 스레드 히스토리 조회
     const threadHistoryResult = rootThreadTs ? await getThreadHistory(channel, rootThreadTs).catch(() => []) : [];
@@ -163,6 +173,13 @@ async function handleAgentChat(
       const cleaned = msg.text.replace(/<@[A-Z0-9]+>/g, "").trim();
       if (!cleaned) continue;
       historyMessages.push({ role: msg.bot_id ? "assistant" : "user", content: cleaned });
+    }
+
+    // ── Stage D: 합의 실패 → CEO 판정 스레드면, CEO 발화를 결정으로 보고 규칙화 유도 ──
+    let decisionAddendum = "";
+    if (isCeoDecisionThread(threadHistoryResult)) {
+      const kind = classifyDecision(question);
+      decisionAddendum = decisionGuidance(kind);
     }
 
     // ── Step 1: 의도 분류 → 필요한 데이터를 본문까지 깊게 로드 ──
@@ -241,8 +258,8 @@ async function handleAgentChat(
     }
     if (!detailSection) detailSection = "(특정 이슈/PR 언급 없음)";
 
-    const systemPrompt = `당신은 Trading Taro 프로젝트의 Hermes 에이전트입니다.
-CEO가 Slack에서 물어보는 질문에 한국어로 간결하게 답합니다.
+    const systemPrompt = `${axis.personaPrompt}
+CEO가 Slack에서 물어보는 질문에 한국어로 간결하게, 당신 축의 관점에서 답합니다.
 현재 파이프라인 상태를 바탕으로 구체적이고 actionable한 답변을 제공하세요.
 
 현재 컨텍스트:
@@ -298,7 +315,7 @@ ${runList || "(없음)"}
 
 - **순수 조회·요약·상태 확인·의견 질문**("브리핑 알려줘", "PR 뭐 있어", "상태 어때")에는 토큰을 내지 않는다.
 - merge/add_constraint 는 비가역·고영향 — CEO가 그 동작을 명시했을 때만. 정말 애매하면 토큰 없이 "구현을 시작할까요?"라고 한 번만 되묻는다(단, '개발/구현/진행' 동사가 있으면 되묻지 말고 바로 implement).
-- add_constraint 는 "앞으로 항상/절대" 류의 반복 규칙에만. 1회성 지시("오늘은 온보딩부터")엔 금지.`;
+- add_constraint 는 "앞으로 항상/절대" 류의 반복 규칙에만. 1회성 지시("오늘은 온보딩부터")엔 금지.${decisionAddendum}`;
 
     const res = await fetch(AI_URL, {
       method: "POST",
@@ -341,13 +358,14 @@ ${runList || "(없음)"}
       reply += "\n\n" + (await executeAction(action, channel, rootThreadTs || threadTs));
     }
 
-    await postMessage(channel, reply, threadTs);
+    await postMessage(channel, reply, threadTs, identity);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await postMessage(
       channel,
       `❌ 답변 생성 실패: ${msg}\n커맨드는 \`/taro help\`를 입력하세요.`,
-      threadTs
+      threadTs,
+      identity
     ).catch(() => {});
   }
 }
