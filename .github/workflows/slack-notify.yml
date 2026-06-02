@@ -20,6 +20,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  issues: read
 
 jobs:
   notify:
@@ -105,7 +106,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$PAYLOAD"
 
-      # ── Daily Agent Council 완료 ────────────────────────────
+      # ── Daily Agent Council 완료: CEO Brief 본문 요약 푸시 (Step 4) ──
       - name: Council completed
         if: |
           github.event_name == 'workflow_run' &&
@@ -114,19 +115,28 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ vars.SLACK_WEBHOOK_URL }}
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           RUN_URL: ${{ github.event.workflow_run.html_url }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "$CONCLUSION" = "success" ]; then
-            PAYLOAD=$(jq -n \
-              --arg text "📋 *Daily Agent Council 완료*\nCEO Brief 이슈가 생성되었습니다. Auto-implement가 곧 실행됩니다.\n>${RUN_URL}" \
-              '{"text": $text}')
-          else
-            PAYLOAD=$(jq -n \
-              --arg text "⚠️ *Daily Agent Council 실패*\n>${RUN_URL}" \
-              '{"text": $text}')
+          set -uo pipefail
+          if [ "$CONCLUSION" != "success" ]; then
+            jq -n --arg t "⚠️ *Daily Agent Council 실패*\n>${RUN_URL}" '{"text": $t}' > /tmp/payload.json
+            curl -sf -X POST "$SLACK_WEBHOOK_URL" -H "Content-Type: application/json" -d @/tmp/payload.json
+            exit 0
           fi
-          curl -sf -X POST "$SLACK_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
+          # 최신 CEO Brief 본문을 단일 jq 패스로 Slack 페이로드화 (재파싱·개행 이슈 회피)
+          gh issue list --label "ceo-brief" --state all --limit 1 \
+            --json number,title,body,url --repo "${{ github.repository }}" 2>/dev/null \
+            | jq --arg run "$RUN_URL" '
+                (.[0] // null) as $b
+                | if $b == null
+                  then {text: ("📋 *Daily Agent Council 완료* — CEO Brief 생성됨.\n>" + $run)}
+                  else {text: (
+                    "📋 *CEO Daily Brief #\($b.number)*\n" + $b.title + "\n" + $b.url + "\n\n"
+                    + (($b.body // "") | gsub("\\|"; "") | .[0:1800])
+                    + "\n\n_… 전체는 GitHub 이슈에서. 피드백은 이 스레드에 @봇 멘션으로._"
+                  )}
+                  end' > /tmp/payload.json
+          curl -sf -X POST "$SLACK_WEBHOOK_URL" -H "Content-Type: application/json" -d @/tmp/payload.json
 
       # ── Auto Implement 완료 ─────────────────────────────────
       - name: Auto implement completed
