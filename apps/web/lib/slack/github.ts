@@ -163,6 +163,60 @@ export async function getPR(n: number): Promise<{
   };
 }
 
+// ── Step 3 (기억 천장): CEO 피드백 로그 적재/조회 ──────────────────
+// prepare 가 읽는 feedback-log 라벨 이슈에 누적 → 다음 Agent Council 사이클에 자동 반영.
+const FEEDBACK_LOG_TITLE = "[Slack] CEO Feedback Log";
+
+interface IssueLite {
+  number: number;
+  title: string;
+  body: string | null;
+}
+
+async function findFeedbackLogIssue(): Promise<IssueLite | undefined> {
+  const issues = (await githubApi(
+    `/repos/${REPO}/issues?labels=feedback-log&state=open&per_page=30&sort=created&direction=desc`
+  )) as IssueLite[];
+  return issues.find((i) => i.title === FEEDBACK_LOG_TITLE);
+}
+
+/** CEO 피드백을 rolling feedback-log 이슈 본문에 누적 (최근 40개 유지). */
+export async function appendFeedbackLog(note: string): Promise<{ number: number }> {
+  const date = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const entry = `- [${date}] ${note.replace(/\n/g, " ").trim()}`;
+  const existing = await findFeedbackLogIssue();
+  if (existing) {
+    const lines = (existing.body ?? "")
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith("- ["));
+    lines.push(entry);
+    const capped = lines.slice(-40).join("\n");
+    await githubApi(`/repos/${REPO}/issues/${existing.number}`, {
+      method: "PATCH",
+      body: JSON.stringify({ body: `# Slack CEO 피드백 로그\n\n${capped}` }),
+    });
+    return { number: existing.number };
+  }
+  const created = (await githubApi(`/repos/${REPO}/issues`, {
+    method: "POST",
+    body: JSON.stringify({
+      title: FEEDBACK_LOG_TITLE,
+      body: `# Slack CEO 피드백 로그\n\n${entry}`,
+      labels: ["feedback-log"],
+    }),
+  })) as { number: number };
+  return { number: created.number };
+}
+
+/** 최근 적재된 CEO 피드백 (스레드 넘은 컨텍스트용). */
+export async function getRecentFeedbackLog(maxChars = 1500): Promise<string> {
+  const existing = await findFeedbackLogIssue();
+  if (!existing || !existing.body) return "";
+  const body = existing.body;
+  return body.length > maxChars ? body.slice(body.length - maxChars) : body;
+}
+
 export async function getFileContent(path: string): Promise<string> {
   const res = (await githubApi(
     `/repos/${REPO}/contents/${path}`

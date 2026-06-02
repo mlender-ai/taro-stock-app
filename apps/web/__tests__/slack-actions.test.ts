@@ -52,9 +52,18 @@ describe("parseActions", () => {
   });
 });
 
+describe("log_feedback 액션", () => {
+  it("note 페이로드 파싱", () => {
+    const r = parseActions('기억할게요 [[ACTION:log_feedback]] {"note":"온보딩은 토스 스타일 선호"}');
+    expect(r.actions).toHaveLength(1);
+    expect(r.actions[0]!.name).toBe("log_feedback");
+    expect(r.actions[0]!.payload).toEqual({ note: "온보딩은 토스 스타일 선호" });
+  });
+});
+
 describe("액션 집합", () => {
-  it("KNOWN_ACTIONS 에 6개 포함", () => {
-    for (const a of ["run_council", "implement", "merge", "approve", "comment", "add_constraint"]) {
+  it("KNOWN_ACTIONS 에 7개 포함", () => {
+    for (const a of ["run_council", "implement", "merge", "approve", "comment", "add_constraint", "log_feedback"]) {
       expect(KNOWN_ACTIONS.has(a)).toBe(true);
     }
   });

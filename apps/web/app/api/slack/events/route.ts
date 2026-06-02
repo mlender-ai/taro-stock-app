@@ -13,6 +13,8 @@ import {
   mergePR,
   addLabel,
   addIssueComment,
+  appendFeedbackLog,
+  getRecentFeedbackLog,
 } from "@/lib/slack/github";
 import { classifyIntent, truncate } from "@/lib/slack/intent";
 import { parseActions, type ParsedAction } from "@/lib/slack/actions";
@@ -165,12 +167,15 @@ async function handleAgentChat(
     // ── Step 1: 의도 분류 → 필요한 데이터를 본문까지 깊게 로드 ──
     const intent = classifyIntent(question);
 
-    // 컨텍스트 수집 (병렬) — 항상 최신 CEO Brief 본문 + 오픈 PR/실행 상태
-    const [prs, latestBrief, runs] = await Promise.allSettled([
+    // 컨텍스트 수집 (병렬) — 항상 최신 CEO Brief 본문 + 오픈 PR/실행 상태 + 최근 피드백
+    const [prs, latestBrief, runs, feedbackLog] = await Promise.allSettled([
       getOpenPRs(5),
       getLatestCEOBrief(),
       getWorkflowRuns("auto-implement.yml", 5),
+      getRecentFeedbackLog(1500),
     ]);
+    const feedbackSection =
+      feedbackLog.status === "fulfilled" && feedbackLog.value ? feedbackLog.value : "(적재된 피드백 없음)";
 
     const prList = prs.status === "fulfilled"
       ? (prs.value as { number: number; title: string; html_url: string }[])
@@ -230,6 +235,9 @@ ${briefSection}
 ## 질문에서 언급된 이슈/PR 상세
 ${detailSection}
 
+## 최근 CEO 피드백 로그 (스레드 넘은 기억 — "어제 뭐라 했지?"에 답할 때 활용)
+${feedbackSection}
+
 ## 최근 auto-implement 실행
 ${runList || "(없음)"}
 
@@ -248,7 +256,9 @@ ${runList || "(없음)"}
   \`[[ACTION:approve]] {"issue":298}\` — 이슈에 implement-approved 라벨
   \`[[ACTION:comment]] {"issue":298,"body":"..."}\` — 이슈/PR에 코멘트 (= 피드백 반영의 1차 형태)
   \`[[ACTION:add_constraint]] {"rule":"...","scope":["all"],"kind":"prohibition","permanent":true}\` — 영구 규칙(standing constraint) 적재
+  \`[[ACTION:log_feedback]] {"note":"..."}\` — CEO의 피드백·방향·판정을 기억에 적재 (다음 Agent Council 입력에 반영)
 - JSON 페이로드는 반드시 한 줄. scope kind 는 정해진 값만.
+- CEO가 제품 방향·선호·평가("X는 별로", "Y 방향 좋아", "온보딩은 토스처럼")를 주면 log_feedback 으로 기억에 남긴다(영구 규칙까진 아닌 소프트 피드백). 영구 금지/규칙이면 add_constraint.
 - **단순 질문·요약·상태 확인·의견 요청에는 절대 토큰을 출력하지 마라.** 실행 의도가 명확할 때만.
 - merge/implement/add_constraint 는 비가역·고영향이다 — CEO가 명시적으로 그 동작을 지시했을 때만 토큰을 낸다. 애매하면 토큰 없이 "진행할까요?"라고 먼저 묻는다.
 - add_constraint 는 "앞으로 항상/절대" 류의 반복 규칙에만. 1회성 지시("오늘은 온보딩부터")엔 금지.`;
@@ -353,6 +363,12 @@ async function executeAction(
         });
         const scope = Array.isArray(action.payload.scope) ? action.payload.scope.join(", ") : "all";
         return `🔒 *Standing Constraint 추가 요청됨*: "${rule}" (scope: ${scope}). 리뷰 PR이 생성됩니다.`;
+      }
+      case "log_feedback": {
+        const note = typeof action.payload.note === "string" ? action.payload.note : "";
+        if (!note) return "⚠️ log_feedback: note 누락으로 적재하지 않았습니다.";
+        const res = await appendFeedbackLog(note);
+        return `🧠 *피드백 기억에 적재됨* (#${res.number}). 다음 Agent Council 사이클 입력에 반영됩니다.`;
       }
       default:
         return "";
