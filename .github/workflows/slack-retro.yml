@@ -1,0 +1,51 @@
+name: Slack Weekly Retro
+
+# weekly — 봇이 회고 스레드를 먼저 연다 (Slack Agent Track Step 4 / 6.3).
+# 지난주 머지/킬/제안/constraint 통계 + CEO에게 질문. CEO가 스레드에 답하면
+# 기존 thread-reply 핸들러(handleAgentChat)가 응답하고 log_feedback 으로 적재됨.
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"  # 매주 월요일 오전 9시 KST (UTC 월 00:00)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  retro:
+    runs-on: ubuntu-latest
+    if: vars.SLACK_WEBHOOK_URL != ''
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build + push weekly retro
+        env:
+          SLACK_WEBHOOK_URL: ${{ vars.SLACK_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          SINCE=$(date -u -d '7 days ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v-7d '+%Y-%m-%dT%H:%M:%SZ')
+          REPO="${{ github.repository }}"
+
+          # 지난주 머지된 PR 수
+          MERGED=$(gh pr list --state merged --limit 50 --json mergedAt,title --repo "$REPO" 2>/dev/null \
+            | jq --arg s "$SINCE" '[.[] | select(.mergedAt >= $s)] | length')
+          # 지난주 닫힌 agent-council 이슈 수
+          CLOSED=$(gh issue list --label "agent-council" --state closed --limit 50 --json closedAt --repo "$REPO" 2>/dev/null \
+            | jq --arg s "$SINCE" '[.[] | select(.closedAt >= $s)] | length')
+          # 현재 열린 제안 수
+          OPEN=$(gh issue list --label "agent-council" --state open --limit 50 --json number --repo "$REPO" 2>/dev/null | jq 'length')
+          # active constraint 수
+          if [ -f constraints/active.json ]; then
+            CONS=$(jq '.constraints | length' constraints/active.json 2>/dev/null || echo 0)
+          else
+            CONS=0
+          fi
+
+          MERGED=${MERGED:-0}; CLOSED=${CLOSED:-0}; OPEN=${OPEN:-0}; CONS=${CONS:-0}
+
+          TEXT="🔄 *주간 회고* (지난 7일)\n• 머지된 PR: *${MERGED}*\n• 처리/폐기된 제안 이슈: *${CLOSED}*\n• 현재 열린 제안: *${OPEN}*\n• 등록된 standing constraints: *${CONS}*\n\n*CEO께 질문:*\n1. 이번 주 가장 잘된 것 / 막힌 것은?\n2. 다음 주 우선순위 방향은? (이 스레드에 답하면 기억에 적재됩니다 — @봇 멘션)"
+          PAYLOAD=$(jq -n --arg text "$TEXT" '{"text": $text}')
+          curl -sf -X POST "$SLACK_WEBHOOK_URL" -H "Content-Type: application/json" -d "$PAYLOAD"
