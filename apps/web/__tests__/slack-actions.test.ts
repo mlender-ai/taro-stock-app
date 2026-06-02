@@ -1,0 +1,65 @@
+import { describe, it, expect } from "vitest";
+import { parseActions, KNOWN_ACTIONS, HIGH_IMPACT_ACTIONS } from "@/lib/slack/actions";
+
+describe("parseActions", () => {
+  it("페이로드 없는 액션을 파싱하고 토큰 제거", () => {
+    const r = parseActions("의회 돌릴게요.\n[[ACTION:run_council]]");
+    expect(r.actions).toEqual([{ name: "run_council", payload: {} }]);
+    expect(r.cleaned).toBe("의회 돌릴게요.");
+  });
+
+  it("JSON 페이로드 액션 파싱", () => {
+    const r = parseActions('머지합니다.\n[[ACTION:merge]] {"pr":291}');
+    expect(r.actions).toEqual([{ name: "merge", payload: { pr: 291 } }]);
+    expect(r.cleaned).toBe("머지합니다.");
+  });
+
+  it("comment 액션 본문 파싱", () => {
+    const r = parseActions('남길게요 [[ACTION:comment]] {"issue":298,"body":"온보딩은 토스 스타일로"}');
+    expect(r.actions).toHaveLength(1);
+    expect(r.actions[0]!.name).toBe("comment");
+    expect(r.actions[0]!.payload).toEqual({ issue: 298, body: "온보딩은 토스 스타일로" });
+  });
+
+  it("하위호환: [[TRIGGER_IMPLEMENT]] → implement", () => {
+    const r = parseActions("개발 시작!\n[[TRIGGER_IMPLEMENT]]");
+    expect(r.actions).toEqual([{ name: "implement", payload: {} }]);
+    expect(r.cleaned).toBe("개발 시작!");
+  });
+
+  it("하위호환: [[ADD_CONSTRAINT]]{json} → add_constraint", () => {
+    const r = parseActions('규칙 등록합니다 [[ADD_CONSTRAINT]]{"rule":"X 금지","scope":["all"]}');
+    expect(r.actions).toHaveLength(1);
+    expect(r.actions[0]!.name).toBe("add_constraint");
+    expect(r.actions[0]!.payload).toEqual({ rule: "X 금지", scope: ["all"] });
+    expect(r.cleaned).toBe("규칙 등록합니다");
+  });
+
+  it("알 수 없는 액션은 무시", () => {
+    const r = parseActions("[[ACTION:delete_everything]] {}");
+    expect(r.actions).toEqual([]);
+  });
+
+  it("액션 없으면 빈 배열 + 원문 유지", () => {
+    const r = parseActions("그냥 일반 답변입니다.");
+    expect(r.actions).toEqual([]);
+    expect(r.cleaned).toBe("그냥 일반 답변입니다.");
+  });
+
+  it("잘못된 JSON 은 빈 payload 로 안전 처리", () => {
+    const r = parseActions("[[ACTION:implement]] {bad json}");
+    expect(r.actions).toEqual([{ name: "implement", payload: {} }]);
+  });
+});
+
+describe("액션 집합", () => {
+  it("KNOWN_ACTIONS 에 6개 포함", () => {
+    for (const a of ["run_council", "implement", "merge", "approve", "comment", "add_constraint"]) {
+      expect(KNOWN_ACTIONS.has(a)).toBe(true);
+    }
+  });
+  it("HIGH_IMPACT 에 merge/implement/add_constraint", () => {
+    expect(HIGH_IMPACT_ACTIONS.has("merge")).toBe(true);
+    expect(HIGH_IMPACT_ACTIONS.has("run_council")).toBe(false);
+  });
+});

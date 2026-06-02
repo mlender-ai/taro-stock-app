@@ -10,8 +10,12 @@ import {
   getLatestCEOBrief,
   getIssue,
   getPR,
+  mergePR,
+  addLabel,
+  addIssueComment,
 } from "@/lib/slack/github";
 import { classifyIntent, truncate } from "@/lib/slack/intent";
+import { parseActions, type ParsedAction } from "@/lib/slack/actions";
 
 interface SlackEvent {
   type: string;
@@ -235,17 +239,19 @@ ${runList || "(없음)"}
 - **위 컨텍스트에 본문이 주어졌으면 "확인할 수 없다"고 답하지 말고 그 내용을 직접 요약·인용해 답한다.**
 - 본문에 없는 정보만 "확인 불가"로 답한다
 
-개발 실행 규칙 (중요):
-- 사용자가 **실제 코드 개발·구현 실행**을 지시하면(예: "개발해줘", "구현해줘", "만들어줘", "우선 개발해", "진행해"), 답변 맨 끝에 정확히 \`[[TRIGGER_IMPLEMENT]]\` 토큰을 단독 줄로 출력한다. 이 토큰은 실제 auto-implement 워크플로우를 실행시킨다.
-- 단순 질문·요약·상태 확인·의견 요청에는 절대 이 토큰을 출력하지 마라.
-- 토큰을 출력할 때는 "개발을 시작하겠다"는 취지의 답변과 함께 출력한다.
-
-Standing Constraint 규칙 (중요):
-- CEO가 **앞으로 계속 지켜야 할 규칙·방향·금지사항**을 지시하면(예: "앞으로 X 하지 마", "항상 토스처럼 가", "그건 영구 금지", "이제부터 Y는 금지"), 답변 끝에 단독 줄로 정확히 다음을 출력한다:
-  \`[[ADD_CONSTRAINT]]{"rule":"<한 문장 규칙>","scope":["pm"|"frontend"|"backend"|"design"|"qa"|"cto"|"marketing"|"security"|"prompt"|"all"],"kind":"prohibition"|"preference"|"priority"|"mental-model","permanent":true}\`
-  JSON은 반드시 한 줄. 전체 적용이면 scope를 ["all"]로.
-- **1회성 지시**("이번엔 이거 해", "오늘은 온보딩부터")에는 절대 이 토큰을 출력하지 마라 — 반복 적용 가능한 영구 규칙일 때만.
-- 토큰 출력 시 "규칙으로 등록하겠다"는 취지의 답변과 함께 출력한다.`;
+액션 실행 규칙 (중요 — tool use):
+- CEO가 **명확히 실행을 지시**하면, 답변 끝에 단독 줄로 액션 토큰을 정확히 출력한다. 한 메시지당 1개만.
+- 사용 가능한 액션:
+  \`[[ACTION:run_council]]\` — Agent Council(idea-proposal) 즉시 실행 ("의회 돌려", "제안 받아")
+  \`[[ACTION:implement]] {"date":"YYYY-MM-DD"}\` — auto-implement 트리거 (date 생략 시 오늘) ("구현 시작", "개발 진행")
+  \`[[ACTION:merge]] {"pr":291}\` — PR squash 머지 ("이 PR 머지해")
+  \`[[ACTION:approve]] {"issue":298}\` — 이슈에 implement-approved 라벨
+  \`[[ACTION:comment]] {"issue":298,"body":"..."}\` — 이슈/PR에 코멘트 (= 피드백 반영의 1차 형태)
+  \`[[ACTION:add_constraint]] {"rule":"...","scope":["all"],"kind":"prohibition","permanent":true}\` — 영구 규칙(standing constraint) 적재
+- JSON 페이로드는 반드시 한 줄. scope kind 는 정해진 값만.
+- **단순 질문·요약·상태 확인·의견 요청에는 절대 토큰을 출력하지 마라.** 실행 의도가 명확할 때만.
+- merge/implement/add_constraint 는 비가역·고영향이다 — CEO가 명시적으로 그 동작을 지시했을 때만 토큰을 낸다. 애매하면 토큰 없이 "진행할까요?"라고 먼저 묻는다.
+- add_constraint 는 "앞으로 항상/절대" 류의 반복 규칙에만. 1회성 지시("오늘은 온보딩부터")엔 금지.`;
 
     const res = await fetch(AI_URL, {
       method: "POST",
@@ -281,38 +287,11 @@ Standing Constraint 규칙 (중요):
 
     if (!reply) throw new Error("AI 응답이 비어있습니다");
 
-    // Standing Constraint 적재 인텐트 감지 → distill-constraints 워크플로우에 위임 (main 직접 push 금지)
-    const constraintMatch = reply.match(/\[\[ADD_CONSTRAINT\]\]\s*(\{[^\n]*\})/);
-    if (constraintMatch && constraintMatch[1]) {
-      reply = reply.replace(/\[\[ADD_CONSTRAINT\]\]\s*\{[^\n]*\}/g, "").trim();
-      const payloadRaw: string = constraintMatch[1];
-      try {
-        const parsed = JSON.parse(payloadRaw) as { rule?: string; scope?: unknown };
-        if (!parsed.rule || typeof parsed.rule !== "string") {
-          throw new Error("rule 필드 누락");
-        }
-        const sourceHint = `slack/${channel}/${rootThreadTs || threadTs || ""}`;
-        await triggerWorkflow("distill-constraints.yml", {
-          manual_constraint: payloadRaw,
-          source_hint: sourceHint,
-        });
-        const scopeStr = Array.isArray(parsed.scope) ? parsed.scope.join(", ") : "all";
-        reply += `\n\n🔒 *Standing Constraint 추가 요청됨*: "${parsed.rule}" (scope: ${scopeStr}).\n리뷰 PR이 생성됩니다 — 머지하면 다음 사이클부터 모든 에이전트가 준수합니다.`;
-      } catch (e) {
-        reply += `\n\n⚠️ Constraint 적재 실패: ${e instanceof Error ? e.message : String(e)}`;
-      }
-    }
-
-    // 개발 실행 인텐트 감지 → 실제 auto-implement 워크플로우 트리거
-    if (reply.includes("[[TRIGGER_IMPLEMENT]]")) {
-      reply = reply.replace(/\[\[TRIGGER_IMPLEMENT\]\]/g, "").trim();
-      const kstDate = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-      try {
-        await triggerWorkflow("auto-implement.yml", { brief_date: kstDate });
-        reply += `\n\n🚀 *auto-implement 워크플로우를 실제로 실행했습니다* (날짜: ${kstDate}).\n진행 상황은 \`@Taro Agent Bot status\` 로 확인하세요.`;
-      } catch (e) {
-        reply += `\n\n⚠️ 워크플로우 실행 실패: ${e instanceof Error ? e.message : String(e)}`;
-      }
+    // ── Step 2: 범용 액션 토큰 파싱 → 실행 (대화로 실행) ──
+    const { actions, cleaned } = parseActions(reply);
+    reply = cleaned;
+    for (const action of actions) {
+      reply += "\n\n" + (await executeAction(action, channel, rootThreadTs || threadTs));
     }
 
     await postMessage(channel, reply, threadTs);
@@ -323,5 +302,62 @@ Standing Constraint 규칙 (중요):
       `❌ 답변 생성 실패: ${msg}\n커맨드는 \`/taro help\`를 입력하세요.`,
       threadTs
     ).catch(() => {});
+  }
+}
+
+// ── Step 2: 액션 실행기 — 대화에서 파싱된 액션을 GitHub 안전 동작으로 실행 ──
+// (코드 변경은 워크플로 경유, main 직접 push 없음)
+async function executeAction(
+  action: ParsedAction,
+  channel: string,
+  threadTs: string | undefined
+): Promise<string> {
+  const kstDate = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  try {
+    switch (action.name) {
+      case "run_council": {
+        await triggerWorkflow("idea-proposal.yml", { agent: "all" });
+        return "🗳️ *Agent Council 실행* — 잠시 후 제안 이슈들이 생성됩니다.";
+      }
+      case "implement": {
+        const date = typeof action.payload.date === "string" ? action.payload.date : kstDate();
+        await triggerWorkflow("auto-implement.yml", { brief_date: date });
+        return `🚀 *auto-implement 실행* (날짜: ${date}). 진행은 \`@봇 status\`로 확인하세요.`;
+      }
+      case "merge": {
+        const pr = Number(action.payload.pr);
+        if (!Number.isInteger(pr) || pr <= 0) return "⚠️ merge: PR 번호가 올바르지 않아 실행하지 않았습니다.";
+        await mergePR(pr);
+        return `✅ *PR #${pr} squash 머지 완료*.`;
+      }
+      case "approve": {
+        const issue = Number(action.payload.issue);
+        if (!Number.isInteger(issue) || issue <= 0) return "⚠️ approve: 이슈 번호가 올바르지 않습니다.";
+        await addLabel(issue, ["implement-approved"]);
+        return `🏷️ *#${issue} implement-approved 라벨 추가*.`;
+      }
+      case "comment": {
+        const issue = Number(action.payload.issue);
+        const body = typeof action.payload.body === "string" ? action.payload.body : "";
+        if (!Number.isInteger(issue) || issue <= 0 || !body) return "⚠️ comment: 이슈 번호/본문이 올바르지 않습니다.";
+        await addIssueComment(issue, `🗣️ (CEO via Slack): ${body}`);
+        return `💬 *#${issue}에 코멘트 작성 완료*.`;
+      }
+      case "add_constraint": {
+        const rule = action.payload.rule;
+        if (typeof rule !== "string" || !rule) return "⚠️ add_constraint: rule 누락으로 실행하지 않았습니다.";
+        const sourceHint = `slack/${channel}/${threadTs || ""}`;
+        await triggerWorkflow("distill-constraints.yml", {
+          manual_constraint: JSON.stringify(action.payload),
+          source_hint: sourceHint,
+        });
+        const scope = Array.isArray(action.payload.scope) ? action.payload.scope.join(", ") : "all";
+        return `🔒 *Standing Constraint 추가 요청됨*: "${rule}" (scope: ${scope}). 리뷰 PR이 생성됩니다.`;
+      }
+      default:
+        return "";
+    }
+  } catch (e) {
+    return `⚠️ 액션(${action.name}) 실행 실패: ${e instanceof Error ? e.message : String(e)}`;
   }
 }
