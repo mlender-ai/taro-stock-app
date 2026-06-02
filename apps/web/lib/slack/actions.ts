@@ -18,7 +18,8 @@ export type ActionName =
   | "merge"
   | "approve"
   | "comment"
-  | "add_constraint";
+  | "add_constraint"
+  | "log_feedback";
 
 export const KNOWN_ACTIONS: ReadonlySet<string> = new Set<ActionName>([
   "run_council",
@@ -27,6 +28,7 @@ export const KNOWN_ACTIONS: ReadonlySet<string> = new Set<ActionName>([
   "approve",
   "comment",
   "add_constraint",
+  "log_feedback",
 ]);
 
 /** 비가역/고영향 — 실행 전 신중해야 하는 액션 */
