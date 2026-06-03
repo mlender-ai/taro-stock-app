@@ -122,6 +122,11 @@ export async function GET(req: NextRequest) {
       revenueGrowth: extractNum(financialData.revenueGrowth),
       debtToEquity: extractNum(financialData.debtToEquity),
       dataAt: new Date(now).toISOString(),
+      // 표준화 필드 (#317): 기존 필드의 의미론적 별칭 — 프런트엔드 일관성 향상
+      delta: change,
+      changeRate: changePercent,
+      high52Week: fiftyTwoWeekHigh,
+      low52Week: fiftyTwoWeekLow,
     };
 
     // 결측치 추적: null인 필드 목록

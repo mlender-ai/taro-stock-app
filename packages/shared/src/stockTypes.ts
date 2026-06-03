@@ -32,6 +32,11 @@ export interface StockQuote {
   debtToEquity?: number | null;
   // 응답 생성 시각 (ISO 8601). 캐시 신선도 추적용.
   dataAt: string;
+  // 표준화 필드 (#317): 프런트엔드에서 일관된 이름으로 접근할 수 있도록 추가 제공
+  delta?: number | null;        // 당일 등락액 (= change)
+  changeRate?: number | null;   // 당일 등락률 % (= changePercent)
+  high52Week?: number | null;   // 52주 최고가 (= fiftyTwoWeekHigh)
+  low52Week?: number | null;    // 52주 최저가 (= fiftyTwoWeekLow)
 }
 
 // 종목 상세 재무 핵심 지표. 외부 데이터 소스 누락 시 null — 0과 결측을 구분한다.

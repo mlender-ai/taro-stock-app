@@ -275,6 +275,8 @@ describe("/api/tarot/quote", () => {
       "volume", "averageVolume",
       "returnOnEquity", "grossMargins", "operatingMargins", "totalRevenue", "revenueGrowth", "debtToEquity",
       "dataAt",
+      // #317 표준화 필드
+      "delta", "changeRate", "high52Week", "low52Week",
     ];
     const actualKeys = Object.keys(body).sort();
     const unexpected = actualKeys.filter((k) => !expectedKeys.includes(k));
