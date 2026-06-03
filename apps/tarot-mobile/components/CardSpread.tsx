@@ -36,6 +36,13 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
     Array.from({ length: CARD_COUNT }, () => new Animated.Value(0))
   ).current;
 
+  // 카드를 고르는 동안 부채가 살아 숨쉬듯 천천히 떠다니게 하는 idle 애니메이션
+  const floatYs = useRef(
+    Array.from({ length: CARD_COUNT }, () => new Animated.Value(0))
+  ).current;
+
+  const floatLoops = useRef<Animated.CompositeAnimation[]>([]);
+
   const dimOpacities = useRef(
     Array.from({ length: CARD_COUNT }, () => new Animated.Value(1))
   ).current;
@@ -60,7 +67,10 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
 
   const totalTranslateYs = useRef(
     Array.from({ length: CARD_COUNT }, (_, i) =>
-      Animated.add(Animated.add(enterYs[i]!, arcOffsets[i]!), liftYs[i]!)
+      Animated.add(
+        Animated.add(Animated.add(enterYs[i]!, arcOffsets[i]!), liftYs[i]!),
+        floatYs[i]!
+      )
     )
   ).current;
 
@@ -89,12 +99,56 @@ export function CardSpread({ spreadType, onComplete }: CardSpreadProps) {
     Animated.stagger(70, animations).start(() => setSpreadPhase("picking"));
   }, []);
 
+  // picking 단계에서만 부채가 잔잔하게 떠다니는 루프 시작/정리
+  useEffect(() => {
+    if (spreadPhase !== "picking") return;
+
+    const loops = Array.from({ length: CARD_COUNT }, (_, i) => {
+      const offset = i - Math.floor(CARD_COUNT / 2);
+      // 가장자리 카드일수록 진폭을 키워 부채가 물결치듯 보이게 함
+      const amplitude = 2.5 + Math.abs(offset) * 1.1;
+      return Animated.loop(
+        Animated.sequence([
+          Animated.timing(floatYs[i]!, {
+            toValue: -amplitude,
+            duration: 1600,
+            delay: Math.abs(offset) * 120,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(floatYs[i]!, {
+            toValue: amplitude,
+            duration: 1600,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    });
+
+    floatLoops.current = loops;
+    loops.forEach(loop => loop.start());
+
+    return () => {
+      loops.forEach(loop => loop.stop());
+      floatLoops.current = [];
+    };
+  }, [spreadPhase]);
+
   const handleCardTap = (cardIdx: number) => {
     if (spreadPhase !== "picking") return;
     if (selected.includes(cardIdx)) return;
 
     const newSelected = [...selected, cardIdx];
     setSelected(newSelected);
+
+    // 선택된 카드는 떠다님을 멈추고 깔끔하게 떠오르도록 정렬
+    floatLoops.current[cardIdx]?.stop();
+    Animated.timing(floatYs[cardIdx]!, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
 
     Animated.spring(liftYs[cardIdx]!, {
       toValue: -28,
