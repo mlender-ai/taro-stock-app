@@ -1843,6 +1843,12 @@ jobs:
 
             echo "#$NUM: U=$U F=$F N=$N A=$A 총합 $TOTAL (lane=$LANE)"
 
+            # B1b: Target-Metric 누락 보완 요청 (소프트 — 차단 아님)
+            if ! grep -qiE 'Target-Metric:[[:space:]]*\S' /tmp/body.txt; then
+              gh issue comment "$NUM" --repo "${{ github.repository }}" \
+                --body "📐 보완 요청(B1 결과-접지): 본문에 \`Target-Metric: <지표 id>\` / \`Expected-Direction: up|down\` 이 없습니다. 이게 있어야 머지 후 이 베팅이 OKR 지표를 실제로 움직였는지 추적됩니다. (이번엔 차단하지 않음 — 다음부터 포함 권장)" || true
+            fi
+
             if [ "$TOTAL" -ge 14 ]; then
               gh issue edit "$NUM" --add-label "score-strong" --repo "${{ github.repository }}" || true
             elif [ "$TOTAL" -ge 11 ]; then
