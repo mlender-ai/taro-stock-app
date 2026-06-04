@@ -169,6 +169,43 @@ jobs:
           echo "$TOP" >> "$GITHUB_OUTPUT"
           echo "__TOP_EOF__" >> "$GITHUB_OUTPUT"
 
+      # ── 2.7 B1c: 결과-접지 나침반 (베팅이 지표를 실제로 움직였나) ──
+      - name: Collect outcome metrics
+        id: outcomes
+        run: |
+          set -uo pipefail
+          SINCE_DATE=$(TZ=Asia/Seoul date -d '7 days ago' '+%Y-%m-%d' 2>/dev/null || TZ=Asia/Seoul date -v-7d '+%Y-%m-%d')
+          MOVED=0; FLAT=0; WORSENED=0; UNKNOWN=0
+          LEDGER="generated/outcomes/ledger.jsonl"
+          if [ -f "$LEDGER" ]; then
+            # 이번 주(checkedAt >= since) 판정만 집계
+            AGG=$(jq -s --arg s "$SINCE_DATE" '
+              [.[] | select(.checkedAt >= $s)]
+              | { moved: ([.[]|select(.verdict=="moved")]|length),
+                  flat: ([.[]|select(.verdict=="flat")]|length),
+                  worsened: ([.[]|select(.verdict=="worsened")]|length),
+                  unknown: ([.[]|select(.verdict=="unknown")]|length) }
+            ' "$LEDGER" 2>/dev/null || echo '{}')
+            MOVED=$(echo "$AGG" | jq -r '.moved // 0')
+            FLAT=$(echo "$AGG" | jq -r '.flat // 0')
+            WORSENED=$(echo "$AGG" | jq -r '.worsened // 0')
+            UNKNOWN=$(echo "$AGG" | jq -r '.unknown // 0')
+          fi
+          MOVED=${MOVED:-0}; FLAT=${FLAT:-0}; WORSENED=${WORSENED:-0}; UNKNOWN=${UNKNOWN:-0}
+          DECIDED=$((MOVED + FLAT + WORSENED))
+          # STUCK 조기신호: 판정 3건 이상인데 moved 가 (flat+worsened) 보다 적으면 정체
+          STUCK=""
+          if [ "$DECIDED" -ge 3 ] && [ "$MOVED" -lt $((FLAT + WORSENED)) ]; then
+            STUCK="⚠️ *진척 정체 신호*: 활동은 했지만 목표 지표가 움직인 베팅(${MOVED})보다 정체·역효과(${FLAT}+${WORSENED})가 많습니다. 접근 각도나 목표 자체를 재검토할 시점."
+          fi
+          echo "moved=$MOVED" >> "$GITHUB_OUTPUT"
+          echo "flat=$FLAT" >> "$GITHUB_OUTPUT"
+          echo "worsened=$WORSENED" >> "$GITHUB_OUTPUT"
+          echo "unknown=$UNKNOWN" >> "$GITHUB_OUTPUT"
+          echo "stuck<<__STUCK_EOF__" >> "$GITHUB_OUTPUT"
+          echo "$STUCK" >> "$GITHUB_OUTPUT"
+          echo "__STUCK_EOF__" >> "$GITHUB_OUTPUT"
+
       # ── 3. Slack 리포트 전송 ────────────────────────────────────
       - name: Send weekly report
         env:
@@ -184,6 +221,11 @@ jobs:
           C_NEW_PRS: ${{ steps.constraints.outputs.new_prs }}
           C_REVIEW_PENDING: ${{ steps.constraints.outputs.review_pending }}
           C_TOP: ${{ steps.constraints.outputs.top }}
+          O_MOVED: ${{ steps.outcomes.outputs.moved }}
+          O_FLAT: ${{ steps.outcomes.outputs.flat }}
+          O_WORSENED: ${{ steps.outcomes.outputs.worsened }}
+          O_UNKNOWN: ${{ steps.outcomes.outputs.unknown }}
+          O_STUCK: ${{ steps.outcomes.outputs.stuck }}
         run: |
           WEEK_START=$(TZ=Asia/Seoul date -d '7 days ago' '+%m/%d' 2>/dev/null || \
                       TZ=Asia/Seoul date -v-7d '+%m/%d')
@@ -217,6 +259,11 @@ jobs:
             "• 이번 주 사전 차단한 제안: *${C_HITS_WEEK}건* — 그만큼 CEO가 같은 피드백을 반복하지 않아도 됐습니다" \
             "• 자주 작동한 규칙: ${C_TOP}" \
             "• 이번 주 새로 학습한 규칙 후보(PR): ${C_NEW_PRS}건 / 리뷰 대기: ${C_REVIEW_PENDING}건" \
+            "" \
+            "*🧭 결과 나침반 (베팅이 지표를 움직였나):*" \
+            "• ✅ 움직임(moved): ${O_MOVED} · ➖ 정체(flat): ${O_FLAT} · 🔻 역효과(worsened): ${O_WORSENED} · ❔ 측정불가(unknown): ${O_UNKNOWN}" \
+            "• 이번 주 머지된 베팅 중 ${O_MOVED}건이 목표 지표를 실제로 움직였습니다 (상관 기록 — 인과 단정 아님)" \
+            "${O_STUCK}" \
             "" \
             "_Hermes 자율 루프 — CEO 개입 없이 자동 운영 중_")
 

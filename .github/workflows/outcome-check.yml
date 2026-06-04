@@ -1,0 +1,57 @@
+name: Outcome Check
+
+# B1c — 결과-접지 나침반. 매일 pending 베팅 중 기한 도래분을 현재 지표로 재측정·판정 →
+# generated/outcomes/ledger.jsonl 에 적재. "이 베팅이 OKR 지표를 실제로 움직였나"를 기록.
+# 상관 기록만(인과 단정 안 함). 측정 불가는 unknown 으로 안전 처리.
+
+on:
+  schedule:
+    - cron: "0 23 * * *"  # 매일 오전 8시 KST (UTC 23:00 전날)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: read
+
+concurrency:
+  group: outcome-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Re-measure due bets + judge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          TODAY=$(TZ=Asia/Seoul date '+%Y-%m-%d')
+
+          # 베팅 디렉토리 없으면 조용히 종료
+          if [ ! -d generated/outcomes/bets ]; then
+            echo "베팅 카드 없음 — 종료"; exit 0
+          fi
+
+          # 현재 지표 스냅샷(재측정용 — /tmp, 커밋 안 함)
+          npx -y tsx@4.19.2 scripts/outcome-snapshot.ts \
+            generated/outcomes/metric-registry.json /tmp "$TODAY" || echo "스냅샷 실패 — unknown 처리됨"
+
+          # 기한 도래 pending 베팅 판정 → ledger append + 베팅 status=checked
+          npx -y tsx@4.19.2 scripts/outcome-judge.ts \
+            generated/outcomes/bets "/tmp/okr-snapshot-${TODAY}.json" generated/outcomes/ledger.jsonl "$TODAY"
+
+      - name: Commit ledger + checked bets
+        run: |
+          set -uo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add generated/outcomes/ledger.jsonl generated/outcomes/bets 2>/dev/null || true
+          git diff --cached --quiet && { echo "변경 없음 — 커밋 생략"; exit 0; }
+          git commit -m "chore(outcomes): outcome ledger 갱신 $(TZ=Asia/Seoul date '+%Y-%m-%d') [skip ci]"
+          git push origin HEAD:main || { git pull --rebase origin main && git push origin HEAD:main || echo "push 실패 — 다음 주기"; }
