@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
 import { useUserStore } from "./store";
+import { dedupeFetch } from "./swrMiddleware";
 
 const API_BASE =
   (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ??
@@ -10,10 +11,7 @@ interface ApiError {
   code: string;
 }
 
-export async function apiFetch<T>(
-  path: string,
-  options?: RequestInit
-): Promise<T> {
+async function _doFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = useUserStore.getState().token;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -28,4 +26,12 @@ export async function apiFetch<T>(
   }
 
   return res.json() as Promise<T>;
+}
+
+export function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  // GET requests without body are deduplicated — mutation requests bypass dedup
+  const isGet = !options?.method || options.method.toUpperCase() === "GET";
+  const key = isGet ? `GET:${path}` : null;
+  if (key) return dedupeFetch(key, () => _doFetch<T>(path, options));
+  return _doFetch<T>(path, options);
 }
