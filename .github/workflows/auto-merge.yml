@@ -170,6 +170,41 @@ jobs:
             esac
           done
 
+      # B1b: 머지 시점 베팅 카드 — 제안의 Target-Metric + 현재 지표 baseline 스냅샷
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Record outcome bet
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.gate.outputs.pr_number }}
+        run: |
+          set -uo pipefail
+          TODAY=$(TZ=Asia/Seoul date '+%Y-%m-%d')
+          gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json title,body \
+            -q '(.title // "") + "\n" + (.body // "")' > /tmp/pr_body.md 2>/dev/null || echo "" > /tmp/pr_body.md
+          # 머지 시점 현재 지표 스냅샷(baseline 취득용 — 커밋 안 함, /tmp)
+          npx -y tsx@4.19.2 scripts/outcome-snapshot.ts \
+            generated/outcomes/metric-registry.json /tmp "$TODAY" || true
+          npx -y tsx@4.19.2 scripts/outcome-bet.ts \
+            "$PR_NUMBER" /tmp/pr_body.md "/tmp/okr-snapshot-${TODAY}.json" "$TODAY" generated/outcomes/bets 7 || true
+          if [ -f "generated/outcomes/bets/${PR_NUMBER}.json" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add "generated/outcomes/bets/${PR_NUMBER}.json"
+            git diff --cached --quiet || {
+              git commit -m "chore(outcomes): bet card #${PR_NUMBER} [skip ci]"
+              git push origin HEAD:main || { git pull --rebase origin main && git push origin HEAD:main || echo "push 실패 — 무시"; }
+            }
+            echo "베팅 카드 기록: #${PR_NUMBER}"
+          else
+            echo "Target-Metric 없음 — 베팅 카드 생략 (#${PR_NUMBER})"
+          fi
+
       - name: Notify Slack (success)
         if: vars.SLACK_WEBHOOK_URL != ''
         env:

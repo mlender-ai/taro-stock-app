@@ -17,3 +17,22 @@
 - 총합 4-10 → 자동 close (임계값 미달)
 
 자기 평가를 솔직하게. 모든 축 4점이면 점수 시스템 무의미해집니다.
+
+---
+
+### 목표 지표 (B1 결과-접지 — 권장, 누락 시 보완 요청)
+
+점수 줄 근처에, 이 제안이 **어떤 OKR 지표를 어느 방향으로 움직이려는가**를 명시:
+`Target-Metric: <지표 id>`
+`Expected-Direction: up|down`
+
+사용 가능한 지표 id (generated/outcomes/metric-registry.json):
+- `o1-kr3-blockers` — 출시 차단 이슈 수 (down)
+- `o4-kr2-techdebt` — 열린 기술부채 이슈 수 (down)
+- `o4-kr1-e2e` — E2E 테스트 스펙 수 (up)
+- `o1-kr5-safety` — AI 안전검사 테스트 수 (up)
+- `o2-kr3-crash` — 앱 크래시율 (down)
+- `o2-kr2-satisfaction` — AI 해석 만족도 (up)
+
+목록에 딱 맞는 지표가 없으면 `Target-Metric: 신규 지표 제안 — <한줄 설명>`.
+이 필드가 있어야 머지 후 "이 베팅이 지표를 실제로 움직였는지" 추적 가능(없으면 보완 요청, 차단은 아님).
