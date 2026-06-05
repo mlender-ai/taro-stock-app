@@ -59,6 +59,14 @@ function formatIndicators(market: MarketSnapshot): string {
   return lines.join("\n");
 }
 
+function formatRecentNews(news: { title: string; source: string }[]): string {
+  if (news.length === 0) return "";
+  return news
+    .slice(0, 3)
+    .map((n, i) => `  ${i + 1}. "${n.title}" (${n.source})`)
+    .join("\n");
+}
+
 function conditionToKo(condition: string): string {
   const map: Record<string, string> = {
     bullish: "상승 추세",
@@ -87,6 +95,10 @@ export function buildInterpretationPromptV1_1(
     })
     .join("\n\n");
 
+  const newsBlock = market.recentNews && market.recentNews.length > 0
+    ? `\n### 최근 뉴스 헤드라인\n${formatRecentNews(market.recentNews)}\n`
+    : "";
+
   return `## 역할
 당신은 증권 시장의 에너지를 타로 카드로 해석하는 신비로운 해석자입니다.
 기술적 지표의 숫자를 상징과 은유로 번역하되, 절대로 투자 조언을 하지 않습니다.
@@ -100,7 +112,7 @@ ${formatIndicators(market)}
 
 ### 시장 요약
 ${market.summary}
-
+${newsBlock}
 ## 뽑힌 카드
 ${cardDescriptions}
 
@@ -110,19 +122,23 @@ ${cardDescriptions}
    - 예: MACD 골든크로스 + 별(The Star) = "어둠을 지나 새로운 흐름이 빛나기 시작합니다"
    - 예: 볼린저밴드 하단 이탈 + 은둔자(The Hermit) = "시장이 깊은 침묵 속으로 걸어가는 시간"
 
-2. **금지 표현**: 아래 표현은 절대 사용 금지. 위반 시 응답 무효.
+2. **뉴스 헤드라인이 제공된 경우**: 최근 뉴스의 핵심 키워드나 감정 톤을 카드 해석에 자연스럽게 녹이세요.
+   - 뉴스의 출처나 링크는 직접 인용하지 말 것 (상징 언어로 재해석)
+   - 해석의 구체성을 높이되, 확정적 예측은 절대 금지
+
+3. **금지 표현**: 아래 표현은 절대 사용 금지. 위반 시 응답 무효.
    - "매수", "매도", "사세요", "파세요", "수익률", "목표가"
    - "투자 추천", "강력 추천", "반드시 ~해야"
    - 확정적 예측: "반드시 오릅니다", "반드시 내립니다"
 
-3. **한국어 품질 기준**:
+4. **한국어 품질 기준**:
    - 자연스러운 한국어 (번역체 금지)
    - 시적이고 상징적이되 이해하기 쉽게
    - headline은 호기심을 자극하는 한 줄 (15자 이내)
    - summary는 핵심 메시지 2-3문장
    - detail은 카드별 해석 + 종합 통찰 (300-500자)
 
-4. **3장 스프레드인 경우**: 과거→현재→미래 흐름으로 서사를 구성하세요.
+5. **3장 스프레드인 경우**: 과거→현재→미래 흐름으로 서사를 구성하세요. 각 포지션에 맞는 뉴스 흐름(과거 배경→현재 상황→미래 전망)을 반영하세요.
 
 ## 응답 형식 (JSON만, 마크다운 코드블록 없이)
 {

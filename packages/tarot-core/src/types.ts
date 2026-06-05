@@ -63,6 +63,8 @@ export interface MarketSnapshot {
   industry?: string;        // 산업 (예: "Consumer Electronics")
   marketCap?: number;       // 시가총액 (대형/중형/소형 심리 차이)
   fiftyTwoWeekPosition?: number; // 0~1, 52주 범위 내 현재 위치
+  // 최근 뉴스 헤드라인 — 해석의 구체성·신뢰도 향상을 위해 프롬프트에 주입됨.
+  recentNews?: { title: string; source: string }[];
   condition: MarketCondition;
   summary: string;
 }
