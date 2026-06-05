@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, memo } from "react";
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Text } from "../ui/Text";
 import { Colors, Spacing, Radius } from "../../constants/theme";
@@ -38,7 +38,8 @@ const TOP_PAD = 16;
 const DRAW_H = CHART_HEIGHT - LABEL_H - TOP_PAD;
 
 // SVG 없는 차트 — Expo Go의 svg 네이티브 부재로 인한 크래시 회피. 순수 View 막대.
-export function FinancialChart({ quarterlyEarnings, annualFinancials, width, currency = "USD" }: Props) {
+// memo로 감싸 부모 리렌더 시 props 불변이면 재렌더 스킵 (#347 성능 최적화).
+export const FinancialChart = memo(function FinancialChart({ quarterlyEarnings, annualFinancials, width, currency = "USD" }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>(
     annualFinancials.length > 0 ? "annual" : "quarterly"
   );
@@ -103,7 +104,7 @@ export function FinancialChart({ quarterlyEarnings, annualFinancials, width, cur
       </View>
     </View>
   );
-}
+});
 
 function QuarterlyChart({ data, width }: { data: QuarterlyEarning[]; width: number }) {
   const chartData = useMemo(() => {
