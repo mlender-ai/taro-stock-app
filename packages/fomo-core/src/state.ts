@@ -1,4 +1,4 @@
-import type { FomoState, FomoFace } from "./types.js";
+import type { FomoState, FomoFace } from "./types";
 
 /**
  * FOMO Index(0~100) → 5구간 상태 + 마스코트 표정.
