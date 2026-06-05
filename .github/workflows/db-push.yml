@@ -1,0 +1,38 @@
+name: DB Push (manual)
+
+# 수동 트리거 전용 — Prisma 스키마를 DATABASE_URL DB에 동기화한다 (ADR-003: migrate 대신 db push).
+# 안전장치: 적용 전 SQL diff를 로그에 출력, --accept-data-loss 미사용(파괴적 변경 시 자동 중단).
+# 시크릿 DATABASE_URL 필요. FOMO 테이블(EmotionVote/FomoIndexSnapshot) 추가용.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Preview pending SQL (read-only diff)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "=== DB → schema 적용 예정 SQL ==="
+          npx prisma migrate diff \
+            --from-schema-datasource prisma/schema.prisma \
+            --to-schema-datamodel prisma/schema.prisma \
+            --script || true
+
+      - name: Prisma db push (additive; aborts on data loss)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx prisma db push
