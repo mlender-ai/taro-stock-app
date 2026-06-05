@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 const YAHOO_RSS_URL = "https://feeds.finance.yahoo.com/rss/2.0/headline";
 const USER_AGENT = "Mozilla/5.0 (compatible; TarotStockBot/1.0)";
 
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10분 캐시
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15분 캐시 (뉴스는 실시간 데이터가 아니므로 재무 데이터와 동일 주기 적용)
 const cache = new Map<string, { data: NewsItem[]; expiresAt: number }>();
 
 interface NewsItem {
