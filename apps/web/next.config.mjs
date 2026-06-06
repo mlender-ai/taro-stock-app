@@ -21,7 +21,7 @@ const adminSecurityHeaders = [
 ];
 
 const sharedConfig = {
-  transpilePackages: ["@trading/shared", "@taro/core"],
+  transpilePackages: ["@trading/shared", "@taro/core", "@fomo/core"],
   headers: async () => [
     {
       source: "/admin/:path*",

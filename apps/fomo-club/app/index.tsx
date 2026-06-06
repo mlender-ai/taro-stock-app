@@ -1,5 +1,14 @@
-import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
+import { useEffect, useRef, useState, useCallback } from "react";
+import {
+  Animated,
+  Easing,
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link } from "expo-router";
 import {
@@ -7,22 +16,50 @@ import {
   EMOTION_LABELS,
   EMOTION_COLORS,
   scoreToFace,
-  scoreToState,
   type EmotionType,
+  type FomoFace as FomoFaceType,
 } from "@fomo/core";
 import { FomoFace } from "../components/FomoFace";
 import { FomoColors, Spacing, Radius } from "../constants/fomoTheme";
-
-// Phase 1 셸: 백엔드 미연동. FOMO Index 실제값은 Phase 3에서 /api/fomo/index 연동.
-// 정직한 숫자 원칙 — 가짜 수치를 진짜처럼 보이지 않게 "준비 중"으로 표기한다.
-const MARKET_SCORE_PLACEHOLDER: number | null = null;
+import {
+  fetchIndex,
+  fetchToday,
+  postVote,
+  type FomoIndexResponse,
+  type TallyResponse,
+} from "../lib/api";
 
 export default function Home() {
   // 두 단계 상태: 'market'(시장의 포모) → 'mine'(나의 포모). docs/MASCOT.md §5.
+  const [index, setIndex] = useState<FomoIndexResponse | null>(null);
+  const [tally, setTally] = useState<TallyResponse | null>(null);
   const [mine, setMine] = useState<EmotionType | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [voting, setVoting] = useState(false);
+
   const stage: "market" | "mine" = mine ? "mine" : "market";
-  const marketFace =
-    MARKET_SCORE_PLACEHOLDER == null ? "curious" : scoreToFace(MARKET_SCORE_PLACEHOLDER);
+  const marketFace: FomoFaceType = index ? scoreToFace(index.score) : "curious";
+
+  useEffect(() => {
+    Promise.allSettled([fetchIndex(), fetchToday()]).then(([i, t]) => {
+      if (i.status === "fulfilled") setIndex(i.value);
+      if (t.status === "fulfilled") setTally(t.value);
+      setLoading(false);
+    });
+  }, []);
+
+  const vote = useCallback(async (e: EmotionType) => {
+    setVoting(true);
+    setMine(e);
+    try {
+      const res = await postVote(e);
+      setTally(res);
+    } catch {
+      // 낙관적 — 선택 유지, 집계는 다음 로드에 반영
+    } finally {
+      setVoting(false);
+    }
+  }, []);
 
   // '나의 포모' 멘트가 떠오르듯 페이드+슬라이드인. docs/MASCOT.md "전환 = 애니메이션 + 멘트".
   const mentionFade = useRef(new Animated.Value(0)).current;
@@ -54,18 +91,22 @@ export default function Home() {
           glow={stage === "mine" && mine ? EMOTION_COLORS[mine] : undefined}
         />
 
-        {/* 보조: FOMO Index 숫자 (미연동 시 정직하게 "준비 중") */}
+        {/* 보조: FOMO Index 숫자 */}
         <View style={styles.indexRow}>
-          {MARKET_SCORE_PLACEHOLDER == null ? (
-            <Text style={styles.muted}>FOMO INDEX · 집계 준비 중</Text>
+          {loading ? (
+            <ActivityIndicator color={FomoColors.muted} />
+          ) : index ? (
+            <>
+              <Text style={styles.indexText}>{index.score} · {index.state}</Text>
+              <Text style={styles.muted}>FOMO INDEX{index.live ? " · 실시간 집계" : ""}</Text>
+              {!!index.aiSummary && <Text style={styles.summary}>{index.aiSummary}</Text>}
+            </>
           ) : (
-            <Text style={styles.indexText}>
-              FOMO INDEX {MARKET_SCORE_PLACEHOLDER} · {scoreToState(MARKET_SCORE_PLACEHOLDER)}
-            </Text>
+            <Text style={styles.muted}>FOMO INDEX · 집계 준비 중</Text>
           )}
         </View>
 
-        {/* 2단계 전환 멘트 — Phase 3에서 실제 멘트/애니메이션 */}
+        {/* 2단계 전환 멘트 (페이드+슬라이드) */}
         {stage === "mine" && mine && (
           <Animated.Text
             style={[
@@ -93,12 +134,14 @@ export default function Home() {
               return (
                 <Pressable
                   key={e}
-                  onPress={() => setMine(e)}
+                  disabled={voting}
+                  onPress={() => vote(e)}
                   style={[
                     styles.chip,
                     {
                       borderColor: selected ? EMOTION_COLORS[e] : FomoColors.hairline,
                       backgroundColor: selected ? EMOTION_COLORS[e] + "22" : FomoColors.surface,
+                      opacity: voting ? 0.6 : 1,
                     },
                   ]}
                 >
@@ -110,7 +153,28 @@ export default function Home() {
             })}
           </View>
 
-          {mine && <Text style={styles.tally}>같은 감정을 선택한 사람: 집계 준비 중</Text>}
+          {/* 집계 결과 — 정직한 숫자 */}
+          {tally && (
+            <View style={styles.tallyBlock}>
+              <Text style={styles.tally}>오늘 {tally.total}명이 감정을 선택했어요</Text>
+              {EMOTION_TYPES.map((e) => (
+                <View key={e} style={styles.barRow}>
+                  <Text style={[styles.barLabel, { color: EMOTION_COLORS[e] }]}>{EMOTION_LABELS[e]}</Text>
+                  <View style={styles.barTrack}>
+                    <View
+                      style={{
+                        width: `${tally.ratios[e] ?? 0}%`,
+                        height: "100%",
+                        borderRadius: 999,
+                        backgroundColor: EMOTION_COLORS[e],
+                      }}
+                    />
+                  </View>
+                  <Text style={styles.barPct}>{tally.ratios[e] ?? 0}%</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -124,14 +188,20 @@ const styles = StyleSheet.create({
   brand: { color: FomoColors.whiteout, fontSize: 18, fontWeight: "600" },
   link: { color: FomoColors.muted, fontSize: 14 },
   stageLabel: { color: FomoColors.muted, fontSize: 12, marginBottom: Spacing.s12 },
-  indexRow: { alignItems: "center", marginTop: Spacing.s24 },
-  muted: { color: FomoColors.muted, fontSize: 14 },
-  indexText: { color: FomoColors.whiteout, fontSize: 16 },
+  indexRow: { alignItems: "center", marginTop: Spacing.s24, minHeight: 28 },
+  indexText: { color: FomoColors.whiteout, fontSize: 24, fontWeight: "600" },
+  muted: { color: FomoColors.muted, fontSize: 12, marginTop: 4 },
+  summary: { color: FomoColors.whiteout, fontSize: 14, textAlign: "center", marginTop: Spacing.s8, maxWidth: 300 },
   mention: { color: FomoColors.whiteout, textAlign: "center", fontSize: 14, marginTop: Spacing.s16, lineHeight: 20 },
   voteBlock: { width: "100%", marginTop: Spacing.s40 },
   voteTitle: { color: FomoColors.whiteout, fontSize: 16, fontWeight: "600", marginBottom: Spacing.s4 },
   voteHint: { color: FomoColors.muted, fontSize: 12, marginBottom: Spacing.s16 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.s8 },
   chip: { paddingHorizontal: Spacing.s16, paddingVertical: Spacing.s12, borderRadius: Radius.md, borderWidth: 1 },
-  tally: { color: FomoColors.muted, fontSize: 12, marginTop: Spacing.s16 },
+  tallyBlock: { marginTop: Spacing.s24 },
+  tally: { color: FomoColors.muted, fontSize: 12, marginBottom: Spacing.s12 },
+  barRow: { flexDirection: "row", alignItems: "center", gap: Spacing.s8, marginBottom: 6 },
+  barLabel: { width: 44, fontSize: 12 },
+  barTrack: { flex: 1, height: 8, borderRadius: 999, backgroundColor: FomoColors.elevated, overflow: "hidden" },
+  barPct: { width: 36, textAlign: "right", color: FomoColors.muted, fontSize: 12 },
 });
