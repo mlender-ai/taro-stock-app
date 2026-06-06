@@ -13,6 +13,26 @@ import type { TarotAuthProvider } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
+// In-memory rate limiter: max 5 attempts per IP per 15-minute window.
+const RATE_WINDOW_MS = 15 * 60 * 1000;
+const MAX_ATTEMPTS = 5;
+const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
+
+function checkRateLimit(ip: string): { limited: boolean; retryAfterSec: number } {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now - entry.windowStart > RATE_WINDOW_MS) {
+    rateLimitMap.set(ip, { count: 1, windowStart: now });
+    return { limited: false, retryAfterSec: 0 };
+  }
+  entry.count += 1;
+  if (entry.count > MAX_ATTEMPTS) {
+    const retryAfterSec = Math.ceil((RATE_WINDOW_MS - (now - entry.windowStart)) / 1000);
+    return { limited: true, retryAfterSec };
+  }
+  return { limited: false, retryAfterSec: 0 };
+}
+
 type SupportedProvider = "APPLE" | "GOOGLE" | "KAKAO" | "NAVER";
 
 interface LoginBody {
@@ -30,6 +50,19 @@ function isSupportedProvider(p: string): p is SupportedProvider {
 }
 
 export async function POST(req: NextRequest) {
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    req.headers.get("x-real-ip") ??
+    "unknown";
+  const { limited, retryAfterSec } = checkRateLimit(ip);
+  if (limited) {
+    console.warn(`[tarot/auth] rate limit exceeded ip=${ip}`);
+    return NextResponse.json(
+      { error: "Too many login attempts. Try again later.", code: "RATE_LIMITED" },
+      { status: 429, headers: { "Retry-After": String(retryAfterSec) } },
+    );
+  }
+
   const body = (await req.json().catch(() => ({}))) as LoginBody;
   const provider = body.provider?.toUpperCase();
   const identityToken = body.identityToken?.trim();
