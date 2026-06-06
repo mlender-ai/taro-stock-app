@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-// 임시 진단 라우트 — Vercel 런타임의 DATABASE_URL 상태를 비밀 노출 없이 확인.
-// 확인 후 제거한다.
+// 임시 진단 라우트 — Vercel 런타임의 DATABASE_URL 상태 + 배포 최신성 확인(비밀 비노출). 확인 후 제거.
+const BUILD_MARKER = "p1-diag-92c940c6";
+
 export async function GET() {
   const raw = process.env.DATABASE_URL ?? "";
   const info: Record<string, unknown> = {
+    buildMarker: BUILD_MARKER,
     hasEnv: raw.length > 0,
     length: raw.length,
     startsWithPostgres: raw.startsWith("postgresql://") || raw.startsWith("postgres://"),
