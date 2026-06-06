@@ -156,6 +156,20 @@ export function FomoFace({
             />
           ))}
         </Animated.View>
+        {/* 입 — 표정별 작은 변형 (docs/MASCOT.md) */}
+        {eye.mouthShape !== "none" && (
+          <Animated.View
+            style={{
+              marginTop: size * 0.1,
+              width: size * eye.mouthW,
+              height: eye.mouthShape === "o" ? size * 0.06 : Math.max(2, size * 0.018),
+              borderRadius: 999,
+              backgroundColor: FomoColors.whiteout,
+              opacity: eye.mouthO,
+              transform: [{ scaleY: blink }],
+            }}
+          />
+        )}
       </Animated.View>
     </Animated.View>
   );
@@ -180,10 +194,18 @@ const styles = StyleSheet.create({
   eyes: { flexDirection: "row" },
 });
 
-const EYE_SHAPE: Record<FomoFaceType, { heightRatio: number; opacity: number }> = {
-  sleepy: { heightRatio: 0.3, opacity: 0.7 },
-  calm: { heightRatio: 0.8, opacity: 0.9 },
-  curious: { heightRatio: 1.0, opacity: 1 },
-  excited: { heightRatio: 1.3, opacity: 1 },
-  manic: { heightRatio: 1.5, opacity: 1 },
+type ExprShape = {
+  heightRatio: number;
+  opacity: number;
+  mouthW: number;
+  mouthShape: "line" | "o" | "none";
+  mouthO: number;
+};
+
+const EYE_SHAPE: Record<FomoFaceType, ExprShape> = {
+  sleepy: { heightRatio: 0.3, opacity: 0.7, mouthW: 0.08, mouthShape: "line", mouthO: 0.4 },
+  calm: { heightRatio: 0.8, opacity: 0.9, mouthW: 0.1, mouthShape: "line", mouthO: 0.7 },
+  curious: { heightRatio: 1.0, opacity: 1, mouthW: 0.07, mouthShape: "o", mouthO: 0.8 },
+  excited: { heightRatio: 1.3, opacity: 1, mouthW: 0.12, mouthShape: "o", mouthO: 1 },
+  manic: { heightRatio: 1.5, opacity: 1, mouthW: 0.16, mouthShape: "o", mouthO: 1 },
 };

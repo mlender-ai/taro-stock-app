@@ -16,6 +16,9 @@ import {
   EMOTION_LABELS,
   EMOTION_COLORS,
   scoreToFace,
+  scoreToState,
+  marketLine,
+  mineLine,
   type EmotionType,
   type FomoFace as FomoFaceType,
 } from "@fomo/core";
@@ -39,6 +42,17 @@ export default function Home() {
 
   const stage: "market" | "mine" = mine ? "mine" : "market";
   const marketFace: FomoFaceType = index ? scoreToFace(index.score) : "curious";
+  const state = index ? scoreToState(index.score) : null;
+  // 포모의 담담한 한마디: 선택 전=시장의 포모, 선택 후=나의 포모. @fomo/core.
+  const line = mine ? mineLine(mine) : state ? marketLine(state) : "";
+  // 시장 glow: 달아오르면 따뜻하게, 차분하면 옅게/없음.
+  const marketGlow = index
+    ? index.score >= 61
+      ? EMOTION_COLORS.fomo
+      : index.score >= 41
+        ? "#5A5A5A"
+        : undefined
+    : undefined;
 
   useEffect(() => {
     Promise.allSettled([fetchIndex(), fetchToday()]).then(([i, t]) => {
@@ -61,18 +75,19 @@ export default function Home() {
     }
   }, []);
 
-  // '나의 포모' 멘트가 떠오르듯 페이드+슬라이드인. docs/MASCOT.md "전환 = 애니메이션 + 멘트".
+  // 멘트가 떠오르듯 페이드+슬라이드인 — 시장/나의 포모 전환마다 재생. docs/MASCOT.md.
   const mentionFade = useRef(new Animated.Value(0)).current;
   useEffect(() => {
+    mentionFade.setValue(0);
     const anim = Animated.timing(mentionFade, {
-      toValue: stage === "mine" ? 1 : 0,
+      toValue: 1,
       duration: 420,
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     });
     anim.start();
     return () => anim.stop();
-  }, [stage, mentionFade]);
+  }, [stage, mine, mentionFade]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -84,11 +99,11 @@ export default function Home() {
 
         {/* 주인공: 포모 마스코트 (숫자는 보조) */}
         <Text style={styles.stageLabel}>
-          {stage === "market" ? "오늘의 포모 — 시장의 분위기" : "나의 포모"}
+          {stage === "market" ? "오늘의 포모" : "나의 포모"}
         </Text>
         <FomoFace
           face={stage === "market" ? marketFace : "calm"}
-          glow={stage === "mine" && mine ? EMOTION_COLORS[mine] : undefined}
+          glow={stage === "mine" && mine ? EMOTION_COLORS[mine] : marketGlow}
         />
 
         {/* 보조: FOMO Index 숫자 */}
@@ -97,17 +112,16 @@ export default function Home() {
             <ActivityIndicator color={FomoColors.muted} />
           ) : index ? (
             <>
-              <Text style={styles.indexText}>{index.score} · {index.state}</Text>
-              <Text style={styles.muted}>FOMO INDEX{index.live ? " · 실시간 집계" : ""}</Text>
-              {!!index.aiSummary && <Text style={styles.summary}>{index.aiSummary}</Text>}
+              <Text style={styles.indexText}>{index.score}</Text>
+              <Text style={styles.muted}>FOMO INDEX · {index.state}</Text>
             </>
           ) : (
             <Text style={styles.muted}>FOMO INDEX · 집계 준비 중</Text>
           )}
         </View>
 
-        {/* 2단계 전환 멘트 (페이드+슬라이드) */}
-        {stage === "mine" && mine && (
+        {/* 포모의 담담한 한마디 — 전환마다 떠오름 (시장의 포모 ↔ 나의 포모) */}
+        {!!line && (
           <Animated.Text
             style={[
               styles.mention,
@@ -119,7 +133,7 @@ export default function Home() {
               },
             ]}
           >
-            다들 어떻든, 너의 「{EMOTION_LABELS[mine]}」도 괜찮아.
+            {line}
           </Animated.Text>
         )}
 
