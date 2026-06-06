@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 // 임시 진단 라우트 — Vercel 런타임의 DATABASE_URL 상태 + 배포 최신성 확인(비밀 비노출). 확인 후 제거.
-const BUILD_MARKER = "diag-keys-3";
+const BUILD_MARKER = "diag-envcheck-4";
 
 export async function GET() {
   const raw = process.env.DATABASE_URL ?? "";
