@@ -36,16 +36,21 @@ export async function GET(req: NextRequest) {
     const prevY = m === 1 ? year - 1 : year;
     const prevLo = `${prevY}-${String(prevM).padStart(2, "0")}-01`;
 
-    const [votes, snaps] = await Promise.all([
-      prisma.emotionVote.findMany({
-        where: { sessionId, votedDate: { gte: prevLo, lt: hi } },
-        select: { votedDate: true, emotion: true },
-      }),
-      prisma.fomoIndexSnapshot.findMany({
+    const votes = await prisma.emotionVote.findMany({
+      where: { sessionId, votedDate: { gte: prevLo, lt: hi } },
+      select: { votedDate: true, emotion: true },
+    });
+
+    // FomoIndexSnapshot 테이블이 DB에 없을 수 있음(마이그레이션 미적용) → 실패해도 감정 데이터는 반환
+    let snaps: { date: string; score: number }[] = [];
+    try {
+      snaps = await prisma.fomoIndexSnapshot.findMany({
         where: { date: { gte: lo, lt: hi } },
         select: { date: true, score: true },
-      }),
-    ]);
+      });
+    } catch {
+      // 테이블 미존재 시 market 오버레이 없이 진행
+    }
 
     const days: Record<string, EmotionType> = {};
     for (const v of votes) {
