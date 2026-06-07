@@ -9,21 +9,26 @@ import {
   scoreToState,
   marketLine,
   mineLine,
+  isCalmDay,
+  restorativeLine,
   type EmotionType,
   type FomoFace as FomoFaceType,
   type FomoState,
 } from "@fomo/core";
 import { FomoFace } from "@/components/FomoFace";
 import { RollingBanner } from "@/components/RollingBanner";
+import { EmotionCalendar } from "@/components/EmotionCalendar";
 import { getSessionId } from "@/lib/session";
 import {
   fetchIndex,
   fetchToday,
   fetchPulse,
   fetchWhale,
+  fetchCalendar,
   postVote,
   type FomoIndexResponse,
   type TallyResponse,
+  type CalendarResponse,
 } from "@/lib/fomoApi";
 
 export default function Home() {
@@ -32,16 +37,29 @@ export default function Home() {
   const [pulse, setPulse] = useState<string[]>([]);
   const [whale, setWhale] = useState<string[]>([]);
   const [mine, setMine] = useState<EmotionType | null>(null);
+  const [calendar, setCalendar] = useState<CalendarResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [voting, setVoting] = useState(false);
 
   useEffect(() => {
-    getSessionId();
-    Promise.allSettled([fetchIndex(), fetchToday(), fetchPulse(), fetchWhale()]).then(([i, t, p, w]) => {
+    const sid = getSessionId();
+    Promise.allSettled([
+      fetchIndex(),
+      fetchToday(),
+      fetchPulse(),
+      fetchWhale(),
+      fetchCalendar(sid),
+    ]).then(([i, t, p, w, c]) => {
       if (i.status === "fulfilled") setIndex(i.value);
       if (t.status === "fulfilled") setTally(t.value);
       if (p.status === "fulfilled") setPulse(p.value.items);
       if (w.status === "fulfilled") setWhale(w.value.items);
+      if (c.status === "fulfilled") {
+        setCalendar(c.value);
+        // 오늘 이미 남긴 감정이 있으면 2단계(나의 포모)로 복원
+        const todays = c.value.days[c.value.today];
+        if (todays) setMine(todays as EmotionType);
+      }
       setLoading(false);
     });
   }, []);
@@ -52,6 +70,10 @@ export default function Home() {
     try {
       const res = await postVote(getSessionId(), e);
       setTally(res);
+      // 캘린더 오늘 칸 즉시 반영(낙관적)
+      setCalendar((prev) =>
+        prev ? { ...prev, days: { ...prev.days, [prev.today]: e } } : prev
+      );
     } catch {
       /* 선택 상태 유지 */
     } finally {
@@ -72,9 +94,9 @@ export default function Home() {
         <span className="text-xs text-muted">가입 없이 둘러보기</span>
       </div>
 
-      {/* 고래/시장 신호 롤링 배너 (실데이터, 하향비교 안도) */}
+      {/* 혼자가 아님의 신호 — 고래·시장 신호를 시장 무관 단일 카드 문법으로 통일 (M3) */}
       <div className="mb-4 w-full">
-        <RollingBanner items={whale.length > 0 ? whale : pulse} />
+        <RollingBanner items={[...whale, ...pulse]} />
       </div>
 
       {/* 주인공: 포모 */}
@@ -111,6 +133,19 @@ export default function Home() {
         </p>
       )}
 
+      {/* 잔잔한 날 = 치유의 날 — 변동성 없는 날에도 열 이유 (M2) */}
+      {state && index && isCalmDay(state) && (
+        <div className="fomo-rise mt-4 flex w-full items-start gap-2.5 rounded-xl border border-hairline bg-surface px-4 py-3">
+          <span className="mt-0.5 text-sm" aria-hidden>
+            🌙
+          </span>
+          <div>
+            <p className="text-xs text-muted">오늘의 쉼</p>
+            <p className="mt-0.5 text-sm leading-5 text-whiteout">{restorativeLine(index.date)}</p>
+          </div>
+        </div>
+      )}
+
       {/* 오늘의 감정 투표 */}
       <section className="mt-7 w-full">
         <h2 className="text-base font-semibold text-whiteout">오늘 당신의 감정은?</h2>
@@ -145,6 +180,20 @@ export default function Home() {
               오늘 <span className="font-pixel text-whiteout">{tally.total}</span>명이 마음을 남겼어요
               {mine ? " · 너도 그 안에 있어" : ""}
             </p>
+            {/* 혼자가 아님의 직접 체감 — 너와 같은 마음인 사람 수 (M3) */}
+            {mine && (tally.counts[mine] ?? 0) > 1 && (
+              <p key={mine} className="fomo-rise mt-1.5 text-sm leading-5 text-whiteout">
+                지금 너처럼{" "}
+                <span className="font-pixel" style={{ color: EMOTION_COLORS[mine] }}>
+                  {EMOTION_LABELS[mine]}
+                </span>
+                인 사람,{" "}
+                <span className="font-pixel" style={{ color: EMOTION_COLORS[mine] }}>
+                  {tally.counts[mine]}
+                </span>
+                명. 너만 그런 거 아니야.
+              </p>
+            )}
             <div className="mt-2.5 flex flex-col gap-1.5">
               {EMOTION_TYPES.map((e) => (
                 <div key={e} className="flex items-center gap-2.5">
@@ -162,6 +211,9 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {/* 감정 캘린더 — 매일 돌아올 이유 (M2) */}
+      {calendar && <EmotionCalendar data={calendar} />}
 
       {/* 면책 — 담담하게 */}
       <p className="mt-7 text-center text-[11px] leading-5 text-muted">
