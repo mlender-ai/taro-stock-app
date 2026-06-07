@@ -50,10 +50,18 @@ Phase A (현재 최우선): FOMO Club MVP 출시 — 검증용. 타로 앱보다
   정체성 고정 (M0): docs/IDENTITY_AND_MILESTONES.md = North Star. MVP가 아니라 MLP(사랑스러움 최대).
     "디시의 마음(담담한 솔직함) + 인디게임의 몸". 시금석: "그날 밤의 내가 덜 외로웠을까".
     마일스톤 M0(정체성)→M1(단 하나의 순간)→M2(돌아올 이유)→M3(혼자가 아님)→M4(여정)→M5+(확장, 검증 후).
-    거버넌스: HARNESS Gate 6 Lovable + lovable-reviewer/mascot-keeper 신규(.claude/agents/). 다음 한 발 = M1(홈에 love mark 투하).
+    거버넌스: HARNESS Gate 6 Lovable + lovable-reviewer/mascot-keeper 신규(.claude/agents/).
+    진행: M0✅ M1✅(웹/모바일 홈 love mark) M2✅(웹) M3🟡(웹 부분: 집계/배너). 다음 한 발 = M3 마무리(카드 문법 1개 통일) 또는 M4.
   - 정의/지표/마스코트 정본: docs/FOMO_CLUB.md, docs/FOMO_INDEX.md, docs/MASCOT.md, docs/MASTER_PROMPT_FOMO_CLUB.md
   - 마스코트 '포모' 설계 확정 (docs/MASCOT.md). 화면 설계의 기준 문서.
     포모 = 살아있는 지표. 두 단계 감정 변화(시장의 포모 → 나의 포모)가 핵심 메커니즘.
+
+### 2026-06-07 — M2 감정 캘린더 (웹, PR #389)
+- fomo-core: `calendar.ts`(`buildCalendar`/`calendarStats` 순수 로직, 시간대-안전 문자열 산술) + `mascot-lines.ts`에 `restorativeLine`/`isCalmDay` 추가. 색·날짜 계산은 모두 fomo-core 단일 소스 → vitest 회귀(31개).
+- 백엔드: `GET /api/fomo/emotions/calendar?sessionId&month` (apps/web). 세션 월별 감정 + FomoIndexSnapshot 점수. **fomoIndexSnapshot 쿼리는 try/catch 폴백** — 그 테이블이 DB에 없을 수 있음(파이프라인 미실행/마이그레이션 미적용). EmotionVote 테이블만 신뢰.
+- fomo-web: `EmotionCalendar.tsx`(픽셀 그리드+스트릭+시장 오버레이) + 홈 '오늘의 쉼' 회복 카드(잔잔한 날).
+- **배포**: apps/fomo-web = Vercel 프로젝트 `fomo-web`(prj_dfwSKviFgdUg7MocHAqiBEPmaxcV, rootDir=apps/fomo-web)로 신규 연결됨. taro-stock-web(prj_B68x…, rootDir=apps/web)은 백엔드 API 전용. `.github/workflows/deploy-fomo-web.yml`은 GitHub Secrets(VERCEL_TOKEN/ORG_ID/FOMO_WEB_PROJECT_ID) 필요 — 단, Vercel Git 통합이 이미 자동 배포하므로 워크플로우는 중복일 수 있음(정리 후보).
+- fomo-web API 기본값: `NEXT_PUBLIC_FOMO_API_BASE` (기본 prod taro-stock-web.vercel.app). 캘린더 라우트가 prod main 머지 전이면 프리뷰 API_BASE 필요.
 
 --- 타로 앱 (보존, 후속 해석 백엔드) ---
 Phase 1 ✅: 기반 인프라 (tarot-core, tarot-mobile 기본 구조, Prisma 스키마 65개 모델)
