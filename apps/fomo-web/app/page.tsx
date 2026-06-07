@@ -65,35 +65,36 @@ export default function Home() {
   const line = mine ? mineLine(mine) : state ? marketLine(state) : "";
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col items-center px-6 pb-20 pt-8">
+    <main className="mx-auto flex min-h-screen max-w-md flex-col items-center px-6 pb-10 pt-5">
       {/* 헤더 */}
-      <div className="mb-7 flex w-full items-center justify-between">
+      <div className="mb-4 flex w-full items-center justify-between">
         <span className="font-pixel text-base text-whiteout">FOMO CLUB</span>
         <span className="text-xs text-muted">가입 없이 둘러보기</span>
       </div>
 
       {/* 고래/시장 신호 롤링 배너 (실데이터, 하향비교 안도) */}
-      <div className="mb-7 w-full">
+      <div className="mb-4 w-full">
         <RollingBanner items={whale.length > 0 ? whale : pulse} />
       </div>
 
       {/* 주인공: 포모 */}
-      <p className="mb-4 text-xs text-muted">
+      <p className="mb-2 text-xs text-muted">
         {stage === "market" ? "오늘의 포모" : "나의 포모"}
       </p>
       <FomoFace
         face={stage === "market" ? marketFace : "calm"}
         glow={stage === "mine" && mine ? EMOTION_COLORS[mine] : state ? STATE_GLOW(index!.score) : undefined}
+        size={120}
       />
 
       {/* 보조: FOMO Index (픽셀) */}
-      <div className="mt-7 flex flex-col items-center">
+      <div className="mt-3 flex flex-col items-center">
         {loading ? (
           <p className="text-sm text-muted">불러오는 중…</p>
         ) : index ? (
           <>
-            <p className="font-pixel text-5xl leading-none text-whiteout">{index.score}</p>
-            <p className="mt-2 font-pixel text-sm text-muted">
+            <p className="font-pixel text-4xl leading-none text-whiteout">{index.score}</p>
+            <p className="mt-1.5 font-pixel text-xs text-muted">
               FOMO INDEX · {index.state}
               {index.prevDayDelta ? ` · 전일 ${index.prevDayDelta > 0 ? "+" : ""}${index.prevDayDelta}` : ""}
             </p>
@@ -105,15 +106,15 @@ export default function Home() {
 
       {/* 포모의 담담한 한마디 (전환 시 떠오름) */}
       {line && (
-        <p key={stage + (mine ?? "")} className="fomo-rise mt-5 max-w-xs text-center text-[15px] leading-6 text-whiteout">
+        <p key={stage + (mine ?? "")} className="fomo-rise mt-3 max-w-xs text-center text-sm leading-5 text-whiteout">
           {line}
         </p>
       )}
 
       {/* 오늘의 감정 투표 */}
-      <section className="mt-12 w-full">
+      <section className="mt-7 w-full">
         <h2 className="text-base font-semibold text-whiteout">오늘 당신의 감정은?</h2>
-        <p className="mb-4 text-xs text-muted">하루 한 번, 지금 마음에 가까운 걸로.</p>
+        <p className="mb-3 text-xs text-muted">하루 한 번, 지금 마음에 가까운 걸로.</p>
 
         <div className="flex flex-wrap gap-2">
           {EMOTION_TYPES.map((e) => {
@@ -123,7 +124,7 @@ export default function Home() {
                 key={e}
                 disabled={voting}
                 onClick={() => vote(e)}
-                className="rounded-xl border px-4 py-3 text-sm transition-all duration-200 disabled:opacity-60"
+                className="rounded-xl border px-3.5 py-2.5 text-sm transition-all duration-200 disabled:opacity-60"
                 style={{
                   borderColor: selected ? EMOTION_COLORS[e] : "#2A2A2A",
                   backgroundColor: selected ? EMOTION_COLORS[e] + "20" : "#0E0E0E",
@@ -139,12 +140,12 @@ export default function Home() {
 
         {/* 집계 — 정직한 숫자 */}
         {tally && (
-          <div className="mt-6">
+          <div className="mt-5">
             <p className="text-xs text-muted">
               오늘 <span className="font-pixel text-whiteout">{tally.total}</span>명이 마음을 남겼어요
               {mine ? " · 너도 그 안에 있어" : ""}
             </p>
-            <div className="mt-3 flex flex-col gap-2">
+            <div className="mt-2.5 flex flex-col gap-1.5">
               {EMOTION_TYPES.map((e) => (
                 <div key={e} className="flex items-center gap-2.5">
                   <span className="w-10 text-xs" style={{ color: EMOTION_COLORS[e] }}>{EMOTION_LABELS[e]}</span>
@@ -163,7 +164,7 @@ export default function Home() {
       </section>
 
       {/* 면책 — 담담하게 */}
-      <p className="mt-12 text-center text-[11px] leading-5 text-muted">
+      <p className="mt-7 text-center text-[11px] leading-5 text-muted">
         FOMO Index는 감정 체감 지표예요. 투자 조언이 아니에요.
       </p>
     </main>
