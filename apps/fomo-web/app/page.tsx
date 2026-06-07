@@ -94,9 +94,9 @@ export default function Home() {
         <span className="text-xs text-muted">가입 없이 둘러보기</span>
       </div>
 
-      {/* 고래/시장 신호 롤링 배너 (실데이터, 하향비교 안도) */}
+      {/* 혼자가 아님의 신호 — 고래·시장 신호를 시장 무관 단일 카드 문법으로 통일 (M3) */}
       <div className="mb-4 w-full">
-        <RollingBanner items={whale.length > 0 ? whale : pulse} />
+        <RollingBanner items={[...whale, ...pulse]} />
       </div>
 
       {/* 주인공: 포모 */}
@@ -180,6 +180,20 @@ export default function Home() {
               오늘 <span className="font-pixel text-whiteout">{tally.total}</span>명이 마음을 남겼어요
               {mine ? " · 너도 그 안에 있어" : ""}
             </p>
+            {/* 혼자가 아님의 직접 체감 — 너와 같은 마음인 사람 수 (M3) */}
+            {mine && (tally.counts[mine] ?? 0) > 1 && (
+              <p key={mine} className="fomo-rise mt-1.5 text-sm leading-5 text-whiteout">
+                지금 너처럼{" "}
+                <span className="font-pixel" style={{ color: EMOTION_COLORS[mine] }}>
+                  {EMOTION_LABELS[mine]}
+                </span>
+                인 사람,{" "}
+                <span className="font-pixel" style={{ color: EMOTION_COLORS[mine] }}>
+                  {tally.counts[mine]}
+                </span>
+                명. 너만 그런 거 아니야.
+              </p>
+            )}
             <div className="mt-2.5 flex flex-col gap-1.5">
               {EMOTION_TYPES.map((e) => (
                 <div key={e} className="flex items-center gap-2.5">
