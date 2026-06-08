@@ -219,6 +219,49 @@ export async function closeIssue(n: number, comment?: string): Promise<void> {
   });
 }
 
+/** close_all 시에도 보존하는 보호 라벨 — 봇 운영 메모리(롤링 피드백 로그 등). */
+const PROTECTED_LABELS = new Set(["feedback-log"]);
+
+/**
+ * 열린 이슈를 전부 닫는다 (머지 해결 여부 무관 — "이슈탭 전부 닫아").
+ * - PR 은 제외 (issues API 가 PR 도 함께 반환하므로 pull_request 필드로 거름).
+ * - 보호 라벨(feedback-log) 이슈는 봇 메모리라 보존.
+ * - 페이지네이션으로 100개 초과도 모두 처리.
+ */
+export async function closeAllOpenIssues(): Promise<{
+  closed: number[];
+  protectedSkipped: number[];
+}> {
+  const closed: number[] = [];
+  const protectedSkipped: number[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const issues = (await githubApi(
+      `/repos/${REPO}/issues?state=open&per_page=100&page=${page}&sort=created&direction=desc`
+    )) as Array<{
+      number: number;
+      pull_request?: unknown;
+      labels?: ({ name: string } | string)[];
+    }>;
+    if (!issues.length) break;
+    for (const it of issues) {
+      if (it.pull_request) continue; // PR 제외
+      const labels = (it.labels ?? []).map((l) => (typeof l === "string" ? l : l.name));
+      if (labels.some((l) => PROTECTED_LABELS.has(l))) {
+        protectedSkipped.push(it.number);
+        continue;
+      }
+      try {
+        await closeIssue(it.number, "🗂️ CEO 지시로 일괄 close.");
+        closed.push(it.number);
+      } catch (e) {
+        console.warn(`closeAllOpenIssues #${it.number} 실패: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+    if (issues.length < 100) break;
+  }
+  return { closed, protectedSkipped };
+}
+
 /** 최근 머지된 PR들이 참조(#N)한 이슈 중 아직 열려있는 것 — "완료(머지로 해결)됐는데 안 닫힌" 이슈. */
 export async function getResolvedOpenIssues(sinceDays = 45): Promise<number[]> {
   const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();

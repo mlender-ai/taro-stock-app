@@ -13,6 +13,7 @@ import {
   mergePR,
   getPRMergeability,
   closeIssue,
+  closeAllOpenIssues,
   getResolvedOpenIssues,
   addLabel,
   addIssueComment,
@@ -318,7 +319,8 @@ ${runList || "(없음)"}
   \`[[ACTION:merge_all]]\` — 열린 PR 중 **이상 없는 것 전부** 머지 ("PR 전부 머지", "남은 PR 머지", "이상없으면 다 머지"). 번호 불필요 — 초안·CI미통과·충돌은 자동 제외.
   \`[[ACTION:approve]] {"issue":298}\` — 이슈에 implement-approved 라벨
   \`[[ACTION:comment]] {"issue":298,"body":"..."}\` — 이슈/PR에 코멘트 (= 피드백 반영의 1차 형태)
-  \`[[ACTION:close_completed]]\` — **완료(머지로 해결)됐는데 안 닫힌 이슈를 전부 닫기** ("완료된 이슈 닫아", "끝난 이슈 정리해"). 번호 불필요.
+  \`[[ACTION:close_completed]]\` — **머지로 해결된 이슈만** 닫기 ("완료된 이슈 닫아", "끝난 이슈 정리해", "머지된 거 닫아"). 번호 불필요.
+  \`[[ACTION:close_all]]\` — **열린 이슈를 전부 닫기** (머지 해결 여부 무관). 번호 불필요. 봇 메모리(feedback-log)만 자동 보존.
   \`[[ACTION:add_constraint]] {"rule":"...","scope":["all"],"kind":"prohibition","permanent":true}\` — 영구 규칙(standing constraint) 적재
   \`[[ACTION:log_feedback]] {"note":"..."}\` — CEO의 피드백·방향·판정을 기억에 적재 (다음 Agent Council 입력에 반영)
 - JSON 페이로드는 반드시 한 줄. scope kind 는 정해진 값만.
@@ -332,9 +334,12 @@ ${runList || "(없음)"}
 
 **벌크 정리 트리거 (번호 없이도 실행 — 자주 쓰임)**:
 - "PR 이상없으면 전부 머지", "남은 PR 다 머지", "문제없으면 머지해" → 번호를 묻지 말고 \`[[ACTION:merge_all]]\` 토큰을 낸다. (개별 번호가 명시되면 그때만 \`[[ACTION:merge]]\`.)
-- "완료된 이슈 닫아", "끝난 이슈 정리해", "해결된 건 닫아줘" → \`[[ACTION:close_completed]]\` 토큰을 낸다.
-- 둘 다 지시하면("머지하고 이슈도 닫아") 두 토큰을 각각 단독 줄로 출력한다.
-- **절대 "PR 번호가 올바르지 않다/머지할 PR이 없다"고 지어내지 마라** — 벌크 토큰을 내면 시스템이 실제 열린 PR/이슈를 조회해 처리한다.
+- 이슈 닫기는 **두 종류를 구분**한다:
+  - "이슈 전부 닫아", "이슈탭(에 있는 리스트) 전부 클로즈", "그냥 다 닫아", "오늘/어제 이슈 다 닫아", "남은 이슈 전부 정리", "싹 닫아" → \`[[ACTION:close_all]]\` (머지 해결 여부 무관, 열린 이슈 전부).
+  - "완료된/끝난/머지로 해결된 이슈(만) 닫아" 처럼 **'완료/머지'를 명시**할 때만 → \`[[ACTION:close_completed]]\`.
+  - 그냥 "이슈 닫아"라고만 하면(완료/머지 한정어 없이) **close_all 로 본다** — CEO는 보통 전부 닫길 원한다. 특정 #번호만 말하면 그건 다른 얘기다.
+- 둘 다 지시하면("머지하고 이슈도 닫아") merge_all + close_all 두 토큰을 각각 단독 줄로 출력한다.
+- **절대 "닫을 이슈가 없다/PR 번호가 올바르지 않다"고 지어내지 마라** — 벌크 토큰을 내면 시스템이 실제 열린 PR/이슈를 조회해 처리한다. close_all 은 이미 닫힌 게 아니면 반드시 무언가 닫는다.
 
 - **순수 조회·요약·상태 확인·의견 질문**("브리핑 알려줘", "PR 뭐 있어", "상태 어때")에는 토큰을 내지 않는다.
 - merge/merge_all/close_completed/add_constraint 는 비가역·고영향 — CEO가 그 동작을 명시했을 때만. 정말 애매하면 토큰 없이 "구현을 시작할까요?"라고 한 번만 되묻는다(단, '개발/구현/진행' 동사가 있으면 되묻지 말고 바로 implement).
@@ -483,6 +488,19 @@ async function executeAction(
           }
         }
         return `🗂️ *완료 이슈 ${closed.length}건 닫음*: ${closed.map((n) => `#${n}`).join(", ")}`;
+      }
+      case "close_all": {
+        // "이슈탭 전부 닫아" — 머지 해결 여부 무관, 열린 이슈 전부 닫는다(봇 메모리 feedback-log만 보존).
+        const { closed, protectedSkipped } = await closeAllOpenIssues();
+        if (!closed.length && !protectedSkipped.length) return "닫을 열린 이슈가 없습니다.";
+        const lines = [
+          closed.length > 0
+            ? `🗂️ *열린 이슈 ${closed.length}건 전부 닫음*: ${closed.map((n) => `#${n}`).join(", ")}`
+            : "닫을 열린 이슈가 없습니다.",
+        ];
+        if (protectedSkipped.length)
+          lines.push(`🔒 보존(${protectedSkipped.length}): ${protectedSkipped.map((n) => `#${n}`).join(", ")}  _봇 메모리(feedback-log)라 유지_`);
+        return lines.join("\n");
       }
       case "add_constraint": {
         const rule = action.payload.rule;

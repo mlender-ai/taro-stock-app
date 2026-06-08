@@ -20,6 +20,7 @@ export type ActionName =
   | "approve"
   | "comment"
   | "close_completed"
+  | "close_all"
   | "add_constraint"
   | "log_feedback";
 
@@ -31,6 +32,7 @@ export const KNOWN_ACTIONS: ReadonlySet<string> = new Set<ActionName>([
   "approve",
   "comment",
   "close_completed",
+  "close_all",
   "add_constraint",
   "log_feedback",
 ]);
@@ -41,6 +43,7 @@ export const HIGH_IMPACT_ACTIONS: ReadonlySet<string> = new Set<ActionName>([
   "merge_all",
   "implement",
   "close_completed",
+  "close_all",
   "add_constraint",
 ]);
 
