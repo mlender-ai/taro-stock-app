@@ -44,10 +44,12 @@ async function fetchIndexCloses(symbol: string): Promise<(number | null)[] | nul
   for (const host of YAHOO_HOSTS) {
     try {
       const url = `${host}/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
+      // no-store: 스로틀/빈 응답을 데이터 캐시에 박지 않는다(이전엔 실패가 5분 캐싱돼
+      // 한 번 throttle된 지수가 계속 누락됐다). 레이트리밋 보호는 라우트 응답 s-maxage(엣지 캐시).
       const res = await fetch(url, {
         headers: { accept: "application/json", "user-agent": YAHOO_UA },
         signal: AbortSignal.timeout(8_000),
-        next: { revalidate: 300 },
+        cache: "no-store",
       });
       if (!res.ok) continue;
       const payload = (await res.json()) as {
@@ -155,7 +157,11 @@ export async function GET() {
 
   if (items.length === 0) items.push(bannerFallback());
 
+  // 엣지 캐시로 Yahoo/CoinGecko 레이트리밋 보호 — 5분 신선, 이후 10분간 stale 허용하며 백그라운드 갱신.
   return withCors(
-    NextResponse.json({ items }, { headers: { "Cache-Control": "public, max-age=120" } })
+    NextResponse.json(
+      { items },
+      { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } }
+    )
   );
 }
