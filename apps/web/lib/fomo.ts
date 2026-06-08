@@ -7,6 +7,7 @@ import {
   scoreToColor,
   scoreToDescription,
   type FomoIndex,
+  type WhaleEvent,
   // @author 안티그래비티 — 1-A: Reddit 커뮤니티 시그널 수집
   fetchRedditSignals,
 } from "@fomo/core";
@@ -43,20 +44,82 @@ export async function todayTally(date = kstDate()): Promise<{ tally: EmotionTall
   return { tally, total };
 }
 
+interface CoinGeckoGlobal {
+  data?: { market_cap_change_percentage_24h_usd?: number };
+}
+interface CoinGeckoMarket {
+  symbol: string;
+  price_change_percentage_24h: number | null;
+  ath_change_percentage: number | null;
+}
+
+/**
+ * CoinGecko 무료 API를 통해 Whale Heat 이벤트 목록 산출.
+ * 암호화폐 시총 변화·BTC 전고점 근접도·BTC 24h 등락을 `WhaleEvent[]`로 변환.
+ * 외부 API 실패 시 빈 배열 반환 → whaleHeat 폴백(0)으로 안전하게 처리. (#394)
+ */
+export async function fetchWhaleHeatData(): Promise<WhaleEvent[]> {
+  try {
+    const [globalRes, marketsRes] = await Promise.allSettled([
+      fetch("https://api.coingecko.com/api/v3/global", { next: { revalidate: 300 } }),
+      fetch(
+        "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10&page=1&price_change_percentage=24h",
+        { next: { revalidate: 300 } }
+      ),
+    ]);
+
+    const events: WhaleEvent[] = [];
+
+    if (globalRes.status === "fulfilled" && globalRes.value.ok) {
+      const g = (await globalRes.value.json()) as CoinGeckoGlobal;
+      const mc = g.data?.market_cap_change_percentage_24h_usd;
+      if (typeof mc === "number") {
+        if (mc > 5)       events.push({ weight: 3, label: `암호화폐 시총 +${mc.toFixed(1)}%` });
+        else if (mc > 2)  events.push({ weight: 1, label: `암호화폐 시총 +${mc.toFixed(1)}%` });
+        else if (mc < -5) events.push({ weight: 2, label: `암호화폐 시총 ${mc.toFixed(1)}%` });
+      }
+    }
+
+    if (marketsRes.status === "fulfilled" && marketsRes.value.ok) {
+      const coins = (await marketsRes.value.json()) as CoinGeckoMarket[];
+      const btc = coins.find((c) => c.symbol?.toLowerCase() === "btc");
+      if (btc) {
+        // BTC 전고점 5% 이내 → 고래 활동 신호 (weight 4 = whale max의 40%)
+        if (typeof btc.ath_change_percentage === "number" && btc.ath_change_percentage > -5) {
+          events.push({ weight: 4, label: `BTC 전고점 근접 (${btc.ath_change_percentage.toFixed(1)}%)` });
+        }
+        if (typeof btc.price_change_percentage_24h === "number" && btc.price_change_percentage_24h > 5) {
+          events.push({ weight: 2, label: `BTC 24h +${btc.price_change_percentage_24h.toFixed(1)}%` });
+        }
+      }
+    }
+
+    log.debug("whale events derived from CoinGecko", { count: events.length });
+    return events;
+  } catch (err) {
+    log.warn("fetchWhaleHeatData failed — whale heat will be 0", {
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return [];
+  }
+}
+
 /**
  * 스냅샷 미존재 시 라이브 계산.
  *
  * @author 안티그래비티
  * - 1-A: Reddit 커뮤니티 시그널을 병렬 수집하여 Community Heat에 반영
  * - 1-B: 각 Heat 컴포넌트의 confidence 메타를 로그에 기록 (정직한 숫자 원칙)
+ * - 추가: Whale Heat를 CoinGecko 무료 API 기반으로 병렬 산출 (#394, #398)
  *
  * 모든 외부 데이터 소스 실패 시에도 중립 폴백으로 안전하게 반환한다.
  */
 export async function computeLiveFomoIndex(date: string): Promise<FomoIndex> {
-  // ── 병렬 페치: 감정 투표 + Reddit 시그널 ──
-  const [tallyResult, redditResult] = await Promise.allSettled([
+  // 3개 소스 병렬 페치: 감정 투표 + Reddit 시그널 + Whale 이벤트 (#398 병렬화)
+  const [tallyResult, redditResult, whaleResult] = await Promise.allSettled([
     todayTally(date),
     fetchRedditSignals(),
+    fetchWhaleHeatData(),
   ]);
 
   // 감정 투표
@@ -89,10 +152,22 @@ export async function computeLiveFomoIndex(date: string): Promise<FomoIndex> {
     });
   }
 
-  const inputs: import("@fomo/core").FomoIndexInputs = { emotion: tally };
-  if (reddit.length > 0) {
-    inputs.community = { reddit };
+  // Whale 이벤트 (#394)
+  let whale: WhaleEvent[] = [];
+  if (whaleResult.status === "fulfilled") {
+    whale = whaleResult.value;
+    log.debug("whale events fetched", { date, count: whale.length });
+  } else {
+    log.warn("whale heat fetch failed — whale heat will be 0", {
+      date,
+      err: whaleResult.reason instanceof Error ? whaleResult.reason.message : String(whaleResult.reason),
+    });
   }
+
+  const inputs: import("@fomo/core").FomoIndexInputs = { emotion: tally };
+  if (reddit.length > 0) inputs.community = { reddit };
+  if (whale.length > 0) inputs.whale = whale;
+
   const idx = computeFomoIndex(inputs, date);
 
   // 1-B: 각 Heat 컴포넌트 신뢰도 로깅
@@ -132,6 +207,7 @@ export function serializeFomoIndex(
     prevDayDelta?: number;
     avg30Delta?: number;
     live: boolean;
+    fallback?: boolean;
   }
 ) {
   const comp = (k: string) => idx.components.find((c) => c.key === k)?.score ?? 0;
@@ -159,6 +235,7 @@ export function serializeFomoIndex(
     prevDayDelta: extra.prevDayDelta ?? 0,
     avg30Delta:   extra.avg30Delta   ?? 0,
     live: extra.live,
+    ...(extra.fallback ? { fallback: true } : {}),
   };
 }
 
