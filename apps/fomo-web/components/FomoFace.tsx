@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { FomoFace as FomoFaceType } from "@fomo/core";
 
 /**
@@ -77,7 +78,8 @@ const OUTLINE = "#6E6E82";
 const BODY = "#F2F2EA";
 const EYE = "#2A2A35";
 
-export function FomoFace({
+// props(face/glow/size)가 바뀌지 않으면 리렌더링 건너뜀 — 부모 상태 업데이트 시 불필요한 SVG 재계산 방지(#410)
+export const FomoFace = memo(function FomoFace({
   face,
   glow,
   size = 168,
@@ -132,4 +134,4 @@ export function FomoFace({
       </svg>
     </div>
   );
-}
+});

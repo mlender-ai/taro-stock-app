@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   EMOTION_TYPES,
   EMOTION_LABELS,
   EMOTION_COLORS,
   scoreToFace,
   scoreToState,
+  scoreToColor,
   marketLine,
   mineLine,
   isCalmDay,
@@ -17,6 +18,7 @@ import { FomoFace } from "@/components/FomoFace";
 import { RollingBanner } from "@/components/RollingBanner";
 import { EmotionCalendar } from "@/components/EmotionCalendar";
 import { SignupGate } from "@/components/SignupGate";
+import { FomoIndexSkeleton, TallySkeleton } from "@/components/SkeletonLoader";
 import { stateGlow } from "@/lib/fomoVisual";
 import type {
   FomoIndexResponse,
@@ -52,8 +54,13 @@ export function HomeView({
 }) {
   const [tab, setTab] = useState<Tab>("home");
 
-  const state = index ? scoreToState(index.score) : null;
-  const marketFace = index ? scoreToFace(index.score) : "curious";
+  // useMemo로 index 기반 파생값 메모이제이션 — index prop이 바뀔 때만 재계산
+  const { state, marketFace, indexColor } = useMemo(() => ({
+    state: index ? scoreToState(index.score) : null,
+    marketFace: index ? scoreToFace(index.score) : "curious" as const,
+    indexColor: index ? scoreToColor(index.score) : null,
+  }), [index]);
+
   const stage: "market" | "mine" = mine ? "mine" : "market";
   const line = mine ? mineLine(mine) : state ? marketLine(state) : "";
 
@@ -73,45 +80,52 @@ export function HomeView({
               <RollingBanner items={banner} />
             </div>
 
-            {/* 주인공: 포모 */}
-            <p className="mb-2 text-xs text-muted">{stage === "market" ? "오늘의 포모" : "나의 포모"}</p>
-            <FomoFace
-              face={stage === "market" ? marketFace : "calm"}
-              glow={
-                stage === "mine" && mine
-                  ? EMOTION_COLORS[mine]
-                  : index
-                    ? stateGlow(index.score)
-                    : undefined
-              }
-              size={84}
-            />
+            {/* 주인공: 포모 — 데이터 미비 시 스켈레톤으로 빈 화면 방지(#409) */}
+            {!index ? (
+              <FomoIndexSkeleton />
+            ) : (
+              <>
+                <p className="mb-2 text-xs text-muted">{stage === "market" ? "오늘의 포모" : "나의 포모"}</p>
+                <FomoFace
+                  face={stage === "market" ? marketFace : "calm"}
+                  glow={
+                    stage === "mine" && mine
+                      ? EMOTION_COLORS[mine]
+                      : stateGlow(index.score)
+                  }
+                  size={84}
+                />
 
-            {/* 보조: FOMO Index (픽셀) */}
-            <div className="mt-3 flex flex-col items-center">
-              {index ? (
-                <>
-                  <p className="font-pixel text-4xl leading-none text-whiteout">{index.score}</p>
+                {/* FOMO Index 수치 — 감정 포인트 색 강조(#412) */}
+                <div className="mt-3 flex flex-col items-center">
+                  <p
+                    className="font-pixel text-5xl font-bold leading-none"
+                    style={{ color: indexColor ?? "#FAFAFA" }}
+                  >
+                    {index.score}
+                  </p>
                   <p className="mt-1.5 font-pixel text-xs text-muted">
                     FOMO INDEX · {index.state}
                     {index.prevDayDelta
                       ? ` · 전일 ${index.prevDayDelta > 0 ? "+" : ""}${index.prevDayDelta}`
                       : ""}
                   </p>
-                </>
-              ) : (
-                <p className="font-pixel text-sm text-muted">FOMO INDEX · 집계 준비 중</p>
-              )}
-            </div>
+                  {/* 3초 안에 읽히는 맥락 문장(#412) */}
+                  <p className="mt-1 text-center text-xs leading-4 text-muted">
+                    오늘의 집단 감정은 <span style={{ color: indexColor ?? "#FAFAFA" }}>{index.state}</span> 상태예요.
+                  </p>
+                </div>
 
-            {/* 포모의 담담한 한마디 */}
-            {line && (
-              <p
-                key={stage + (mine ?? "")}
-                className="fomo-rise mt-3 max-w-xs text-center text-sm leading-5 text-whiteout"
-              >
-                {line}
-              </p>
+                {/* 포모의 담담한 한마디 */}
+                {line && (
+                  <p
+                    key={stage + (mine ?? "")}
+                    className="fomo-rise mt-3 max-w-xs text-center text-sm leading-5 text-whiteout"
+                  >
+                    {line}
+                  </p>
+                )}
+              </>
             )}
 
             {/* 오늘의 너 — 게이트에서 고른 감정 요약 + 다시 고르기 */}
@@ -142,9 +156,11 @@ export function HomeView({
               </div>
             )}
 
-            {/* 집계 — 정직한 숫자 */}
-            {tally && (
-              <section className="mt-7 w-full">
+            {/* 집계 — 정직한 숫자 / 로딩 중 스켈레톤(#409) */}
+            {!tally ? (
+              <TallySkeleton />
+            ) : (
+            <section className="mt-7 w-full">
                 <p className="text-xs text-muted">
                   오늘 <span className="font-pixel text-whiteout">{tally.total}</span>명이 마음을 남겼어요
                   {mine ? " · 너도 그 안에 있어" : ""}
