@@ -238,3 +238,67 @@ describe("communityHeat — Reddit 소스 확장 (1-A)", () => {
     expect(h.meta!.sourcesAvailable).toBe(2);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #413: FOMO Index 스냅샷 생성 및 데이터 정합성 회귀 테스트
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("FOMO Index 스냅샷 정합성 — 폴백 회귀 테스트 (#413)", () => {
+  // 시나리오 1: 모든 데이터 소스 정상 → 스냅샷 정확히 생성
+  it("Given 전체 소스 정상 When computeFomoIndex Then 스냅샷 1건 + 컴포넌트 4개 반환", () => {
+    const idx = computeFomoIndex(
+      {
+        market: { volumeChangePct: 30, turnoverChangePct: 20 },
+        community: { mentionChangePct: 50, bullishRatio: 0.6 },
+        emotion: { fomo: 10, greed: 5, fear: 3 },
+        whale: [{ weight: 3, label: "BTC 신고가" }],
+      },
+      "2026-06-09"
+    );
+    expect(idx.date).toBe("2026-06-09");
+    expect(idx.score).toBeGreaterThan(0);
+    expect(idx.score).toBeLessThanOrEqual(100);
+    expect(idx.components).toHaveLength(4);
+    // 각 컴포넌트 점수가 max를 초과하지 않아야 함
+    for (const c of idx.components) {
+      expect(c.score).toBeGreaterThanOrEqual(0);
+      expect(c.score).toBeLessThanOrEqual(c.max);
+    }
+  });
+
+  // 시나리오 2: 일부 소스 실패(결측) → 폴백 값으로 대체, 오류 노출 없음
+  it("Given 일부 소스 결측 When computeFomoIndex Then 폴백 적용하여 정상 스냅샷 생성", () => {
+    // market/whale 미제공 → 폴백(중립)
+    const idx = computeFomoIndex(
+      { emotion: { fomo: 5, fear: 5 } },
+      "2026-06-09"
+    );
+    expect(idx.score).toBeGreaterThan(0);
+    expect(idx.components).toHaveLength(4);
+    const market = idx.components.find((c) => c.key === "market")!;
+    const whale = idx.components.find((c) => c.key === "whale")!;
+    expect(market.meta!.confidence).toBe("fallback");
+    expect(whale.meta!.confidence).toBe("fallback");
+    // 감정은 실제 데이터 기반이므로 fallback 아님
+    const emotion = idx.components.find((c) => c.key === "emotion")!;
+    expect(emotion.meta!.confidence).not.toBe("fallback");
+  });
+
+  // 시나리오 3: 전체 소스 미제공 → 중립 스냅샷 (15+15+15+0=45)
+  it("Given 전체 소스 미제공 When computeFomoIndex Then 중립 스냅샷(score=45, 관심) 반환", () => {
+    const idx = computeFomoIndex({}, "2026-06-09");
+    expect(idx.score).toBe(45);
+    expect(idx.state).toBe("관심");
+    for (const c of idx.components) {
+      expect(c.meta!.confidence).toBe("fallback");
+    }
+  });
+
+  // buildSummary — 폴백 데이터로도 요약 문장이 생성됨
+  it("폴백 스냅샷에서도 buildSummary가 비어있지 않음", () => {
+    const idx = computeFomoIndex({}, "2026-06-09");
+    const summary = buildSummary(idx, {});
+    expect(summary.length).toBeGreaterThan(0);
+    expect(summary).not.toMatch(/undefined|null|NaN/);
+  });
+});
