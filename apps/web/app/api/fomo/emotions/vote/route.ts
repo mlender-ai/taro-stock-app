@@ -3,6 +3,7 @@ import { EMOTION_TYPES } from "@fomo/core";
 import { prisma } from "../../../../../lib/prisma";
 import { kstDate, todayTally, isEmotionType, corsJson, withCors } from "../../../../../lib/fomo";
 import { extractBearerToken, verifyToken } from "@/lib/tarot/jwt";
+import { verifySessionSig } from "../../../../../lib/sessionHmac";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export function OPTIONS() {
 
 interface VoteBody {
   sessionId?: string;
+  sessionSig?: string;
   emotion?: string;
   source?: string;
   userId?: string;
@@ -29,6 +31,15 @@ export async function POST(req: NextRequest) {
     if (!sessionId) {
       return corsJson({ error: "sessionId 필요", code: "MISSING_SESSION" }, { status: 400 });
     }
+
+    // HMAC 서명 검증 — 서명이 있으면 반드시 올바른 서명이어야 한다.
+    // 서명이 없는 경우 레거시 클라이언트(서명 미지원)로 간주하고 허용.
+    const sessionSig = body.sessionSig?.trim();
+    if (sessionSig && !verifySessionSig(sessionId, sessionSig)) {
+      console.warn("[fomo/emotions/vote] 세션 서명 불일치 — 위변조 의심", { sessionId: sessionId.slice(0, 8) + "…" });
+      return corsJson({ error: "세션 서명이 올바르지 않습니다", code: "INVALID_SESSION_SIG" }, { status: 403 });
+    }
+
     if (!isEmotionType(emotion)) {
       return corsJson(
         { error: `emotion은 ${EMOTION_TYPES.join("|")} 중 하나`, code: "BAD_EMOTION" },
