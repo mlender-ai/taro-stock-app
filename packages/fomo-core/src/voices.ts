@@ -45,6 +45,14 @@ export interface FomoVoice {
 const SITUATION_MAP = new Map(SITUATION_OPTIONS.map((o) => [o.key, o.label]));
 const RESOLVE_MAP = new Map(RESOLVE_OPTIONS.map((o) => [o.key, o.label]));
 
+/** vote API 수신 검증용 — 알려진 키만 저장(스키마 가드레일의 서버측 짝). */
+export function isSituationKey(k: unknown): k is string {
+  return typeof k === "string" && SITUATION_MAP.has(k);
+}
+export function isResolveKey(k: unknown): k is string {
+  return typeof k === "string" && RESOLVE_MAP.has(k);
+}
+
 /**
  * 3-슬롯을 결정적으로 한 줄로 조합한다.
  * 예: "공포 · 오늘도 파란 날이었지만, 허둥대진 않았어."

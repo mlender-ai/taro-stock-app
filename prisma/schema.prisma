@@ -729,16 +729,20 @@ model AdminSessionConfig {
 
 // 익명 감정 투표 — 웹/앱 공통, 1세션 1일 1회
 model EmotionVote {
-  id        String   @id @default(cuid())
-  sessionId String // 익명 세션 (웹: localStorage, 앱: 디바이스 ID)
-  userId    String? // 가입자만 (선택)
-  emotion   String // "fomo"|"fear"|"regret"|"greed"|"conviction"
-  source    String // "web"|"mobile"
-  votedDate String // YYYY-MM-DD (1일 1회 제한용)
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  sessionId    String // 익명 세션 (웹: localStorage, 앱: 디바이스 ID)
+  userId       String? // 가입자만 (선택)
+  emotion      String // "fomo"|"fear"|"regret"|"greed"|"conviction"
+  source       String // "web"|"mobile"
+  votedDate    String // YYYY-MM-DD (1일 1회 제한용)
+  // M4 구조화 한마디 (optional opt-in) — 키는 @fomo/core voices.ts 선택지만 허용
+  situationKey String? // 상황 선택지 키 (없으면 voice 미생성)
+  resolveKey   String? // 의연함 선택지 키
+  createdAt    DateTime @default(now())
 
   @@unique([sessionId, votedDate]) // 1세션 1일 1회
   @@index([votedDate, emotion])
+  @@index([votedDate, situationKey]) // 피드 조회용 (M4)
 }
 
 // 데일리 챌린지 상태 — 수락/완료/적립 포인트 추적 (P2)

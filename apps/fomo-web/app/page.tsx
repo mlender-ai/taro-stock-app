@@ -110,6 +110,21 @@ export default function Home() {
     }
   }, []);
 
+  // M4 구조화 한마디 — 같은 vote에 상황·의연함 키 추가(upsert) 후 피드 갱신.
+  const voiceRef = useRef<EmotionType | null>(null);
+  voiceRef.current = mine;
+  const sendVoice = useCallback(async (situationKey: string, resolveKey: string) => {
+    const emotion = voiceRef.current;
+    if (!emotion) return;
+    try {
+      await postVote(getSessionId(), emotion, { situationKey, resolveKey });
+      const v = await fetchVoices();
+      setVoices(v.items);
+    } catch {
+      /* 한마디 저장 실패해도 여정은 이어진다 — 피드는 다음 진입에 갱신 */
+    }
+  }, []);
+
   const reopenGate = useCallback(() => {
     setGateReopen(true);
     setPhase("gate");
@@ -139,6 +154,7 @@ export default function Home() {
       <EmotionGate
         score={index ? index.score : null}
         onVote={vote}
+        onVoice={sendVoice}
         onDone={finishGate}
         reopen={gateReopen}
       />

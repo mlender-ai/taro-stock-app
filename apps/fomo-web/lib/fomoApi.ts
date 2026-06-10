@@ -55,11 +55,15 @@ export const fetchCalendar = (sessionId: string, month?: string) =>
     `/api/fomo/emotions/calendar?sessionId=${encodeURIComponent(sessionId)}${month ? `&month=${month}` : ""}`
   );
 
-export async function postVote(sessionId: string, emotion: string): Promise<TallyResponse & { mine: string }> {
+export async function postVote(
+  sessionId: string,
+  emotion: string,
+  voice?: { situationKey: string; resolveKey: string }
+): Promise<TallyResponse & { mine: string }> {
   const res = await fetch(`${API_BASE}/api/fomo/emotions/vote`, {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ sessionId, emotion, source: "web" }),
+    body: JSON.stringify({ sessionId, emotion, source: "web", ...voice }),
   });
   if (!res.ok) throw new Error(`vote ${res.status}`);
   return res.json();
