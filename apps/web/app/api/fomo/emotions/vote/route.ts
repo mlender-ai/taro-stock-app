@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { EMOTION_TYPES } from "@fomo/core";
 import { prisma } from "../../../../../lib/prisma";
-import { kstDate, todayTally, isEmotionType, corsJson, withCors } from "../../../../../lib/fomo";
+import { kstDate, todayTally, isEmotionType, corsJson, withCors, awardPoints } from "../../../../../lib/fomo";
 import { extractBearerToken, verifyToken } from "@/lib/tarot/jwt";
 
 export const dynamic = "force-dynamic";
@@ -47,12 +47,15 @@ export async function POST(req: NextRequest) {
       update: { emotion, source, ...(userId ? { userId } : {}) },
     });
 
+    // P2: 1일 1회 감정 투표 포인트 적립(멱등 — 재투표는 추가 적립 없음)
+    const award = await awardPoints({ sessionId, userId, action: "emotion_vote", refDate: date });
+
     const { tally, total } = await todayTally(date);
     const counts = Object.fromEntries(EMOTION_TYPES.map((e) => [e, tally[e] ?? 0]));
     const ratios = Object.fromEntries(
       EMOTION_TYPES.map((e) => [e, total > 0 ? Math.round(((tally[e] ?? 0) / total) * 100) : 0])
     );
-    return corsJson({ ok: true, mine: emotion, date, total, counts, ratios });
+    return corsJson({ ok: true, mine: emotion, date, total, counts, ratios, awarded: award?.amount ?? 0 });
   } catch (err) {
     console.warn("[fomo/emotions/vote] error", err);
     return corsJson({ error: "투표 저장 실패", code: "VOTE_ERROR" }, { status: 500 });

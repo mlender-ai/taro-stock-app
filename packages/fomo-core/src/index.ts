@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./state";
+export * from "./points";
 export * from "./mascot-lines";
 export * from "./calendar";
 export * from "./banner";

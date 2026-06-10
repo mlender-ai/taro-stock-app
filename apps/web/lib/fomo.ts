@@ -9,6 +9,9 @@ import {
   type FomoIndex,
   // @author 안티그래비티 — 1-A: Reddit 커뮤니티 시그널 수집
   fetchRedditSignals,
+  // P2: 게임화 포인트 적립
+  pointsForAction,
+  type PointAction,
 } from "@fomo/core";
 import { prisma } from "./prisma";
 import { createLogger } from "./logger";
@@ -172,4 +175,45 @@ export function withCors(res: NextResponse): NextResponse {
 
 export function corsJson(body: unknown, init?: ResponseInit): NextResponse {
   return withCors(NextResponse.json(body, init));
+}
+
+/**
+ * 포인트 적립 — (sessionId, action, refDate) 단위 멱등.
+ * 이미 적립된 동일 키는 중복 적립하지 않는다(정직한 숫자: 1행동 1적립).
+ * 적립 성공 시 {amount}, 중복/실패 시 null.
+ */
+export async function awardPoints(args: {
+  sessionId: string;
+  userId?: string | null;
+  action: PointAction;
+  refDate: string;
+}): Promise<{ amount: number } | null> {
+  const { sessionId, userId = null, action, refDate } = args;
+  const amount = pointsForAction(action);
+  try {
+    const existing = await prisma.pointTransaction.findUnique({
+      where: { sessionId_action_refDate: { sessionId, action, refDate } },
+    });
+    if (existing) return null; // 이미 적립됨 — 멱등
+    await prisma.pointTransaction.create({
+      data: { sessionId, userId, action, amount, refDate },
+    });
+    return { amount };
+  } catch (err) {
+    log.warn("awardPoints failed", {
+      sessionId,
+      action,
+      refDate,
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+/** 세션의 적립 포인트 트랜잭션 로그 조회(최신순). */
+export async function pointTransactions(sessionId: string) {
+  return prisma.pointTransaction.findMany({
+    where: { sessionId },
+    orderBy: { createdAt: "desc" },
+  });
 }
