@@ -1,4 +1,4 @@
-import type { FomoState, FomoFace } from "./types";
+import type { FomoState, FomoFace, PointReason } from "./types";
 
 /**
  * FOMO Index(0~100) → 5구간 상태 + 마스코트 표정.
@@ -60,6 +60,25 @@ export function scoreToColor(score: number): string {
 /** 구간 3초 설명 문장. */
 export function scoreToDescription(score: number): string {
   return bandFor(score).description;
+}
+
+/**
+ * 포인트 적립 보상표. P2 게임화 데일리 챌린지.
+ * 사유별 적립량을 한 곳에 고정한다 — 보상 밸런싱은 이 표만 수정.
+ */
+export const POINT_REWARDS: Record<PointReason, number> = {
+  emotion_vote: 10, // 오늘의 감정 투표 완료
+  challenge_complete: 30, // 데일리 챌린지 성공
+};
+
+/** 사유에 해당하는 적립 포인트. 알 수 없는 사유는 0. */
+export function pointsForReason(reason: PointReason): number {
+  return POINT_REWARDS[reason] ?? 0;
+}
+
+/** 포인트 적립 사유 타입가드. */
+export function isPointReason(v: unknown): v is PointReason {
+  return v === "emotion_vote" || v === "challenge_complete";
 }
 
 /** 전체 구간 메타데이터 (UI 범례, 설정 화면 등 활용). */

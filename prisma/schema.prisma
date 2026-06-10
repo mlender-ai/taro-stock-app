@@ -741,6 +741,39 @@ model EmotionVote {
   @@index([votedDate, emotion])
 }
 
+// ─────────────────────────────────────────────
+// FOMO Club (P2) — 포인트 적립 (감정 투표 / 챌린지 완료)
+// 익명 세션 기반. 정직한 숫자: 실제 적립값만, 로그로 모든 변동 추적.
+// ─────────────────────────────────────────────
+
+// 세션별 포인트 잔액 계정
+model FomoPointAccount {
+  id        String   @id @default(cuid())
+  sessionId String   @unique // 익명 세션 키 (웹: localStorage, 앱: 디바이스 ID)
+  userId    String? // 가입자만 (선택)
+  balance   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  logs FomoPointLog[]
+}
+
+// 포인트 변동 로그 (트랜잭션 테이블) — 모든 적립을 누락 없이 기록
+model FomoPointLog {
+  id           String   @id @default(cuid())
+  accountId    String
+  account      FomoPointAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sessionId    String
+  reason       String // "emotion_vote"|"challenge_complete"
+  amount       Int // 적립 포인트 (양수)
+  balanceAfter Int // 적립 직후 잔액 (감사 추적용)
+  refDate      String // YYYY-MM-DD (멱등성 기준일)
+  createdAt    DateTime @default(now())
+
+  @@unique([sessionId, reason, refDate]) // 동일 행동 1일 1회만 적립 (중복 방지)
+  @@index([accountId, createdAt])
+}
+
 // 일일 FOMO Index 스냅샷 — 파이프라인이 산출하여 저장
 model FomoIndexSnapshot {
   id            String   @id @default(cuid())

@@ -77,3 +77,35 @@ export const EMOTION_LABELS: Record<EmotionType, string> = {
   greed: "탐욕",
   conviction: "확신",
 };
+
+/**
+ * 포인트 적립 사유. P2 게임화 데일리 챌린지.
+ * - emotion_vote: 오늘의 감정 투표 완료
+ * - challenge_complete: 데일리 챌린지(미션) 성공
+ */
+export type PointReason = "emotion_vote" | "challenge_complete";
+
+export const POINT_REASONS: readonly PointReason[] = [
+  "emotion_vote",
+  "challenge_complete",
+] as const;
+
+/** 세션별 포인트 계정 코어 형태. */
+export interface PointAccount {
+  sessionId: string;
+  userId?: string | null;
+  balance: number;
+}
+
+/** 포인트 변동 로그 1건. */
+export interface PointLogEntry {
+  reason: PointReason;
+  /** 적립 포인트(양수). */
+  amount: number;
+  /** 적립 직후 잔액. */
+  balanceAfter: number;
+  /** YYYY-MM-DD (멱등성 기준일). */
+  date: string;
+  /** ISO 타임스탬프 (서버 기록). */
+  createdAt?: string;
+}
