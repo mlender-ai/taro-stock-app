@@ -12,7 +12,9 @@ import {
   fetchToday,
   fetchBanner,
   fetchCalendar,
+  fetchVoices,
   postVote,
+  type VoiceItem,
   type FomoIndexResponse,
   type TallyResponse,
   type CalendarResponse,
@@ -44,6 +46,7 @@ export default function Home() {
   const [tally, setTally] = useState<TallyResponse | null>(null);
   const [banner, setBanner] = useState<BannerItem[]>([]);
   const [calendar, setCalendar] = useState<CalendarResponse | null>(null);
+  const [voices, setVoices] = useState<VoiceItem[] | null>(null);
   const [mine, setMine] = useState<EmotionType | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
 
@@ -68,10 +71,13 @@ export default function Home() {
       fetchToday(),
       fetchBanner(),
       fetchCalendar(sid),
-    ]).then(([i, t, b, c]) => {
+      fetchVoices(),
+    ]).then(([i, t, b, c, v]) => {
       if (i.status === "fulfilled") setIndex(i.value);
       if (t.status === "fulfilled") setTally(t.value);
       if (b.status === "fulfilled") setBanner(b.value.items);
+      // 실패 시 빈 배열 — 무한 "불러오는 중" 대신 담담한 빈 상태로
+      setVoices(v.status === "fulfilled" ? v.value.items : []);
       let todays: EmotionType | null = null;
       if (c.status === "fulfilled") {
         setCalendar(c.value);
@@ -145,6 +151,7 @@ export default function Home() {
       tally={tally}
       banner={banner}
       calendar={calendar}
+      voices={voices}
       mine={mine}
       onReopenGate={reopenGate}
       loggedIn={loggedIn}

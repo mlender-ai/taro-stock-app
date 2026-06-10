@@ -17,15 +17,17 @@ import { FomoFace } from "@/components/FomoFace";
 import { RollingBanner } from "@/components/RollingBanner";
 import { EmotionCalendar } from "@/components/EmotionCalendar";
 import { SignupGate } from "@/components/SignupGate";
+import { VoiceFeed } from "@/components/VoiceFeed";
 import { stateGlow } from "@/lib/fomoVisual";
 import type {
   FomoIndexResponse,
   TallyResponse,
   CalendarResponse,
   BannerItem,
+  VoiceItem,
 } from "@/lib/fomoApi";
 
-type Tab = "home" | "calendar";
+type Tab = "home" | "feed" | "calendar";
 
 /**
  * 메인 홈 — 하단 탭 바로 메인/캘린더 분기.
@@ -36,6 +38,7 @@ export function HomeView({
   tally,
   banner,
   calendar,
+  voices,
   mine,
   onReopenGate,
   loggedIn,
@@ -45,6 +48,7 @@ export function HomeView({
   tally: TallyResponse | null;
   banner: BannerItem[];
   calendar: CalendarResponse | null;
+  voices: VoiceItem[] | null;
   mine: EmotionType | null;
   onReopenGate: () => void;
   loggedIn: boolean;
@@ -190,6 +194,12 @@ export function HomeView({
           </>
         )}
 
+        {tab === "feed" && (
+          <div className="w-full">
+            <VoiceFeed items={voices} />
+          </div>
+        )}
+
         {tab === "calendar" && (
           <div className="w-full">
             {!loggedIn ? (
@@ -207,6 +217,7 @@ export function HomeView({
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#1E1E1E] bg-black">
         <div className="mx-auto flex max-w-md">
           <TabButton active={tab === "home"} onClick={() => setTab("home")} label="오늘" />
+          <TabButton active={tab === "feed"} onClick={() => setTab("feed")} label="피드" />
           <TabButton active={tab === "calendar"} onClick={() => setTab("calendar")} label="기록" />
         </div>
       </nav>

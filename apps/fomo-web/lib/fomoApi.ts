@@ -65,6 +65,16 @@ export async function postVote(sessionId: string, emotion: string): Promise<Tall
   return res.json();
 }
 
+export interface VoiceItem {
+  emotion: string;
+  text: string;
+  /** true=포모 큐레이션(콜드스타트 폴백) / false=실제 사용자 조합. */
+  curated: boolean;
+}
+
+/** M4 피드 — 타인의 구조화 한마디. */
+export const fetchVoices = () => get<{ date: string; items: VoiceItem[] }>("/api/fomo/voices");
+
 interface LoginResponse {
   token: string;
   user: { id: string; displayName: string | null; isNew: boolean };
