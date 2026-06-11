@@ -1,7 +1,8 @@
 import * as crypto from "crypto";
+import { resolveServerSecret } from "./secret";
 
-const NONCE_SECRET =
-  process.env.REWARD_NONCE_SECRET || "dev-reward-nonce-secret-change-in-prod";
+// P0-1: 하드코딩 폴백 제거 → fail-closed (prod 미설정 시 throw, dev/test 프로세스별 랜덤).
+const nonceSecret = (): string => resolveServerSecret("REWARD_NONCE_SECRET");
 
 export const NONCE_TTL_MS = 10 * 60 * 1000; // 10분
 
@@ -22,7 +23,7 @@ export function signNonce(
   expiresAt: number
 ): string {
   return crypto
-    .createHmac("sha256", NONCE_SECRET)
+    .createHmac("sha256", nonceSecret())
     .update(`${nonce}:${userId}:${expiresAt}`)
     .digest("hex");
 }

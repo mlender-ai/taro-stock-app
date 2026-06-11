@@ -1,7 +1,9 @@
 // 서버 사이드 JWT — 경량 구현 (Node crypto 내장 모듈만 사용)
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
+import { resolveServerSecret } from "./secret";
 
-const SECRET = process.env["TAROT_API_SECRET"] ?? "dev-secret-change-me";
+// P0-1: 하드코딩 폴백 제거 → fail-closed. 호출 시점에 해석(빌드 무중단, prod 미설정 시 throw).
+const secret = (): string => resolveServerSecret("TAROT_API_SECRET");
 export const ACCESS_EXPIRY_MS  = 7  * 24 * 60 * 60 * 1000; // 7일 (기존 30일 → 단축)
 const REFRESH_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000; // 90일 리프레시 토큰
 
@@ -18,7 +20,7 @@ function base64url(input: string): string {
 function sign(payload: JwtPayload): string {
   const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const body = base64url(JSON.stringify(payload));
-  const sig = createHmac("sha256", SECRET).update(`${header}.${body}`).digest("base64url");
+  const sig = createHmac("sha256", secret()).update(`${header}.${body}`).digest("base64url");
   return `${header}.${body}.${sig}`;
 }
 
@@ -27,7 +29,7 @@ function verify(token: string): JwtPayload | null {
   if (parts.length !== 3) return null;
   const [header, body, sig] = parts as [string, string, string];
 
-  const expectedSig = createHmac("sha256", SECRET)
+  const expectedSig = createHmac("sha256", secret())
     .update(`${header}.${body}`)
     .digest("base64url");
 
