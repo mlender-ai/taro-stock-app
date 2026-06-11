@@ -13,7 +13,9 @@ import {
   fetchBanner,
   fetchCalendar,
   fetchVoices,
+  fetchFeed,
   postVote,
+  type FeedResponse,
   type VoiceItem,
   type FomoIndexResponse,
   type TallyResponse,
@@ -47,6 +49,7 @@ export default function Home() {
   const [banner, setBanner] = useState<BannerItem[]>([]);
   const [calendar, setCalendar] = useState<CalendarResponse | null>(null);
   const [voices, setVoices] = useState<VoiceItem[] | null>(null);
+  const [feed, setFeed] = useState<FeedResponse | null>(null);
   const [mine, setMine] = useState<EmotionType | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
 
@@ -72,10 +75,13 @@ export default function Home() {
       fetchBanner(),
       fetchCalendar(sid),
       fetchVoices(),
-    ]).then(([i, t, b, c, v]) => {
+      fetchFeed(),
+    ]).then(([i, t, b, c, v, f]) => {
       if (i.status === "fulfilled") setIndex(i.value);
       if (t.status === "fulfilled") setTally(t.value);
       if (b.status === "fulfilled") setBanner(b.value.items);
+      // 실패 시 null — EmotionFeed가 mock으로 폴백(빈 화면 금지)
+      if (f.status === "fulfilled") setFeed(f.value);
       // 실패 시 빈 배열 — 무한 "불러오는 중" 대신 담담한 빈 상태로
       setVoices(v.status === "fulfilled" ? v.value.items : []);
       let todays: EmotionType | null = null;
@@ -167,6 +173,7 @@ export default function Home() {
       index={index}
       tally={tally}
       banner={banner}
+      feed={feed}
       calendar={calendar}
       voices={voices}
       mine={mine}

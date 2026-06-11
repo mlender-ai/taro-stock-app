@@ -18,8 +18,24 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-export function MoodSignals({ items }: { items: BannerItem[] }) {
-  const signals: MoodSignal[] = useMemo(() => moodifyBanner(items), [items]);
+export function MoodSignals({
+  items,
+  extra = [],
+}: {
+  items: BannerItem[];
+  /** 감정 치환 엔진(Phase 3)이 공급하는 시그널 — 있으면 앞에 흐른다. */
+  extra?: MoodSignal[];
+}) {
+  const signals: MoodSignal[] = useMemo(() => {
+    // 엔진 시그널 우선 + 배너 치환 보충. 같은 문장은 한 번만(소스가 겹칠 수 있다).
+    const merged = [...extra, ...moodifyBanner(items, Math.max(0, 3 - extra.length))];
+    const seenText = new Set<string>();
+    return merged.filter((s) => {
+      if (seenText.has(s.text)) return false;
+      seenText.add(s.text);
+      return true;
+    });
+  }, [items, extra]);
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {

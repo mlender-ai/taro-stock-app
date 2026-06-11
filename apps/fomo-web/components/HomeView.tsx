@@ -34,6 +34,7 @@ import type {
   TallyResponse,
   CalendarResponse,
   BannerItem,
+  FeedResponse,
   VoiceItem,
 } from "@/lib/fomoApi";
 
@@ -56,6 +57,7 @@ export function HomeView({
   index,
   tally,
   banner,
+  feed,
   calendar,
   voices,
   mine,
@@ -66,6 +68,7 @@ export function HomeView({
   index: FomoIndexResponse | null;
   tally: TallyResponse | null;
   banner: BannerItem[];
+  feed: FeedResponse | null;
   calendar: CalendarResponse | null;
   voices: VoiceItem[] | null;
   mine: EmotionType | null;
@@ -163,9 +166,10 @@ export function HomeView({
               </p>
             )}
 
-            {/* 롤링 시그널 — 시장 신호를 분위기로 (액션 제로, docs/PIVOT_FEED_FIRST.md) */}
+            {/* 롤링 시그널 — 시장 신호를 분위기로 (액션 제로, docs/PIVOT_FEED_FIRST.md).
+                치환 엔진(feed.moods)이 있으면 우선, 배너 신호 치환이 보충. */}
             <div className="mt-5 w-full">
-              <MoodSignals items={banner} />
+              <MoodSignals items={banner} extra={feed?.moods ?? []} />
             </div>
 
             {/* 오늘의 너 — 게이트에서 고른 감정 요약 + 다시 고르기 [HIDDEN: FEATURE_EMOTION_VOTE] */}
@@ -252,8 +256,9 @@ export function HomeView({
 
         {tab === "feed" && (
           <div className="w-full">
-            {/* 신규 피드 = 감정 카테고리 (Phase 2). 탭 진입 = 감정 선택, 액션 제로. */}
-            {FEATURE_FEED_EMOTION_TABS && <EmotionFeed />}
+            {/* 신규 피드 = 감정 카테고리 (Phase 2). 탭 진입 = 감정 선택, 액션 제로.
+                Phase 3: 치환 엔진 카드(feed.cards)가 있으면 실데이터, 없으면 mock 폴백. */}
+            {FEATURE_FEED_EMOTION_TABS && <EmotionFeed {...(feed ? { cards: feed.cards } : {})} />}
             {/* 한마디 피드(VoiceFeed)는 감정 기록과 한 몸 — flag로 숨김 [HIDDEN: FEATURE_EMOTION_JOURNAL] */}
             {FEATURE_EMOTION_JOURNAL && <VoiceFeed items={voices} />}
           </div>

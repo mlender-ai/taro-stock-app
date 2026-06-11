@@ -21,7 +21,7 @@ export const MOCK_FEED_CARDS: Record<FeedEmotion, EmotionCard[]> = {
     { id: "mock-fomo-6", emotion: "fomo", headline: "오늘 제일 많이 검색된 단어가 반도체래. 다들 궁금했나 봐.", evidence: sample("검색 분위기"), confidence: 1 },
   ],
   fear: [
-    { id: "mock-fear-1", emotion: "fear", headline: "암호화폐 더 떨어진다는 말 돌던데? 오늘 다들 떨고 있어.", evidence: sample("커뮤니티 분위기"), confidence: 1 },
+    { id: "mock-fear-1", emotion: "fear", headline: "암호화폐 무섭다는 말이 도는 날. 오늘 다들 떨고 있어.", evidence: sample("커뮤니티 분위기"), confidence: 1 },
     { id: "mock-fear-2", emotion: "fear", headline: "내릴 때마다 자꾸 열어보게 되지. 다들 같은 화면 보고 있어.", confidence: 1 },
     { id: "mock-fear-3", emotion: "fear", headline: "손절 얘기가 많아진 밤이야. 혼자 무서운 거 아니야.", evidence: sample("커뮤니티 분위기"), confidence: 1 },
     { id: "mock-fear-4", emotion: "fear", headline: "뉴스가 유난히 무섭게 들리는 날. 잠깐 숨 골라도 늦지 않아.", confidence: 1 },
