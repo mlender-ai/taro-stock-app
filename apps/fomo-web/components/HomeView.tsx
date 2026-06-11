@@ -12,6 +12,8 @@ import {
   isCalmDay,
   restorativeLine,
   calendarStats,
+  personalLine,
+  prevDay,
   type EmotionType,
 } from "@fomo/core";
 import { FomoFace } from "@/components/FomoFace";
@@ -60,11 +62,20 @@ export function HomeView({
   const state = index ? scoreToState(index.score) : null;
   const marketFace = index ? scoreToFace(index.score) : "curious";
   const stage: "market" | "mine" = mine ? "mine" : "market";
-  const line = mine ? mineLine(mine) : state ? marketLine(state) : "";
   // 연속 기록 — 캘린더와 같은 계산(calendarStats)·같은 문구로 홈에도 살짝 (전략: 리텐션 = BM의 전제)
   const streak = calendar
     ? calendarStats(calendar.month, calendar.days as Record<string, EmotionType>, calendar.today).streak
     : 0;
+  // 포모의 기억 — 어제의 감정·연속 기록을 기억하는 멘트가 있으면 우선, 없으면 기존 한마디 폴백
+  const memory =
+    mine && calendar
+      ? personalLine({
+          yesterdayEmotion: (calendar.days[prevDay(calendar.today)] ?? null) as EmotionType | null,
+          todayEmotion: mine,
+          streak,
+        })
+      : null;
+  const line = mine ? (memory ?? mineLine(mine)) : state ? marketLine(state) : "";
 
   return (
     <>
