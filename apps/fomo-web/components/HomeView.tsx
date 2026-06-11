@@ -23,7 +23,7 @@ import {
 } from "@fomo/core";
 import { FomoFace } from "@/components/FomoFace";
 import { MoodSignals } from "@/components/MoodSignals";
-import { EmotionFeed } from "@/components/EmotionFeed";
+import { NewsFeed } from "@/components/NewsFeed";
 import { EmotionCalendar } from "@/components/EmotionCalendar";
 import { SignupGate } from "@/components/SignupGate";
 import { VoiceFeed } from "@/components/VoiceFeed";
@@ -35,6 +35,7 @@ import type {
   CalendarResponse,
   BannerItem,
   FeedResponse,
+  NewsResponse,
   VoiceItem,
 } from "@/lib/fomoApi";
 
@@ -58,6 +59,7 @@ export function HomeView({
   tally,
   banner,
   feed,
+  news,
   calendar,
   voices,
   mine,
@@ -69,6 +71,7 @@ export function HomeView({
   tally: TallyResponse | null;
   banner: BannerItem[];
   feed: FeedResponse | null;
+  news: NewsResponse | null;
   calendar: CalendarResponse | null;
   voices: VoiceItem[] | null;
   mine: EmotionType | null;
@@ -256,9 +259,8 @@ export function HomeView({
 
         {tab === "feed" && (
           <div className="w-full">
-            {/* 신규 피드 = 감정 카테고리 (Phase 2). 탭 진입 = 감정 선택, 액션 제로.
-                Phase 3: 치환 엔진 카드(feed.cards)가 있으면 실데이터, 없으면 mock 폴백. */}
-            {FEATURE_FEED_EMOTION_TABS && <EmotionFeed {...(feed ? { cards: feed.cards } : {})} />}
+            {/* 피드 = 실제 뉴스, FOMO 점수순 단일 피드 (사실 적시, docs/PIVOT_FEED_FIRST.md). */}
+            {FEATURE_FEED_EMOTION_TABS && <NewsFeed articles={news ? news.articles : null} />}
             {/* 한마디 피드(VoiceFeed)는 감정 기록과 한 몸 — flag로 숨김 [HIDDEN: FEATURE_EMOTION_JOURNAL] */}
             {FEATURE_EMOTION_JOURNAL && <VoiceFeed items={voices} />}
           </div>

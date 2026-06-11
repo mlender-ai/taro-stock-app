@@ -14,8 +14,10 @@ import {
   fetchCalendar,
   fetchVoices,
   fetchFeed,
+  fetchNews,
   postVote,
   type FeedResponse,
+  type NewsResponse,
   type VoiceItem,
   type FomoIndexResponse,
   type TallyResponse,
@@ -50,12 +52,21 @@ export default function Home() {
   const [calendar, setCalendar] = useState<CalendarResponse | null>(null);
   const [voices, setVoices] = useState<VoiceItem[] | null>(null);
   const [feed, setFeed] = useState<FeedResponse | null>(null);
+  const [news, setNews] = useState<NewsResponse | null>(null);
   const [mine, setMine] = useState<EmotionType | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
 
   // 로그인 상태는 클라에서만 확정(SSR 불일치 방지).
   useEffect(() => {
     setLoggedIn(isLoggedIn());
+  }, []);
+
+  // 뉴스 피드는 외부 RSS 다중 수집이라 느릴 수 있다 — 스플래시를 막지 않고 별도로 로드.
+  // 실패 시 빈 배열 → 피드 탭에 담담한 빈 상태(무한 로딩 금지).
+  useEffect(() => {
+    fetchNews()
+      .then(setNews)
+      .catch(() => setNews({ articles: [], lang: "en" }));
   }, []);
 
   // 스플래시 동안 데이터 프리페치 + 최소 표시시간 보장 후 분기
@@ -174,6 +185,7 @@ export default function Home() {
       tally={tally}
       banner={banner}
       feed={feed}
+      news={news}
       calendar={calendar}
       voices={voices}
       mine={mine}

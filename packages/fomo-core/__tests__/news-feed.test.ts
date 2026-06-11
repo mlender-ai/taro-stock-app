@@ -1,0 +1,126 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildNewsFeed,
+  localizeArticle,
+  parseYahooRss,
+  scoreArticleFomo,
+  type RawArticle,
+} from "../src";
+
+const NOW = Date.parse("2026-06-12T12:00:00Z");
+
+function article(p: Partial<RawArticle>): RawArticle {
+  return {
+    id: p.id ?? "a",
+    title: p.title ?? "Market update",
+    url: p.url ?? "https://x.com/a",
+    source: p.source ?? "Yahoo Finance",
+    publishedAt: p.publishedAt ?? "2026-06-12T11:00:00Z",
+    lang: p.lang ?? "en",
+    ...p,
+  };
+}
+
+describe("scoreArticleFomo", () => {
+  it("신고가/급등 헤드라인은 높은 점수", () => {
+    const hot = scoreArticleFomo(
+      article({ title: "Nvidia soars to record all-time high as AI rally continues" }),
+      NOW
+    );
+    expect(hot.score).toBeGreaterThanOrEqual(80);
+  });
+
+  it("급락/소송 헤드라인은 낮은 점수 (FOMO와 반대)", () => {
+    const cold = scoreArticleFomo(
+      article({ title: "Stock plunges after lawsuit and analyst downgrade" }),
+      NOW
+    );
+    expect(cold.score).toBeLessThan(40);
+  });
+
+  it("한국어 키워드도 동일하게 점수화 (확장성)", () => {
+    const ko = scoreArticleFomo(
+      article({ title: "삼성전자 신고가 급등, 사상 최고", lang: "ko" }),
+      NOW
+    );
+    expect(ko.score).toBeGreaterThanOrEqual(80);
+  });
+
+  it("최신 기사가 같은 내용이면 더 높다", () => {
+    const fresh = scoreArticleFomo(article({ title: "Tech gains", publishedAt: "2026-06-12T11:30:00Z" }), NOW);
+    const stale = scoreArticleFomo(article({ title: "Tech gains", publishedAt: "2026-06-01T00:00:00Z" }), NOW);
+    expect(fresh.score).toBeGreaterThan(stale.score);
+  });
+
+  it("0~100 범위", () => {
+    const s = scoreArticleFomo(article({ title: "record surge rally soar boom jump spike" }), NOW);
+    expect(s.score).toBeLessThanOrEqual(100);
+    expect(s.score).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("buildNewsFeed", () => {
+  const arts = [
+    article({ id: "1", title: "Boring filing", url: "https://x.com/boring", publishedAt: "2026-06-12T11:00:00Z" }),
+    article({ id: "2", title: "Nvidia hits record high, stock soars", url: "https://x.com/nvda", publishedAt: "2026-06-12T11:50:00Z" }),
+    article({ id: "3", title: "Market plunges on crash fears", url: "https://x.com/crash", publishedAt: "2026-06-12T11:00:00Z" }),
+  ];
+
+  it("FOMO 점수 높은 순 정렬", () => {
+    const feed = buildNewsFeed(arts, { nowMs: NOW });
+    expect(feed[0]!.id).toBe("2"); // 신고가 급등이 맨 위
+    expect(feed[0]!.fomoScore).toBeGreaterThan(feed[feed.length - 1]!.fomoScore);
+  });
+
+  it("url 정규화 기준 dedupe (쿼리/해시 무시)", () => {
+    const dup = [
+      article({ id: "a", url: "https://x.com/p?utm=1", title: "Big news" }),
+      article({ id: "b", url: "https://x.com/p#top", title: "Big news" }),
+    ];
+    expect(buildNewsFeed(dup, { nowMs: NOW })).toHaveLength(1);
+  });
+
+  it("제목/url 결측 카드는 제외 (깨진 카드 금지)", () => {
+    const broken = [article({ id: "ok", title: "Fine" }), article({ id: "bad", title: "  ", url: "https://x.com/bad" })];
+    const feed = buildNewsFeed(broken, { nowMs: NOW });
+    expect(feed.every((a) => a.title.trim())).toBe(true);
+  });
+
+  it("limit 적용", () => {
+    expect(buildNewsFeed(arts, { nowMs: NOW, limit: 1 })).toHaveLength(1);
+  });
+});
+
+describe("localizeArticle", () => {
+  it("한국어 번역 있으면 ko 표기, 없으면 원문", () => {
+    const a = article({ title: "Nvidia soars", titleKo: "엔비디아 급등" });
+    expect(localizeArticle(a, "ko").title).toBe("엔비디아 급등");
+    expect(localizeArticle(a, "en").title).toBe("Nvidia soars");
+    expect(localizeArticle(article({ title: "No KO" }), "ko").title).toBe("No KO");
+  });
+});
+
+describe("parseYahooRss", () => {
+  const xml = `<rss><channel>
+    <item><title><![CDATA[Nvidia hits record high]]></title><link>https://finance.yahoo.com/news/nvda-1.html</link>
+      <description><![CDATA[Shares <b>soared</b> 5%.]]></description><pubDate>Thu, 12 Jun 2026 11:00:00 GMT</pubDate>
+      <source url="https://reuters.com">Reuters</source></item>
+    <item><title>Broken</title><link></link></item>
+  </channel></rss>`;
+
+  it("필수 필드 있는 항목만, 정규화해서 반환", () => {
+    const items = parseYahooRss(xml, { symbol: "NVDA", nowIso: "2026-06-12T12:00:00Z" });
+    expect(items).toHaveLength(1);
+    expect(items[0]!.title).toBe("Nvidia hits record high");
+    expect(items[0]!.symbol).toBe("NVDA");
+    expect(items[0]!.source).toBe("Reuters");
+    expect(items[0]!.lang).toBe("en");
+    expect(items[0]!.publishedAt).toBe("2026-06-12T11:00:00.000Z");
+  });
+
+  it("점수 파이프라인과 연결되면 신고가 기사가 상위", () => {
+    const items = parseYahooRss(xml, { nowIso: "2026-06-12T12:00:00Z" });
+    const feed = buildNewsFeed(items, { nowMs: NOW });
+    expect(feed[0]!.fomoScore).toBeGreaterThanOrEqual(70);
+  });
+});

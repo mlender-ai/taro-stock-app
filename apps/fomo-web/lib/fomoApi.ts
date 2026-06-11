@@ -1,6 +1,6 @@
 // FOMO API 클라이언트. API는 apps/web(@trading/web)의 /api/fomo/*에 있다.
 // NEXT_PUBLIC_FOMO_API_BASE로 오버라이드(로컬: http://127.0.0.1:3200), 기본은 배포된 prod.
-import type { BannerItem, FeedCards, MoodSignal } from "@fomo/core";
+import type { BannerItem, FeedCards, MoodSignal, ScoredArticle } from "@fomo/core";
 import { getToken, setToken } from "@/lib/auth";
 
 export type { BannerItem } from "@fomo/core";
@@ -56,6 +56,14 @@ export interface FeedResponse {
   moods: MoodSignal[];
 }
 export const fetchFeed = () => get<FeedResponse>("/api/fomo/feed");
+
+/** 뉴스 피드 — 실제 기사를 FOMO 점수순으로(피드 탭). */
+export type { ScoredArticle } from "@fomo/core";
+export interface NewsResponse {
+  articles: ScoredArticle[];
+  lang: "en" | "ko";
+}
+export const fetchNews = () => get<NewsResponse>("/api/fomo/news");
 
 export const fetchCalendar = (sessionId: string, month?: string) =>
   get<CalendarResponse>(
