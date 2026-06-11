@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 
 /**
  * 서버 시크릿 fail-closed 리졸버 (P0-1).
@@ -28,6 +28,13 @@ export function resolveServerSecret(envKey: string, ...fallbackKeys: string[]): 
   }
 
   if (process.env.NODE_ENV === "production") {
+    // 최종 폴백: prod에 항상 존재하는 고엔트로피 시크릿(DATABASE_URL)에서 결정적 파생.
+    // 공개 고정 문자열 없이 prod 무중단을 보장하고, envKey를 섞어 시크릿별로 다른 키를 만든다.
+    // (전용 env를 설정하면 위에서 항상 우선. DATABASE_URL 회전 시 토큰만 무효화 — 허용.)
+    const dbUrl = process.env.DATABASE_URL;
+    if (dbUrl && dbUrl.length >= MIN_LENGTH) {
+      return createHash("sha256").update(`fomo-secret:${envKey}:${dbUrl}`).digest("hex");
+    }
     throw new Error(
       `[security] ${envKey} must be set to a ${MIN_LENGTH}+ character secret in production (fail-closed).`
     );
