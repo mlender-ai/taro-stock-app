@@ -62,3 +62,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; }
 }
+
+/* 가로 스크롤 세그먼트(감정 탭)의 스크롤바 숨김 */
+.scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }

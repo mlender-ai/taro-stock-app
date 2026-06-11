@@ -23,6 +23,7 @@ import {
 } from "@fomo/core";
 import { FomoFace } from "@/components/FomoFace";
 import { MoodSignals } from "@/components/MoodSignals";
+import { EmotionFeed } from "@/components/EmotionFeed";
 import { EmotionCalendar } from "@/components/EmotionCalendar";
 import { SignupGate } from "@/components/SignupGate";
 import { VoiceFeed } from "@/components/VoiceFeed";
@@ -251,6 +252,8 @@ export function HomeView({
 
         {tab === "feed" && (
           <div className="w-full">
+            {/* 신규 피드 = 감정 카테고리 (Phase 2). 탭 진입 = 감정 선택, 액션 제로. */}
+            {FEATURE_FEED_EMOTION_TABS && <EmotionFeed />}
             {/* 한마디 피드(VoiceFeed)는 감정 기록과 한 몸 — flag로 숨김 [HIDDEN: FEATURE_EMOTION_JOURNAL] */}
             {FEATURE_EMOTION_JOURNAL && <VoiceFeed items={voices} />}
           </div>

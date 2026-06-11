@@ -6,6 +6,7 @@ export * from "./calendar";
 export * from "./insights";
 export * from "./banner";
 export * from "./mood-signals";
+export * from "./emotion-translation";
 export * from "./voices";
 export * from "./index-engine/types";
 export * from "./index-engine/marketHeat";
