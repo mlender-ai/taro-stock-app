@@ -36,6 +36,61 @@ function slugId(url: string): string {
   return `news-${url.replace(/^https?:\/\//, "").replace(/[^a-z0-9]+/gi, "-").slice(0, 60)}`;
 }
 
+/**
+ * 범용 RSS 2.0 파서 — 한국 금융 뉴스(한경/매경/연합 등) 정규화용.
+ * 표준 <item>(title/link/description/pubDate)만 본다. category 영문 추론 없음(한국어 소스).
+ * source(출처명)·lang 은 호출부가 지정. 같은 RawArticle 로 정규화되어 점수기·피드를 공유.
+ */
+export function parseRssFeed(
+  xml: string,
+  opts: { source: string; lang: NewsLang; nowIso: string }
+): RawArticle[] {
+  const { source, lang, nowIso } = opts;
+  const items: RawArticle[] = [];
+  const seen = new Set<string>();
+  const itemRegex = /<item[\s>]([\s\S]*?)<\/item>/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = itemRegex.exec(xml)) !== null) {
+    const block = match[1]!;
+    const title =
+      block.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/)?.[1] ??
+      block.match(/<title>([\s\S]*?)<\/title>/)?.[1] ??
+      "";
+    // link: <link>url</link> 또는 일부 피드의 <link ...>url</link>
+    const link =
+      block.match(/<link><!\[CDATA\[([\s\S]*?)\]\]><\/link>/)?.[1] ??
+      block.match(/<link[^>]*>([\s\S]*?)<\/link>/)?.[1] ??
+      "";
+    const description =
+      block.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/)?.[1] ??
+      block.match(/<description>([\s\S]*?)<\/description>/)?.[1] ??
+      "";
+    const pubDate =
+      block.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] ??
+      block.match(/<dc:date>([\s\S]*?)<\/dc:date>/)?.[1] ??
+      "";
+
+    const cleanTitle = title.replace(/<[^>]*>/g, "").trim();
+    const cleanLink = link.trim();
+    if (!cleanTitle || !cleanLink) continue;
+    if (seen.has(cleanLink)) continue;
+    seen.add(cleanLink);
+
+    const cleanDesc = description.replace(/<[^>]*>/g, "").trim().slice(0, 200);
+    items.push({
+      id: slugId(cleanLink),
+      title: cleanTitle,
+      url: cleanLink,
+      source,
+      publishedAt: toIso(pubDate) || nowIso,
+      lang,
+      ...(cleanDesc ? { summary: cleanDesc } : {}),
+    });
+  }
+  return items;
+}
+
 export function parseYahooRss(
   xml: string,
   opts: { symbol?: string; nowIso: string; lang?: NewsLang } = { nowIso: "" }

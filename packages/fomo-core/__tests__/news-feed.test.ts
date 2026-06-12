@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildNewsFeed,
   localizeArticle,
+  parseRssFeed,
   parseYahooRss,
   scoreArticleFomo,
   type RawArticle,
@@ -88,6 +89,32 @@ describe("buildNewsFeed", () => {
 
   it("limit 적용", () => {
     expect(buildNewsFeed(arts, { nowMs: NOW, limit: 1 })).toHaveLength(1);
+  });
+});
+
+describe("parseRssFeed (한국 뉴스)", () => {
+  const xml = `<rss version="2.0"><channel>
+    <item><title><![CDATA[삼성전자·SK하이닉스 신고가 급등]]></title>
+      <link>https://www.hankyung.com/article/202606122768i</link>
+      <description><![CDATA[<p>반도체 강세</p>]]></description>
+      <pubDate>Fri, 12 Jun 2026 11:19:42 +0900</pubDate></item>
+    <item><title>제목만 있고 링크 없음</title><link></link></item>
+  </channel></rss>`;
+
+  it("한국어 기사 정규화 (source/lang 지정, 필수 결측 제외)", () => {
+    const items = parseRssFeed(xml, { source: "한국경제", lang: "ko", nowIso: "2026-06-12T12:00:00Z" });
+    expect(items).toHaveLength(1);
+    expect(items[0]!.title).toBe("삼성전자·SK하이닉스 신고가 급등");
+    expect(items[0]!.source).toBe("한국경제");
+    expect(items[0]!.lang).toBe("ko");
+    expect(items[0]!.summary).toBe("반도체 강세");
+    expect(items[0]!.publishedAt).toBe("2026-06-12T02:19:42.000Z");
+  });
+
+  it("한국어 헤드라인이 FOMO 점수 파이프라인에서 상위 (한국어 키워드)", () => {
+    const items = parseRssFeed(xml, { source: "한국경제", lang: "ko", nowIso: "2026-06-12T12:00:00Z" });
+    const feed = buildNewsFeed(items, { nowMs: Date.parse("2026-06-12T12:00:00Z") });
+    expect(feed[0]!.fomoScore).toBeGreaterThanOrEqual(70); // 신고가 급등
   });
 });
 

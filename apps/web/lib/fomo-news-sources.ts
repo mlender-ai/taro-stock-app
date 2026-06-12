@@ -1,15 +1,19 @@
-import { parseYahooRss, type NewsSource, type RawArticle } from "@fomo/core";
+import { parseRssFeed, parseYahooRss, type NewsSource, type RawArticle } from "@fomo/core";
 
 /**
  * FOMO 뉴스 소스 — 실제 기사 수집. docs/PIVOT_FEED_FIRST.md.
  *
- * 지금은 Yahoo Finance RSS(영문) 1개. 한국어 소스(네이버 금융/연합 RSS 등)는
- * NewsSource 인터페이스를 구현해 SOURCES 배열에 추가하면 같은 파이프라인에 합류한다.
+ * Yahoo Finance RSS(영문) + 한국 금융 뉴스 RSS(한국경제·매일경제). 한국어 기사는 그대로 한국어로
+ * 노출(번역 불요), 영문과 한 피드에 섞여 FOMO 점수순 정렬된다(점수기는 영/한 키워드 둘 다 봄).
+ * NewsSource 인터페이스로 소스를 추가하면 같은 파이프라인(점수/정렬/dedupe)에 합류.
  * 파싱/점수/정렬은 @fomo/core/news-feed 순수부가 담당(테스트 보장).
  */
 
 const YAHOO_RSS = "https://feeds.finance.yahoo.com/rss/2.0/headline";
 const UA = "Mozilla/5.0 (compatible; FomoClubBot/1.0)";
+// 한국 뉴스 RSS는 봇 UA를 막는 경우가 있어 일반 브라우저 UA 사용.
+const BROWSER_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 // FOMO를 부르는 고관심 종목 — 국내 리테일이 자주 좇는 미국 대형 테크/코인 프록시.
 // (한국어 소스 추가 전까지 영문 기사 유니버스. 종목은 운영 중 조정 가능.)
@@ -51,11 +55,45 @@ export const yahooSource: NewsSource = {
   },
 };
 
+// ───────────────────────── 한국 금융 뉴스 RSS ─────────────────────────
+// 증권/금융 초점 피드(Node fetch 200 확인). 표준 RSS 2.0 → parseRssFeed.
+const KR_FEEDS: { id: string; url: string; source: string }[] = [
+  { id: "hankyung", url: "https://www.hankyung.com/feed/finance", source: "한국경제" },
+  { id: "mk", url: "https://www.mk.co.kr/rss/50200011/", source: "매일경제" },
+];
+
+/** 한국 RSS 피드 1개 → 한국어 RawArticle[]. 실패 시 빈 배열. */
+function makeKoreanRssSource({ id, url, source }: (typeof KR_FEEDS)[number]): NewsSource {
+  return {
+    id,
+    lang: "ko",
+    enabled: true,
+    async fetch() {
+      try {
+        const res = await fetch(url, {
+          headers: { accept: "application/rss+xml, application/xml, text/xml", "user-agent": BROWSER_UA },
+          signal: AbortSignal.timeout(8_000),
+          next: { revalidate: 600 },
+        });
+        if (!res.ok) return [];
+        const xml = await res.text();
+        return parseRssFeed(xml, { source, lang: "ko", nowIso: new Date().toISOString() });
+      } catch (err) {
+        console.warn(`[fomo/news] ${id} error`, err);
+        return [];
+      }
+    },
+  };
+}
+
 /**
- * 등록된 뉴스 소스 — 확장 지점.
- * 한국어 소스 추가 예) { id: "naver-finance", lang: "ko", enabled: true, fetch: ... }
+ * 등록된 뉴스 소스 — 확장 지점. 영문(Yahoo) + 한국어(한경/매경).
+ * 소스 추가 시 이 배열에 NewsSource 구현을 넣으면 같은 파이프라인에 합류.
  */
-export const NEWS_SOURCES: readonly NewsSource[] = [yahooSource];
+export const NEWS_SOURCES: readonly NewsSource[] = [
+  yahooSource,
+  ...KR_FEEDS.map(makeKoreanRssSource),
+];
 
 /** 모든 enabled 소스를 병렬 수집해 정규화 기사 배열로 합산. */
 export async function fetchAllNews(): Promise<RawArticle[]> {
