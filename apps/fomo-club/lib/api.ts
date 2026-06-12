@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import type { BannerItem, MarketScore, MoodSignal, DeckCard } from "@fomo/core";
 
 // FOMO API 베이스. app.json extra.apiBaseUrl → EXPO_PUBLIC_FOMO_API_URL → 배포 prod.
 const configured = (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined)?.trim();
@@ -43,6 +44,29 @@ async function get<T>(path: string): Promise<T> {
 
 export const fetchIndex = () => get<FomoIndexResponse>("/api/fomo/index");
 export const fetchToday = () => get<TallyResponse>("/api/fomo/emotions/today");
+
+// ── 피벗(피드 중심) — 웹과 동일 데이터. docs/PIVOT_FEED_FIRST.md ──
+
+/** 롤링 배너 + 상단 캐러셀용 시장 점수(나스닥/비트코인/코스피). */
+export interface BannerResponse {
+  items: BannerItem[];
+  markets?: MarketScore[];
+}
+export const fetchBanner = () => get<BannerResponse>("/api/fomo/banner");
+
+/** 오늘 탭 분위기 시그널 + (미사용)감정 카드. */
+export interface FeedResponse {
+  moods: MoodSignal[];
+  cards?: unknown;
+}
+export const fetchFeed = () => get<FeedResponse>("/api/fomo/feed");
+
+/** 피드 탭 스와이프 덱(뉴스+차트, 포모 코멘트 포함). */
+export interface NewsResponse {
+  deck: DeckCard[];
+  lang: "en" | "ko";
+}
+export const fetchNews = () => get<NewsResponse>("/api/fomo/news");
 
 export async function postVote(emotion: string): Promise<TallyResponse & { mine: string }> {
   const res = await fetch(`${API_BASE}/api/fomo/emotions/vote`, {
