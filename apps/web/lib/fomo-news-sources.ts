@@ -48,11 +48,15 @@ async function fetchYahooSymbol(symbol: string, nowIso: string): Promise<RawArti
   }
 }
 
-/** Yahoo Finance 소스 — 심볼 유니버스를 병렬 수집해 합산. */
+/**
+ * Yahoo Finance 뉴스 소스 — 심볼 유니버스를 병렬 수집해 합산.
+ * [비활성] 피드는 한국 뉴스 우선 구성으로 전환(2026-06-12). Yahoo는 차트/지수(fomo-market-sources)
+ * 용도로만 남긴다. 영문 뉴스가 다시 필요하면 NEWS_SOURCES 에 yahooSource 를 추가.
+ */
 export const yahooSource: NewsSource = {
   id: "yahoo",
   lang: "en",
-  enabled: true,
+  enabled: false,
   async fetch() {
     const nowIso = new Date().toISOString();
     const settled = await Promise.allSettled(SYMBOLS.map((s) => fetchYahooSymbol(s, nowIso)));
@@ -123,6 +127,7 @@ function makeKoreanRssSource({ id, url, source }: (typeof KR_FEEDS)[number]): Ne
  * 등록된 뉴스 소스 — 확장 지점. 영문(Yahoo) + 한국어(한경/매경/연합/네이버).
  * 소스 추가 시 이 배열에 NewsSource 구현을 넣으면 같은 파이프라인에 합류.
  */
+// 한국 뉴스 우선 구성 — Yahoo(영문)는 차트 전용이라 피드에서 제외(yahooSource.enabled=false).
 export const NEWS_SOURCES: readonly NewsSource[] = [
   yahooSource,
   naverNewsSource,
