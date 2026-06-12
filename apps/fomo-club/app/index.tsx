@@ -132,17 +132,21 @@ export default function Home() {
           glow={stage === "mine" && mine ? EMOTION_COLORS[mine] : marketGlow}
         />
 
-        {/* 보조: FOMO Index 숫자 */}
+        {/* 보조: FOMO Index 숫자 (#412 — 가시성 + 정보 위계 개선) */}
         <View style={styles.indexRow}>
           {loading ? (
             <ActivityIndicator color={FomoColors.muted} />
           ) : index ? (
             <>
-              {/* 이슈 #412: 상태별 포인트 색으로 숫자 자체가 감정 온도를 나타낸다. */}
-              <Text style={[styles.indexText, { color: indexColor }]}>{index.score}</Text>
-              <Text style={styles.muted}>FOMO INDEX · {index.state}</Text>
-              {/* 3초 직관 요약 — 숫자가 무슨 온도인지 한 줄로. */}
+              {/* 상태별 포인트 색 + 더 큰 폰트로 3초 안에 온도 전달 (#412). */}
+              <Text style={[styles.indexScore, { color: indexColor }]}>{index.score}</Text>
+              <Text style={styles.indexLabel}>FOMO INDEX · {index.state}</Text>
+              {/* 1줄 온도 요약 — 숫자가 무슨 의미인지 직관적으로. */}
               <Text style={styles.indexSummary}>{marketSummary(scoreToState(index.score))}</Text>
+              {/* aiSummary: 상위 Heat + 감정 맥락 — 있을 때만 표시. */}
+              {!!index.aiSummary && (
+                <Text style={styles.indexContext}>{index.aiSummary}</Text>
+              )}
             </>
           ) : (
             <Text style={styles.muted}>FOMO INDEX · 집계 준비 중</Text>
@@ -233,9 +237,14 @@ const styles = StyleSheet.create({
   link: { color: FomoColors.muted, fontSize: 14 },
   stageLabel: { color: FomoColors.muted, fontSize: 12, marginBottom: Spacing.s12 },
   indexRow: { alignItems: "center", marginTop: Spacing.s24, minHeight: 28 },
-  indexText: { color: FomoColors.whiteout, fontSize: 24, fontWeight: "600" },
+  // #412: 32pt + Bold — 숫자 자체가 감정 온도를 드러내도록 크기·굵기 강화.
+  indexScore: { color: FomoColors.whiteout, fontSize: 32, fontWeight: "700", letterSpacing: 1 },
+  indexLabel: { color: FomoColors.muted, fontSize: 12, marginTop: 6 },
   muted: { color: FomoColors.muted, fontSize: 12, marginTop: 4 },
-  indexSummary: { color: FomoColors.whiteout, fontSize: 13, marginTop: Spacing.s4, opacity: 0.85 },
+  // #412: 온도 요약 — 14pt, 선명하게.
+  indexSummary: { color: FomoColors.whiteout, fontSize: 14, marginTop: Spacing.s4, lineHeight: 20 },
+  // #412: aiSummary 맥락 설명 — 16pt, 약간 흐리게(보조 텍스트).
+  indexContext: { color: FomoColors.whiteout, fontSize: 13, marginTop: Spacing.s8, textAlign: "center", opacity: 0.7, maxWidth: 280, lineHeight: 18 },
   summary: { color: FomoColors.whiteout, fontSize: 14, textAlign: "center", marginTop: Spacing.s8, maxWidth: 300 },
   mention: { color: FomoColors.whiteout, textAlign: "center", fontSize: 14, marginTop: Spacing.s16, lineHeight: 20 },
   voteBlock: { width: "100%", marginTop: Spacing.s40 },

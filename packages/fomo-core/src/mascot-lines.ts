@@ -1,5 +1,6 @@
-import type { EmotionType, FomoState } from "./types";
+import type { EmotionType, FomoState, FomoIndex } from "./types";
 import { EMOTION_LABELS } from "./types";
+import type { EmotionTally } from "./index-engine/types";
 
 /**
  * 포모의 담담한 한마디. docs/IDENTITY_AND_MILESTONES.md §2.1 "담담한 솔직함".
@@ -95,6 +96,53 @@ export interface PersonalContext {
   todayEmotion?: EmotionType | null;
   /** 오늘 포함 현재 연속 기록 일수 */
   streak?: number;
+}
+
+// ── Heat 한글 레이블 ─────────────────────────────────────────────────────────
+const HEAT_LABELS: Record<string, string> = {
+  market: "시장",
+  community: "커뮤니티",
+  emotion: "감정",
+  whale: "고래",
+};
+
+// #428 — "상위 2개 Heat 온도 + 왜 이런 감정인지" 담백하게 전달하는 멘트 구조.
+// marketLine(state)보다 구체적이지만 투자 조언·단정은 여전히 금지.
+const CONTEXT_LINE: Record<FomoState, (top: string[]) => string> = {
+  무관심: (top) => `${top.join(", ")} 모두 조용해. 이런 날도 있어.`,
+  관망: (top) => `${top.join(", ")} 쪽에서 움직임이 조금 있지만, 아직은 지켜보는 분위기야.`,
+  관심: (top) => `${top[0] ? `${top[0]} 쪽` : "어딘가"}에서 관심이 모이고 있어. 너도 느껴지지.`,
+  FOMO: (top) => `${top.join(", ")} 모두 달아올랐어. 놓치기 싫은 마음, 너만 그런 거 아니야.`,
+  광기: (top) => `${top[0] ? `${top[0]} 쪽이` : ""} 특히 뜨거워. 감정이 앞서 달리는 날이야. 잠깐 숨 고르자.`,
+};
+
+/**
+ * FOMO Index 전체 데이터 기반 enriched 마스코트 멘트 (#428).
+ * marketLine(state)보다 구체적: 상위 2개 Heat 명칭을 언급해 "왜 지금 이런 분위기인지" 담는다.
+ * 투자 조언·단정·단독 종목 언급 금지. regulation-reviewer + lovable-reviewer 검사 대상.
+ */
+export function buildMarketLine(index: FomoIndex, tally: EmotionTally = {}): string {
+  // 상위 2개 Heat (비율 기준) — 맥락 없는 숫자 나열 대신 이름만.
+  const top = [...index.components]
+    .filter((c) => c.max > 0)
+    .map((c) => ({ label: HEAT_LABELS[c.key] ?? c.key, pct: (c.score / c.max) * 100 }))
+    .sort((a, b) => b.pct - a.pct)
+    .slice(0, 2)
+    .filter((c) => c.pct > 40) // 뚜렷하게 달아오른 Heat만 언급
+    .map((c) => c.label);
+
+  const contextLine = CONTEXT_LINE[index.state](top);
+
+  // 감정 투표가 있으면 "집단 감정"을 한 마디 덧붙인다.
+  const tallyEntries = (Object.entries(tally) as [EmotionType, number][]).filter(
+    ([, n]) => (n ?? 0) > 0
+  );
+  if (tallyEntries.length > 0) {
+    const [topEmotion] = tallyEntries.sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))[0]!;
+    return `${contextLine} 오늘 가장 많이 선택된 감정은 「${EMOTION_LABELS[topEmotion]}」이야.`;
+  }
+
+  return contextLine;
 }
 
 /** 기억을 꺼내는 절기 — 연속 기록 마일스톤. */

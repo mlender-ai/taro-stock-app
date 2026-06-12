@@ -21,7 +21,13 @@ export async function GET() {
     );
     return corsJson({ date, total, counts, ratios, fallback: total === 0 });
   } catch (err) {
-    console.warn("[fomo/emotions/today] error", err);
-    return corsJson({ error: "집계 조회 실패", code: "TALLY_ERROR" }, { status: 500 });
+    // DB 장애 시 500 대신 안전한 폴백 구조 반환 (#425).
+    // 정직한 숫자: fallback=true로 데이터 미비임을 명시하되 빈 화면/에러 노출은 금지.
+    console.warn("[fomo/emotions/today] error, returning safe fallback", err);
+    const emptyCounts = Object.fromEntries(EMOTION_TYPES.map((e) => [e, 0]));
+    return corsJson(
+      { date, total: 0, counts: emptyCounts, ratios: emptyCounts, fallback: true, error: "TALLY_UNAVAILABLE" },
+      { status: 200 }
+    );
   }
 }
