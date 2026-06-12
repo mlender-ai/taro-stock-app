@@ -36,6 +36,47 @@ export interface MarketScore {
   changePct: number;
 }
 
+/**
+ * 네이버 금융 지수 응답(/index/{sym}/basic) → { change(%), close }.
+ * Yahoo가 Node fetch에 429를 줘서(2026-06) 네이버를 macro 1차 소스로 쓴다.
+ * 등락률은 fluctuationsRatio(부호 불안정)라 compareToPreviousPrice(상승/하락/보합)로 부호를 확정.
+ * 결측/파싱 실패 시 null.
+ */
+export interface NaverIndexRaw {
+  closePrice?: string | number;
+  fluctuationsRatio?: string | number;
+  /** "상승" | "하락" | "보합" — 문자열 또는 {text}/{name} 객체. */
+  compareToPreviousPrice?: string | { text?: string; name?: string } | null;
+}
+
+function parseLooseNumber(v: unknown): number | null {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string") {
+    const s = v.replace(/,/g, "").trim();
+    if (s === "") return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+export function parseNaverIndexQuote(raw: NaverIndexRaw | null | undefined): {
+  change: number;
+  close: number;
+} | null {
+  if (!raw) return null;
+  const close = parseLooseNumber(raw.closePrice);
+  const ratio = parseLooseNumber(raw.fluctuationsRatio);
+  if (close === null || ratio === null) return null;
+
+  const dirRaw = raw.compareToPreviousPrice;
+  const dir =
+    typeof dirRaw === "string" ? dirRaw : (dirRaw?.text ?? dirRaw?.name ?? "");
+  const mag = Math.abs(ratio);
+  const change = dir.includes("하락") ? -mag : dir.includes("보합") ? 0 : mag || ratio;
+  return { change, close };
+}
+
 function macroChange(quotes: MacroQuote[], key: MacroQuote["key"]): number | null {
   const q = quotes.find((x) => x.key === key);
   return typeof q?.change === "number" ? q.change : null;

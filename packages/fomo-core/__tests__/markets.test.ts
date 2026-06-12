@@ -1,5 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { assetHeatScore, buildMarketScores, type MacroQuote, type WhaleInput } from "../src";
+import {
+  assetHeatScore,
+  buildMarketScores,
+  parseNaverIndexQuote,
+  type MacroQuote,
+  type WhaleInput,
+} from "../src";
+
+describe("parseNaverIndexQuote", () => {
+  it("상승 → 양수 등락률, 콤마 제거", () => {
+    const q = parseNaverIndexQuote({
+      closePrice: "8,374.35",
+      fluctuationsRatio: "7.86",
+      compareToPreviousPrice: "상승",
+    });
+    expect(q).toEqual({ change: 7.86, close: 8374.35 });
+  });
+
+  it("하락 → 음수 (fluctuationsRatio 부호 무관)", () => {
+    expect(parseNaverIndexQuote({ closePrice: "100", fluctuationsRatio: "1.2", compareToPreviousPrice: "하락" })?.change).toBe(-1.2);
+    expect(parseNaverIndexQuote({ closePrice: "100", fluctuationsRatio: "-1.2", compareToPreviousPrice: "하락" })?.change).toBe(-1.2);
+  });
+
+  it("보합 → 0, 객체형 방향도 처리", () => {
+    expect(parseNaverIndexQuote({ closePrice: "100", fluctuationsRatio: "0", compareToPreviousPrice: "보합" })?.change).toBe(0);
+    expect(parseNaverIndexQuote({ closePrice: "100", fluctuationsRatio: "2", compareToPreviousPrice: { text: "하락" } })?.change).toBe(-2);
+  });
+
+  it("결측/파싱 실패 → null", () => {
+    expect(parseNaverIndexQuote(null)).toBeNull();
+    expect(parseNaverIndexQuote({ closePrice: "", fluctuationsRatio: "" })).toBeNull();
+  });
+});
 
 describe("assetHeatScore", () => {
   it("0% → 중립 50", () => {

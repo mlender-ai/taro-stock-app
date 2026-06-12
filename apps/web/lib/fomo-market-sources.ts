@@ -1,10 +1,17 @@
-import { yahooChange, twelveDataChange, type MacroQuote, type WhaleInput } from "@fomo/core";
+import {
+  yahooChange,
+  twelveDataChange,
+  parseNaverIndexQuote,
+  type MacroQuote,
+  type WhaleInput,
+} from "@fomo/core";
 
 /**
  * FOMO 시장 데이터 수집 공용부 — banner(롤링 배너)와 feed(감정 치환 피드)가 공유한다.
- * 원래 banner 라우트에 있던 것을 추출(#PIVOT Phase 3). 동작 동일.
  *
- * - macro: 1차 Twelve Data(키 있을 때 batch 1콜) → 누락분만 Yahoo chart 폴백(순차).
+ * - macro: 1차 Twelve Data(키 있을 때 batch 1콜) → **네이버 금융 지수**(Node에서 안정) → Yahoo(폴백).
+ *   ⚠️ Yahoo chart는 Node/undici fetch에 429를 준다(2026-06, curl만 통과) → Vercel·로컬 dev 모두 전멸.
+ *   그래서 네이버를 키 없이 동작하는 1차 폴백으로 둔다(국내+해외 지수 모두 커버, 등락률 제공).
  * - whale: CoinGecko global + top10 markets.
  * 정직한 숫자 원칙: 실측값만, 결측은 생략.
  */
@@ -14,14 +21,50 @@ const YAHOO_UA =
 // 호스트 2개 폴백 — 한쪽이 스로틀(429/빈응답)이면 다른 쪽 시도.
 const YAHOO_HOSTS = ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com"];
 
-// symbol: Yahoo chart 심볼(폴백). td: Twelve Data `/quote` 심볼(1차 소스).
-export const INDICES: { key: MacroQuote["key"]; label: string; symbol: string; td: string }[] = [
-  { key: "kospi", label: "코스피", symbol: "^KS11", td: "KS11" },
-  { key: "kosdaq", label: "코스닥", symbol: "^KQ11", td: "KQ11" },
-  { key: "spx", label: "S&P500", symbol: "^GSPC", td: "GSPC" },
-  { key: "ndq", label: "나스닥", symbol: "^IXIC", td: "IXIC" },
-  { key: "sox", label: "필라델피아 반도체", symbol: "^SOX", td: "SOX" },
+// symbol: Yahoo chart 심볼(최후 폴백). td: Twelve Data `/quote` 심볼(1차, 키 필요).
+// naver: 네이버 금융 지수 심볼 — 국내(KOSPI/KOSDAQ)는 m.stock, 해외(.IXIC 등)는 api.stock.
+type NaverScope = "domestic" | "world";
+export const INDICES: {
+  key: MacroQuote["key"];
+  label: string;
+  symbol: string;
+  td: string;
+  naver: string;
+  naverScope: NaverScope;
+}[] = [
+  { key: "kospi", label: "코스피", symbol: "^KS11", td: "KS11", naver: "KOSPI", naverScope: "domestic" },
+  { key: "kosdaq", label: "코스닥", symbol: "^KQ11", td: "KQ11", naver: "KOSDAQ", naverScope: "domestic" },
+  { key: "spx", label: "S&P500", symbol: "^GSPC", td: "GSPC", naver: ".INX", naverScope: "world" },
+  { key: "ndq", label: "나스닥", symbol: "^IXIC", td: "IXIC", naver: ".IXIC", naverScope: "world" },
+  { key: "sox", label: "필라델피아 반도체", symbol: "^SOX", td: "SOX", naver: ".SOX", naverScope: "world" },
 ];
+
+const NAVER_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+/** 네이버 금융 지수 1개 → {change(%), close}. 실패 시 null. */
+async function fetchNaverIndex(
+  naver: string,
+  scope: NaverScope
+): Promise<{ change: number; close: number } | null> {
+  const url =
+    scope === "domestic"
+      ? `https://m.stock.naver.com/api/index/${encodeURIComponent(naver)}/basic`
+      : `https://api.stock.naver.com/index/${encodeURIComponent(naver)}/basic`;
+  try {
+    const res = await fetch(url, {
+      headers: { accept: "application/json", "user-agent": NAVER_UA },
+      signal: AbortSignal.timeout(8_000),
+      // 5분 데이터 캐시 — 레이트리밋 보호.
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return null;
+    return parseNaverIndexQuote(await res.json());
+  } catch (err) {
+    console.warn(`[fomo/sources] naver ${naver} error`, err);
+    return null;
+  }
+}
 
 /** 한 심볼의 일봉 종가 배열. query1→query2 폴백. 실패 시 null. */
 async function fetchIndexCloses(symbol: string): Promise<(number | null)[] | null> {
@@ -84,23 +127,32 @@ async function fetchMacroTwelveData(): Promise<
 }
 
 /**
- * 거시 지수 변화율 수집. Yahoo 는 순차 요청(동시 burst 스로틀 회피).
+ * 거시 지수 변화율 수집. 소스 우선순위: Twelve Data(키) → 네이버 → Yahoo.
+ * 네이버/Yahoo 폴백은 지수별 병렬 — Yahoo 순차 누적 타임아웃(함수 데드라인) 회피.
  */
 export async function fetchMacro(): Promise<MacroQuote[]> {
   const td = await fetchMacroTwelveData();
+
+  const settled = await Promise.allSettled(
+    INDICES.map(async (s): Promise<MacroQuote | null> => {
+      const hit = td.get(s.key);
+      if (hit) return { key: s.key, label: s.label, change: hit.change, close: hit.close };
+
+      // Twelve Data 누락(키 없음 포함) → 네이버(Node에서 안정) → Yahoo(429 가능).
+      const naver = await fetchNaverIndex(s.naver, s.naverScope);
+      if (naver) return { key: s.key, label: s.label, change: naver.change, close: naver.close };
+
+      const closes = await fetchIndexCloses(s.symbol);
+      const parsed = closes ? yahooChange(closes) : null;
+      if (parsed) return { key: s.key, label: s.label, change: parsed.change, close: parsed.close };
+
+      console.warn(`[fomo/sources] macro miss ${s.symbol} (td+naver+yahoo)`);
+      return null;
+    })
+  );
+
   const quotes: MacroQuote[] = [];
-  for (const s of INDICES) {
-    const hit = td.get(s.key);
-    if (hit) {
-      quotes.push({ ...s, change: hit.change, close: hit.close });
-      continue;
-    }
-    // Twelve Data 누락(키 없음 포함) → Yahoo 폴백.
-    const closes = await fetchIndexCloses(s.symbol);
-    const parsed = closes ? yahooChange(closes) : null;
-    if (parsed) quotes.push({ ...s, change: parsed.change, close: parsed.close });
-    else console.warn(`[fomo/sources] macro miss ${s.symbol} (td+yahoo)`);
-  }
+  for (const r of settled) if (r.status === "fulfilled" && r.value) quotes.push(r.value);
   return quotes;
 }
 
