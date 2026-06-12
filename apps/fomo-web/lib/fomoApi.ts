@@ -63,10 +63,10 @@ export interface FeedResponse {
 }
 export const fetchFeed = () => get<FeedResponse>("/api/fomo/feed");
 
-/** 뉴스 피드 — 실제 기사를 FOMO 점수순으로(피드 탭). */
-export type { ScoredArticle } from "@fomo/core";
+/** 뉴스 덱 — 한국 뉴스(점수순) + 차트 카드 인터리브, 스와이프용(피드 탭). */
+export type { ScoredArticle, ChartCard, DeckCard } from "@fomo/core";
 export interface NewsResponse {
-  articles: ScoredArticle[];
+  deck: import("@fomo/core").DeckCard[];
   lang: "en" | "ko";
 }
 export const fetchNews = () => get<NewsResponse>("/api/fomo/news");

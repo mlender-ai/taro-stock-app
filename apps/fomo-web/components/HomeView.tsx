@@ -24,7 +24,7 @@ import {
 import { FomoFace } from "@/components/FomoFace";
 import { MoodSignals } from "@/components/MoodSignals";
 import { MarketCarousel } from "@/components/MarketCarousel";
-import { NewsFeed } from "@/components/NewsFeed";
+import { SwipeDeck } from "@/components/SwipeDeck";
 import { EmotionCalendar } from "@/components/EmotionCalendar";
 import { SignupGate } from "@/components/SignupGate";
 import { VoiceFeed } from "@/components/VoiceFeed";
@@ -270,8 +270,8 @@ export function HomeView({
 
         {tab === "feed" && (
           <div className="w-full">
-            {/* 피드 = 실제 뉴스, FOMO 점수순 단일 피드 (사실 적시, docs/PIVOT_FEED_FIRST.md). */}
-            {FEATURE_FEED_EMOTION_TABS && <NewsFeed articles={news ? news.articles : null} />}
+            {/* 피드 = 스와이프 카드 덱 (뉴스 + 차트 카드, docs/PIVOT_FEED_FIRST.md). */}
+            {FEATURE_FEED_EMOTION_TABS && <SwipeDeck deck={news ? news.deck : null} />}
             {/* 한마디 피드(VoiceFeed)는 감정 기록과 한 몸 — flag로 숨김 [HIDDEN: FEATURE_EMOTION_JOURNAL] */}
             {FEATURE_EMOTION_JOURNAL && <VoiceFeed items={voices} />}
           </div>

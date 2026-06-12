@@ -68,7 +68,7 @@ export default function Home() {
   useEffect(() => {
     fetchNews()
       .then(setNews)
-      .catch(() => setNews({ articles: [], lang: "en" }));
+      .catch(() => setNews({ deck: [], lang: "ko" }));
   }, []);
 
   // 스플래시 동안 데이터 프리페치 + 최소 표시시간 보장 후 분기

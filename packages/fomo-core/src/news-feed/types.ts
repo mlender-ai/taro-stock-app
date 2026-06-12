@@ -42,4 +42,6 @@ export interface ScoredArticle extends RawArticle {
   fomoScore: number;
   /** 점수 근거 (디버그/튜닝용, UI 비노출). */
   scoreReason: string;
+  /** 포모(마스코트)의 한 줄 코멘트. LLM 생성, 실패 시 규칙 폴백. */
+  comment?: string;
 }

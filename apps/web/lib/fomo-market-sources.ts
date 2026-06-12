@@ -43,7 +43,7 @@ const NAVER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 /** 네이버 금융 지수 1개 → {change(%), close}. 실패 시 null. */
-async function fetchNaverIndex(
+export async function fetchNaverIndex(
   naver: string,
   scope: NaverScope
 ): Promise<{ change: number; close: number } | null> {
@@ -66,11 +66,17 @@ async function fetchNaverIndex(
   }
 }
 
-/** 한 심볼의 일봉 종가 배열. query1→query2 폴백. 실패 시 null. */
-async function fetchIndexCloses(symbol: string): Promise<(number | null)[] | null> {
+/**
+ * 한 심볼의 일봉 종가 배열. query1→query2 폴백. 실패 시 null.
+ * ⚠️ Yahoo는 Node/Vercel에서 간헐적 429 — 호출부는 폴백/숫자카드를 항상 준비할 것.
+ */
+export async function fetchIndexCloses(
+  symbol: string,
+  range = "5d"
+): Promise<(number | null)[] | null> {
   for (const host of YAHOO_HOSTS) {
     try {
-      const url = `${host}/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
+      const url = `${host}/v8/finance/chart/${encodeURIComponent(symbol)}?range=${encodeURIComponent(range)}&interval=1d`;
       // no-store: 스로틀/빈 응답을 데이터 캐시에 박지 않는다. 레이트리밋 보호는 라우트 s-maxage.
       const res = await fetch(url, {
         headers: { accept: "application/json", "user-agent": YAHOO_UA },
