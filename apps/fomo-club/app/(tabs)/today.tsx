@@ -52,21 +52,23 @@ export default function Today() {
           </View>
         )}
 
-        <Text style={styles.faceLabel}>오늘의 포모</Text>
-        <FomoFace face={index ? scoreToFace(index.score) : "curious"} size={96} glow={color} />
-
-        <View style={styles.indexBox}>
-          {index ? (
-            <>
-              <Text style={[styles.score, { color }]}>{index.score}</Text>
-              <Text style={styles.indexMeta}>
-                FOMO INDEX · {index.state}
-                {index.prevDayDelta ? ` · 전일 ${index.prevDayDelta > 0 ? "+" : ""}${index.prevDayDelta}` : ""}
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.indexMeta}>불러오는 중…</Text>
-          )}
+        {/* #412: 마스코트 + FOMO Index 나란히 — 감정과 지수의 직접 연결 */}
+        <View style={styles.heroRow}>
+          <FomoFace face={index ? scoreToFace(index.score) : "curious"} size={88} glow={color} />
+          <View style={styles.indexBlock}>
+            <Text style={styles.faceLabel}>오늘의 포모</Text>
+            {index ? (
+              <>
+                <Text style={[styles.score, { color }]}>{index.score}</Text>
+                <Text style={styles.indexMeta}>
+                  FOMO INDEX · {index.state}
+                  {index.prevDayDelta ? ` · 전일 ${index.prevDayDelta > 0 ? "+" : ""}${index.prevDayDelta}` : ""}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.indexMeta}>불러오는 중…</Text>
+            )}
+          </View>
         </View>
 
         {state && <Text style={styles.line}>{marketLine(state)}</Text>}
@@ -91,10 +93,11 @@ const styles = StyleSheet.create({
   logo: { color: FomoColors.whiteout, fontSize: 16, fontWeight: "700" },
   sub: { color: FomoColors.muted, fontSize: 12 },
   block: { width: "100%", marginVertical: Spacing.s16 },
-  faceLabel: { color: FomoColors.muted, fontSize: 12, marginBottom: Spacing.s8 },
-  indexBox: { alignItems: "center", marginTop: Spacing.s12 },
+  faceLabel: { color: FomoColors.muted, fontSize: 12, marginBottom: 4 },
+  heroRow: { flexDirection: "row", alignItems: "center", gap: Spacing.s24, marginTop: Spacing.s16 },
+  indexBlock: { alignItems: "flex-start" },
   score: { fontSize: 40, fontWeight: "800", lineHeight: 44 },
-  indexMeta: { color: FomoColors.muted, fontSize: 12, marginTop: 6 },
+  indexMeta: { color: FomoColors.muted, fontSize: 12, marginTop: 4 },
   line: { color: FomoColors.whiteout, fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: Spacing.s12, maxWidth: 300 },
   disclaimer: { color: FomoColors.muted, fontSize: 11, lineHeight: 20, textAlign: "center", marginTop: Spacing.s24 },
   bold: { color: FomoColors.whiteout },
