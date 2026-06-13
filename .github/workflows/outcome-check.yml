@@ -5,8 +5,9 @@ name: Outcome Check
 # 상관 기록만(인과 단정 안 함). 측정 불가는 unknown 으로 안전 처리.
 
 on:
-  schedule:
-    - cron: "0 23 * * *"  # 매일 오전 8시 KST (UTC 23:00 전날)
+  # [PAUSED 2026-06-13] 에이전트 자율 루프 일시정지 — Phase 트랙 직접 개발 집중. cron 비활성(수동 workflow_dispatch만). 되살리려면 아래 주석 해제.
+  #   schedule:
+  #     - cron: "0 23 * * *"  # 매일 오전 8시 KST (UTC 23:00 전날)
   workflow_dispatch:
 
 permissions:

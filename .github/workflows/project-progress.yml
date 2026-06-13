@@ -4,8 +4,9 @@ name: Project Progress Report
 #   활성 프로젝트 있음 → project:<id> task 의 머지/PR/미착수 집계 + "다음 할 일".
 #   활성 프로젝트 없음 → 백로그 surfacing(오너의 select_project 선택 대기).
 on:
-  schedule:
-    - cron: "0 22 * * *"  # 매일 오전 7시 KST (UTC 22:00 전날)
+  # [PAUSED 2026-06-13] 에이전트 자율 루프 일시정지 — Phase 트랙 직접 개발 집중. cron 비활성(수동 workflow_dispatch만). 되살리려면 아래 주석 해제.
+  #   schedule:
+  #     - cron: "0 22 * * *"  # 매일 오전 7시 KST (UTC 22:00 전날)
   workflow_dispatch:
 
 concurrency:

@@ -4,8 +4,9 @@ name: Compact Standing Constraints
 # 무한 성장 방지 (Phase 2 Task 5).
 
 on:
-  schedule:
-    - cron: "0 21 * * 0"  # 매주 월요일 오전 6시 KST (UTC 일 21:00)
+  # [PAUSED 2026-06-13] 에이전트 자율 루프 일시정지 — Phase 트랙 직접 개발 집중. cron 비활성(수동 workflow_dispatch만). 되살리려면 아래 주석 해제.
+  #   schedule:
+  #     - cron: "0 21 * * 0"  # 매주 월요일 오전 6시 KST (UTC 일 21:00)
   workflow_dispatch:
 
 permissions:

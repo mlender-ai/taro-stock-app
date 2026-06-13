@@ -6,8 +6,9 @@ name: Stale Agent PR Sweep
 # - 수동 실행(workflow_dispatch)은 기본 dry_run(미리보기), 스케줄 실행은 실제 정리
 
 on:
-  schedule:
-    - cron: "30 18 * * *"   # 매일 03:30 KST (auto-implement 이후 시각)
+  # [PAUSED 2026-06-13] 에이전트 자율 루프 일시정지 — Phase 트랙 직접 개발 집중. cron 비활성(수동 workflow_dispatch만). 되살리려면 아래 주석 해제.
+  #   schedule:
+  #     - cron: "30 18 * * *"   # 매일 03:30 KST (auto-implement 이후 시각)
   workflow_dispatch:
     inputs:
       dry_run:

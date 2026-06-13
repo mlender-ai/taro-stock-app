@@ -4,8 +4,9 @@ name: Knowledge Distill (Brain K1)
 #   knowledge/distilled.md (멱등 누적, K2 검색이 읽음) + knowledge/daily/<date>.md (그날 raw).
 #   "메모는 쌓이는데 다시 안 본다"를 막는 복리 지식 레이어.
 on:
-  schedule:
-    - cron: "30 22 * * *"  # 매일 오전 7:30 KST (진척 리포트 직후)
+  # [PAUSED 2026-06-13] 에이전트 자율 루프 일시정지 — Phase 트랙 직접 개발 집중. cron 비활성(수동 workflow_dispatch만). 되살리려면 아래 주석 해제.
+  #   schedule:
+  #     - cron: "30 22 * * *"  # 매일 오전 7:30 KST (진척 리포트 직후)
   workflow_dispatch:
     inputs:
       since:

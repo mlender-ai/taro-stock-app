@@ -5,8 +5,9 @@ name: Slack Weekly Retro
 # 기존 thread-reply 핸들러(handleAgentChat)가 응답하고 log_feedback 으로 적재됨.
 
 on:
-  schedule:
-    - cron: "0 0 * * 1"  # 매주 월요일 오전 9시 KST (UTC 월 00:00)
+  # [PAUSED 2026-06-13] 에이전트 자율 루프 일시정지 — Phase 트랙 직접 개발 집중. cron 비활성(수동 workflow_dispatch만). 되살리려면 아래 주석 해제.
+  #   schedule:
+  #     - cron: "0 0 * * 1"  # 매주 월요일 오전 9시 KST (UTC 월 00:00)
   workflow_dispatch:
 
 permissions:
