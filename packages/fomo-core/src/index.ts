@@ -10,6 +10,7 @@ export * from "./mood-signals";
 export * from "./emotion-translation";
 export * from "./news-feed";
 export * from "./stock-cards";
+export * from "./keyword-cards";
 export * from "./voices";
 export * from "./index-engine/types";
 export * from "./index-engine/marketHeat";
