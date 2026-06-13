@@ -29,10 +29,14 @@ const SOURCE_THEME: Record<string, string> = {
   "reddit/cryptocurrency": "코인",
 };
 
-/** 한 시그널의 참여도(좋아요+댓글). 둘 다 0이면 글 수로 보정(naver 종토는 글당 반응 미파싱). */
+/**
+ * 한 시그널의 커뮤니티 열 기여 = **글 수(postCount)**. 옵션 F(§4.3 cross-source 단위 통일).
+ * upvote+댓글은 소스마다 단위가 다르다(reddit 좋아요 ≫ naver 글당 반응 미파싱) → 같이 정규화하면
+ * reddit 이 무조건 이긴다. "오늘 이 테마에 글이 몇 개 올라왔나"는 reddit·naver 공통 단위라
+ * 날짜·소스 간 비교가 정직하다. 임의 가중치/상한 없음.
+ */
 function engagementOf(s: CommunitySourceSignal): number {
-  const reactions = Math.max(0, s.totalUpvotes) + Math.max(0, s.totalComments);
-  return reactions > 0 ? reactions : Math.max(0, s.postCount);
+  return Math.max(0, s.postCount);
 }
 
 export interface CommunityThemeWeight {

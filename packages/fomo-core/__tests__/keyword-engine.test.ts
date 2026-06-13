@@ -76,16 +76,25 @@ describe("scoreKeywords (군중 쏠림 0~100)", () => {
     expect(semi.fomoScore).toBeGreaterThan(rate.fomoScore);
   });
 
-  it("30일 기준선 없으면 confidence 'low' + (a)volume·(b)accel은 null (가짜 기준선 금지)", () => {
+  it("30일 절대 기준선 없으면 confidence 'low' + (a)volume은 당일 상대값·(b)accel은 null", () => {
     const scored = scoreKeywords(extractKeywords(SAMPLE), { nowMs: NOW });
     for (const s of scored) {
       expect(s.confidence).toBe("low");
-      expect(s.signals.volume).toBeNull();
+      // (a)volume 은 더 이상 null 이 아니라 당일 상대 mention(0~1). (b)accel 만 null.
+      expect(s.signals.volume).toBeGreaterThanOrEqual(0);
+      expect(s.signals.volume).toBeLessThanOrEqual(1);
       expect(s.signals.accel).toBeNull();
-      // 산출에 쓰인 신호는 실제 집계 기반(tone·community)
       expect(s.signals.tone).toBeGreaterThanOrEqual(0);
       expect(s.signals.tone).toBeLessThanOrEqual(1);
     }
+  });
+
+  it("volume(당일 상대 mention)이 주신호 — mention 최다 키워드의 volume=1.0", () => {
+    const ex = extractKeywords(SAMPLE);
+    const scored = scoreKeywords(ex, { nowMs: NOW });
+    const maxMention = Math.max(...ex.map((e) => e.mentions));
+    const top = scored.find((s) => s.mentions === maxMention)!;
+    expect(top.signals.volume).toBeCloseTo(1.0, 5);
   });
 
   it("빈 입력 → 빈 배열(에러 없음, 폴백)", () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildKeywordCard,
   buildKeywordCards,
   overallConfidence,
   CALM_MARKERS,
@@ -7,6 +8,8 @@ import {
   mergeCommunityEngagement,
   extractKeywords,
   scoreKeywords,
+  josa,
+  hasBatchim,
   type KeywordSourceItem,
   type ScoredKeyword,
   type CommunitySourceSignal,
@@ -64,6 +67,51 @@ describe("buildKeywordCards (룰 폴백 코멘트)", () => {
   });
 });
 
+describe("josa (조사 받침 처리)", () => {
+  it("받침 유무로 은/는 선택", () => {
+    expect(josa("코인", "은는")).toBe("은"); // ㄴ 받침
+    expect(josa("반도체", "은는")).toBe("는"); // 모음
+    expect(josa("금리", "은는")).toBe("는");
+    expect(josa("2차전지", "은는")).toBe("는");
+  });
+  it("영문 약어 예외맵 — AI는 받침 없음", () => {
+    expect(hasBatchim("AI")).toBe(false);
+    expect(josa("AI", "은는")).toBe("는");
+  });
+  it("이/가·을/를도 받침 따라", () => {
+    expect(josa("코인", "이가")).toBe("이");
+    expect(josa("반도체", "이가")).toBe("가");
+    expect(josa("코인", "을를")).toBe("을");
+  });
+  it("카드 코멘트에 '코인는' 같은 오류가 없다", () => {
+    const cards = buildKeywordCards(scoreSample());
+    for (const c of cards) {
+      expect(c.comment.includes("코인는")).toBe(false);
+      // 일반화: 받침 있는 키워드 뒤 '는', 없는 키워드 뒤 '은'이 붙는 오류 차단
+      expect(c.comment.includes(`${c.keyword}는`) && hasBatchim(c.keyword)).toBe(false);
+    }
+  });
+});
+
+describe("코멘트 변주 (밴드 중복 해소)", () => {
+  it("결정적 — 같은 입력은 항상 같은 코멘트(캐시 정합)", () => {
+    const k = scoreSample()[0]!;
+    expect(buildKeywordCard(k).comment).toBe(buildKeywordCard(k).comment);
+  });
+  it("같은 밴드라도 키워드가 다르면 코멘트가 동일하지 않다", () => {
+    const base = scoreSample()[0]!;
+    // 같은 점수(밴드)지만 다른 키워드 → 변주 풀 + 키워드명으로 달라진다
+    const a = buildKeywordCard({ ...base, keyword: "코인", emoji: "₿", fomoScore: 30, mentions: 11 });
+    const b = buildKeywordCard({ ...base, keyword: "금리", emoji: "💵", fomoScore: 30, mentions: 7 });
+    expect(a.comment).not.toBe(b.comment);
+  });
+  it("코멘트에 mention 수가 반영된다", () => {
+    const base = scoreSample()[0]!;
+    const card = buildKeywordCard({ ...base, keyword: "AI", fomoScore: 66, mentions: 23 });
+    expect(card.comment.includes("23")).toBe(true);
+  });
+});
+
 describe("overallConfidence (정직성)", () => {
   it("키워드 0건 → fallback", () => {
     expect(overallConfidence([])).toBe("fallback");
@@ -80,10 +128,11 @@ describe("communityEngagementByTheme / merge (§4.3 커뮤니티 귀속)", () =>
     { source: "naver/035720", postCount: 30, totalUpvotes: 30, totalComments: 0, bullishRatio: 0.5, fetchedAt: "" }, // 카카오 → 매핑 없음
   ];
 
-  it("소스 라벨 → 테마 매핑, 매핑 없는 소스는 제외", () => {
+  it("소스 라벨 → 테마 매핑(옵션 F: 글 수 기준), 매핑 없는 소스는 제외", () => {
     const map = communityEngagementByTheme(signals);
-    expect(map.get("반도체")?.engagement).toBe(40);
-    expect(map.get("코인")?.engagement).toBe(280); // 200+80
+    // 옵션 F: engagement = postCount(글 수). reddit upvote(200+80) 안 씀 → 단위 통일.
+    expect(map.get("반도체")?.engagement).toBe(40); // postCount 40
+    expect(map.get("코인")?.engagement).toBe(25); // postCount 25 (업보트 무시)
     expect(map.has("2차전지")).toBe(false);
     // 카카오(매핑 없음)는 어떤 테마에도 안 들어간다
     expect([...map.keys()]).toEqual(expect.arrayContaining(["반도체", "코인"]));
@@ -95,8 +144,8 @@ describe("communityEngagementByTheme / merge (§4.3 커뮤니티 귀속)", () =>
     const merged = mergeCommunityEngagement(extracted, signals);
     const semi = merged.find((k) => k.keyword === "반도체")!;
     const coin = merged.find((k) => k.keyword === "코인")!;
-    expect(semi.engagement).toBe(40); // 뉴스 0 + 커뮤니티 40
-    expect(coin.engagement).toBe(280);
+    expect(semi.engagement).toBe(40); // 뉴스 0 + 커뮤니티 글수 40
+    expect(coin.engagement).toBe(25); // 옵션 F: 글수 25 (업보트 아님)
     // 커뮤니티 시그널이 새 테마를 만들지 않는다(키 수 동일)
     expect(merged.length).toBe(extracted.length);
   });
