@@ -10,8 +10,6 @@ import {
   scoreToColor,
   marketLine,
   mineLine,
-  isCalmDay,
-  restorativeLine,
   calendarStats,
   personalLine,
   prevDay,
@@ -22,9 +20,7 @@ import {
   type EmotionType,
 } from "@fomo/core";
 import { FomoFace } from "@/components/FomoFace";
-import { MoodSignals } from "@/components/MoodSignals";
-import { MarketCarousel } from "@/components/MarketCarousel";
-import { SwipeDeck } from "@/components/SwipeDeck";
+import { StockCardFeed } from "@/components/StockCardFeed";
 import { EmotionCalendar } from "@/components/EmotionCalendar";
 import { SignupGate } from "@/components/SignupGate";
 import { VoiceFeed } from "@/components/VoiceFeed";
@@ -41,13 +37,13 @@ import type {
   VoiceItem,
 } from "@/lib/fomoApi";
 
-type Tab = "home" | "feed" | "calendar";
+type Tab = "home" | "card" | "calendar";
 
-// 방향 전환(docs/PIVOT_FEED_FIRST.md): 기록 탭은 flag로 숨김 — 기본 [오늘/피드] 2탭.
+// CARD_FEED_DEV_SPEC v2: 하단 탭 [오늘/카드] 2개. 기록 탭은 flag로 숨김 유지.
 const TABS: { key: Tab; label: string }[] = [
   { key: "home", label: "오늘" },
   ...(FEATURE_FEED_EMOTION_TABS || FEATURE_EMOTION_JOURNAL
-    ? [{ key: "feed" as Tab, label: "피드" }]
+    ? [{ key: "card" as Tab, label: "카드" }]
     : []),
   ...(FEATURE_HISTORY_TAB ? [{ key: "calendar" as Tab, label: "기록" }] : []),
 ];
@@ -127,64 +123,66 @@ export function HomeView({
 
         {tab === "home" && (
           <>
-            {/* 상단 시장 점수 캐러셀 — 나스닥·비트코인·코스피, 3초 자동 슬라이드 */}
-            {markets.length > 0 && (
-              <div className="mb-5 w-full">
-                <MarketCarousel markets={markets} />
+            {/* FOMO INDEX — 어제 대비 변화 중심(매일 올 이유). CARD_FEED_DEV_SPEC §3 */}
+            <p className="mb-1 mt-2 text-xs text-muted">오늘의 시장 온도</p>
+            {index ? (
+              <div className="flex flex-col items-center">
+                {/* 숫자 색 = 감정 색 (과열=빨강 / 침체=파랑) */}
+                <p
+                  className="font-pixel text-6xl leading-none"
+                  style={{ color: scoreToColor(index.score) }}
+                >
+                  {index.score}
+                </p>
+                <p className="mt-2 font-pixel text-xs text-muted">FOMO INDEX · {index.state}</p>
+                {/* 어제 대비 변화 — 가장 눈에 띄게 */}
+                {index.prevDayDelta !== 0 ? (
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="text-sm text-muted">
+                      어제 {index.score - index.prevDayDelta} → 오늘 {index.score}
+                    </span>
+                    <span
+                      className="rounded-full px-2.5 py-1 font-pixel text-sm"
+                      style={{
+                        color: scoreToColor(index.score),
+                        backgroundColor: `${scoreToColor(index.score)}1A`,
+                      }}
+                    >
+                      {index.prevDayDelta > 0 ? `▲ +${index.prevDayDelta}` : `▼ ${index.prevDayDelta}`}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-muted">어제랑 비슷한 온도야.</p>
+                )}
               </div>
+            ) : (
+              <FomoIndexSkeleton />
             )}
 
-            {/* 주인공: 포모 */}
-            <p className="mb-2 text-xs text-muted">{stage === "market" ? "오늘의 포모" : "나의 포모"}</p>
+            {/* 포모 */}
+            <p className="mb-2 mt-8 text-xs text-muted">오늘의 포모</p>
             <FomoFace
-              face={stage === "market" ? marketFace : "calm"}
+              face={marketFace}
               size={84}
               {...(fomoFaceGlow !== undefined ? { glow: fomoFaceGlow } : {})}
             />
 
-            {/* 보조: FOMO Index (픽셀) */}
-            <div className="mt-3 flex flex-col items-center">
-              {index ? (
-                <>
-                  {/* 숫자 색 = 감정 색 (과열=빨강 계열, 침체=파랑 계열) */}
-                  <p
-                    className="font-pixel text-4xl leading-none"
-                    style={{ color: scoreToColor(index.score) }}
-                  >
-                    {index.score}
-                  </p>
-                  <p className="mt-1.5 font-pixel text-xs text-muted">
-                    FOMO INDEX · {index.state}
-                    {index.prevDayDelta
-                      ? ` · 전일 ${index.prevDayDelta > 0 ? "+" : ""}${index.prevDayDelta}`
-                      : ""}
-                  </p>
-                  {FEATURE_EMOTION_VOTE && streak >= 2 && (
-                    <p className="mt-1.5 font-pixel text-[11px]" style={{ color: EMOTION_COLORS.conviction }}>
-                      {streak}일째 함께
-                    </p>
-                  )}
-                </>
-              ) : (
-                <FomoIndexSkeleton />
-              )}
-            </div>
-
-            {/* 포모의 담담한 한마디 */}
+            {/* 담담한 한 줄 — 오늘 시장 분위기 */}
             {line && (
-              <p
-                key={stage + (mine ?? "")}
-                className="fomo-rise mt-3 max-w-xs text-center text-sm leading-5 text-whiteout"
-              >
+              <p className="fomo-rise mt-4 max-w-xs text-center text-sm leading-5 text-whiteout">
                 {line}
               </p>
             )}
 
-            {/* 롤링 시그널 — 시장 신호를 분위기로 (액션 제로, docs/PIVOT_FEED_FIRST.md).
-                치환 엔진(feed.moods)이 있으면 우선, 배너 신호 치환이 보충. */}
-            <div className="mt-5 w-full">
-              <MoodSignals items={banner} extra={feed?.moods ?? []} />
-            </div>
+            {/* CTA — 종목 카드로 유도 */}
+            <button
+              onClick={() => setTab("card")}
+              className="mt-8 w-full rounded-2xl border border-hairline bg-surface px-5 py-4 text-center transition-colors hover:border-muted"
+            >
+              <span className="text-sm font-semibold text-whiteout">오늘의 종목 카드 보러가기</span>
+              <span className="ml-1.5 font-pixel text-sm text-muted">→</span>
+              <span className="mt-1 block text-[11px] text-muted">왜 오르고 내렸는지, 친구처럼 쉽게.</span>
+            </button>
 
             {/* 오늘의 너 — 게이트에서 고른 감정 요약 + 다시 고르기 [HIDDEN: FEATURE_EMOTION_VOTE] */}
             {FEATURE_EMOTION_VOTE && mine && (
@@ -200,17 +198,6 @@ export function HomeView({
                 >
                   다시 고르기
                 </button>
-              </div>
-            )}
-
-            {/* 잔잔한 날 = 치유의 날 (M2) */}
-            {state && index && isCalmDay(state) && (
-              <div className="fomo-rise mt-4 flex w-full items-start gap-2.5 rounded-xl border border-hairline bg-surface px-4 py-3">
-                <span className="mt-0.5 text-sm" aria-hidden>🌙</span>
-                <div>
-                  <p className="text-xs text-muted">오늘의 쉼</p>
-                  <p className="mt-0.5 text-sm leading-5 text-whiteout">{restorativeLine(index.date)}</p>
-                </div>
               </div>
             )}
 
@@ -268,10 +255,10 @@ export function HomeView({
           </>
         )}
 
-        {tab === "feed" && (
+        {tab === "card" && (
           <div className="w-full">
-            {/* 피드 = 스와이프 카드 덱 (뉴스 + 차트 카드, docs/PIVOT_FEED_FIRST.md). */}
-            {FEATURE_FEED_EMOTION_TABS && <SwipeDeck deck={news ? news.deck : null} />}
+            {/* 카드 = 종목 카드 피드 (릴스형, 탭→뎁스, mock). CARD_FEED_DEV_SPEC §4 */}
+            <StockCardFeed />
             {/* 한마디 피드(VoiceFeed)는 감정 기록과 한 몸 — flag로 숨김 [HIDDEN: FEATURE_EMOTION_JOURNAL] */}
             {FEATURE_EMOTION_JOURNAL && <VoiceFeed items={voices} />}
           </div>
