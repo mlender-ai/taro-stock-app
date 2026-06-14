@@ -14,11 +14,15 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
       "오늘 다들 반도체 얘기뿐이야. 너만 못 탄 것 같지? 그 마음 알아. " +
       "근데 이미 한참 오른 거 따라 들어가는 건 늘 조심하는 게 좋아.",
     related: ["삼성전자", "SK하이닉스", "엔비디아"],
+    sources: [
+      { title: "엔비디아 신고가… HBM 수요 폭발에 삼성·SK 동반 강세", source: "한국경제" },
+      { title: "외국인, 반도체 대형주 집중 매수", source: "매일경제" },
+    ],
     depth: {
       whyTitle: "오늘 왜 여기에 다들 쏠렸어?",
       why:
-        "반도체 값이 다시 오를 것 같다는 얘기가 돌면서 관련 회사들이 같이 들썩였어. " +
-        "삼성전자·SK하이닉스 같은 큰 회사들이 한꺼번에 오르니까 '나도 타야 하나' 하는 사람이 확 몰린 거야.",
+        "반도체 수요가 살아난다는 얘기가 돌면서 관련 회사들이 같이 들썩였어. " +
+        "삼성전자·SK하이닉스 같은 큰 회사들이 한꺼번에 들썩이니까 '나도 타야 하나' 하는 사람이 확 몰린 거야. 아래 실제 뉴스가 그 근거야.",
       rememberTitle: "근데 이건 기억해",
       remember:
         "다들 좋다고 몰릴 때가 보통 제일 비쌀 때야. 뉴스 보고 들어가면 늦는 경우가 많거든. " +
@@ -34,6 +38,10 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
       "AI 얘기가 또 뜨거워졌어. 다들 이쪽으로 시선이 쏠리는 날이야. " +
       "휩쓸리기 쉬운 주제니까 한 박자 천천히 봐도 돼.",
     related: ["엔비디아", "마이크로소프트", "팔란티어"],
+    sources: [
+      { title: "오픈AI 새 모델 공개에 AI 관련주 일제히 강세", source: "연합뉴스" },
+      { title: "'AI 수혜' 기대에 팔란티어 급등", source: "이데일리" },
+    ],
     depth: {
       whyTitle: "오늘 왜 여기에 다들 쏠렸어?",
       why:
@@ -53,6 +61,10 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
       "코인판이 다시 달아올랐어. '나만 안 탔나' 싶은 사람들이 오늘 진짜 많아. " +
       "딱 이럴 때가 제일 휩쓸리기 쉬워. 따라가는 건 늦춰도 괜찮아.",
     related: ["비트코인", "이더리움"],
+    sources: [
+      { title: "비트코인 다시 들썩… 코인판 거래량 급증", source: "블록미디어" },
+      { title: "이더리움 현물 ETF 기대감에 매수세", source: "코인데스크코리아" },
+    ],
     depth: {
       whyTitle: "오늘 왜 여기에 다들 쏠렸어?",
       why:
@@ -72,6 +84,10 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
       "오늘은 금리 얘기로 다들 눈치 보는 날이야. 크게 들뜨진 않았어. " +
       "조용히 지켜보는 분위기니까 너도 급할 거 없어.",
     related: ["은행주", "채권"],
+    sources: [
+      { title: "연준 FOMC 앞두고 금리 관망세", source: "연합뉴스" },
+      { title: "금리 향방에 은행·채권 시장 촉각", source: "한국경제" },
+    ],
     depth: {
       whyTitle: "오늘 왜 여기에 다들 쏠렸어?",
       why:
@@ -91,6 +107,10 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
       "2차전지는 오늘 좀 가라앉았어. 한때 엄청 뜨거웠던 곳이라 지금은 식은 느낌이야. " +
       "빠졌다고 무서워할 것도, 싸졌다고 급할 것도 없어.",
     related: ["에코프로비엠", "LG에너지솔루션"],
+    sources: [
+      { title: "전기차 둔화 우려 재부각… 2차전지주 약세", source: "이데일리" },
+      { title: "배터리 업종, 관심 식으며 거래 한산", source: "머니투데이" },
+    ],
     depth: {
       whyTitle: "오늘은 왜 잠잠했어?",
       why:
@@ -110,6 +130,10 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
       "바이오는 오늘 거의 조용했어. 다들 관심이 다른 데 가 있는 날이야. " +
       "조용한 건 나쁜 게 아니야. 너도 안 급해도 돼.",
     related: ["삼성바이오로직스", "셀트리온"],
+    sources: [
+      { title: "바이오, 특별한 모멘텀 없이 관망", source: "약업신문" },
+      { title: "제약·바이오 거래 한산… 시선 분산", source: "데일리팜" },
+    ],
     depth: {
       whyTitle: "오늘은 왜 잠잠했어?",
       why:

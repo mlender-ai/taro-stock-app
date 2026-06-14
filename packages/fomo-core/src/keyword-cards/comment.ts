@@ -1,4 +1,5 @@
-import type { KeywordCard } from "./types";
+import type { KeywordCard, KeywordCardSource } from "./types";
+import type { KeywordSourceItem } from "./extract";
 import type { ScoredKeyword, KeywordConfidence } from "./score";
 import { josa } from "./josa";
 
@@ -9,9 +10,11 @@ import { josa } from "./josa";
  * mock.ts 의 톤을 폴백 기준으로 삼는다: 친구 반말 + 담담함 + 반드시 균형추(진정)로 닫기.
  *
  * 변주: 같은 밴드라도 똑같은 문장이 반복되지 않게 밴드별 템플릿 2~3개 풀 + 키워드 해시로
- *   **결정적** 선택(랜덤 X → 새로고침/캐시에도 안 바뀜) + 코멘트에 mention 수 반영.
+ *   **결정적** 선택(랜덤 X → 새로고침/캐시에도 안 바뀜).
  * 조사: josa() 로 받침 처리("코인는"→"코인은").
  *
+ * 정직성(운영자 피드백 2026-06-14): "N번 돌았어" 같은 *언급 횟수*는 백엔드 신호일 뿐
+ *   유저에게 의미 없어 코멘트/why 에 노출하지 않는다. 대신 실제 핵심 뉴스(card.sources)로 근거를 보여준다.
  * 절대 규칙(§2): 예측·투자조언·전문용어·거래부추김 0, 모든 변주에 균형추 필수.
  * 가드 테스트(keyword-comment.test.ts)가 금칙어/균형추를 전 변주에서 검증한다.
  */
@@ -38,7 +41,7 @@ function pick<T>(arr: readonly T[], key: string): T {
   return arr[h % arr.length]!;
 }
 
-type CommentFn = (kw: string, mention: number) => string;
+type CommentFn = (kw: string) => string;
 
 interface BandTemplate {
   /** 구간 하한(이상). state.ts BANDS 와 동일 경계. */
@@ -58,11 +61,11 @@ const BANDS: readonly BandTemplate[] = [
   {
     min: 81,
     comments: [
-      (k, m) =>
-        `오늘 ${k} 얘기가 ${m}번이나 돌았어. 너만 못 탄 것 같지? 그 마음 알아. ` +
+      (k) =>
+        `오늘 다들 ${k} 얘기뿐이야. 너만 못 탄 것 같지? 그 마음 알아. ` +
         `근데 이미 한참 달아오른 거 따라 들어가는 건 늘 조심하는 게 좋아.`,
-      (k, m) =>
-        `${eun(k)} 오늘 제일 시끄러운 키워드야 — ${m}번 넘게 얘기됐어. ` +
+      (k) =>
+        `${eun(k)} 오늘 제일 시끄러운 키워드야. ` +
         `다 놓친 기분 들지? 그래도 따라가는 건 천천히, 늦었다고 조급해 말고.`,
     ],
     whyTitle: "오늘 왜 여기에 다들 쏠렸어?",
@@ -75,11 +78,11 @@ const BANDS: readonly BandTemplate[] = [
   {
     min: 61,
     comments: [
-      (k, m) =>
-        `${k} 얘기가 다시 뜨거워졌어. 오늘만 ${m}번쯤 돌았더라. ` +
+      (k) =>
+        `${k} 얘기가 다시 뜨거워졌어. ` +
         `휩쓸리기 쉬운 주제니까 한 박자 천천히 봐도 돼.`,
-      (k, m) =>
-        `오늘 ${k} 쪽으로 시선이 꽤 쏠렸어(${m}번). 다들 보니까 나도 봐야 하나 싶지? ` +
+      (k) =>
+        `오늘 ${k} 쪽으로 시선이 꽤 쏠렸어. 다들 보니까 나도 봐야 하나 싶지? ` +
         `그 마음일수록 조심해서 천천히.`,
     ],
     whyTitle: "오늘 왜 여기에 다들 쏠렸어?",
@@ -92,11 +95,11 @@ const BANDS: readonly BandTemplate[] = [
   {
     min: 41,
     comments: [
-      (k, m) =>
-        `오늘은 ${k} 쪽으로 시선이 조금씩 모이는 날이야(${m}번). ` +
+      (k) =>
+        `오늘은 ${k} 쪽으로 시선이 조금씩 모이는 날이야. ` +
         `크게 들뜨진 않았어. 급할 거 없어.`,
-      (k, m) =>
-        `${k} 얘기가 ${m}번 정도 보이네. 후끈하진 않고 슬슬 관심 붙는 정도야. ` +
+      (k) =>
+        `${k} 얘기가 슬슬 보이네. 후끈하진 않고 관심 붙는 정도야. ` +
         `천천히 봐도 돼.`,
     ],
     whyTitle: "오늘 왜 여기에 시선이 모였어?",
@@ -109,11 +112,11 @@ const BANDS: readonly BandTemplate[] = [
   {
     min: 21,
     comments: [
-      (k, m) =>
-        `${eun(k)} 오늘 좀 잠잠했어. ${m}번 정도 언급됐는데 크게 들썩이진 않았어. ` +
+      (k) =>
+        `${eun(k)} 오늘 좀 잠잠했어. 크게 들썩이진 않았어. ` +
         `무서워할 것도, 급할 것도 없어.`,
-      (k, m) =>
-        `오늘 ${k} 얘기는 ${m}번쯤, 조용한 편이야. 한 박자 쉬어가는 날이지. ` +
+      (k) =>
+        `오늘 ${k} 얘기는 조용한 편이야. 한 박자 쉬어가는 날이지. ` +
         `안 급해도 돼.`,
     ],
     whyTitle: "오늘은 왜 잠잠했어?",
@@ -126,11 +129,11 @@ const BANDS: readonly BandTemplate[] = [
   {
     min: 0,
     comments: [
-      (k, m) =>
-        `${eun(k)} 오늘 거의 조용했어(${m}번). 다들 관심이 다른 데 가 있어. ` +
+      (k) =>
+        `${eun(k)} 오늘 거의 조용했어. 다들 관심이 다른 데 가 있어. ` +
         `조용한 건 나쁜 게 아니야.`,
-      (k, m) =>
-        `오늘 ${k} 얘기는 ${m}번뿐, 거의 안 보였어. 이런 날도 있는 거야. ` +
+      (k) =>
+        `오늘 ${k} 얘기는 거의 안 보였어. 이런 날도 있는 거야. ` +
         `너도 안 급해도 돼.`,
     ],
     whyTitle: "오늘은 왜 잠잠했어?",
@@ -156,7 +159,7 @@ function relatedPhrase(related: readonly string[]): string {
 
 /**
  * depth.why — 오늘 데이터를 담담히. 예측 없이 "무슨 일이 있었나"만.
- * 실제 mention 수를 정직하게 노출(가짜 단정 금지).
+ * 언급 횟수 같은 백엔드 수치는 노출하지 않는다(운영자 피드백) — 근거는 card.sources(실제 뉴스)가 보여준다.
  */
 function buildWhy(kw: ScoredKeyword): string {
   const phrase = relatedPhrase(kw.related);
@@ -164,16 +167,41 @@ function buildWhy(kw: ScoredKeyword): string {
     return `오늘은 ${kw.keyword} 쪽에 새 소식이 거의 없어서 사람들 시선이 머물지 않았어. 새 소식이 없으면 이렇게 잠잠하기도 해.`;
   }
   return (
-    `오늘 ${kw.keyword} 관련 얘기가 여기저기서 ${kw.mentions}건쯤 돌았어. ` +
-    `${phrase}이 같이 묶여 오르내리니까 '나도 봐야 하나' 하는 사람이 늘어난 거야.`
+    `오늘 ${kw.keyword} 관련 소식이 여기저기서 돌았어. ` +
+    `${phrase}이 같이 묶여 오르내리니까 '나도 봐야 하나' 하는 사람이 늘어난 거야. 아래 실제 뉴스가 그 근거야.`
   );
+}
+
+/**
+ * card.sources — 이 키워드를 뽑게 한 실제 핵심 뉴스(상위 N). 최신 우선, 제목 중복 제거.
+ * 추상 브리핑 대신 "무슨 기사 때문인지"를 직접 보여준다(운영자 피드백 2026-06-14).
+ */
+const MAX_SOURCES = 3;
+function buildSources(articles: readonly KeywordSourceItem[]): KeywordCardSource[] {
+  const sorted = [...articles].sort((a, b) =>
+    (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "")
+  );
+  const seen = new Set<string>();
+  const out: KeywordCardSource[] = [];
+  for (const a of sorted) {
+    const title = a.title?.trim();
+    if (!title || seen.has(title)) continue;
+    seen.add(title);
+    out.push({
+      title,
+      ...(a.source ? { source: a.source } : {}),
+      ...(a.url ? { url: a.url } : {}),
+    });
+    if (out.length >= MAX_SOURCES) break;
+  }
+  return out;
 }
 
 /** ScoredKeyword → KeywordCard(룰 폴백 코멘트 포함, 키워드 해시로 변주 결정). */
 export function buildKeywordCard(kw: ScoredKeyword): KeywordCard {
   const band = bandFor(kw.fomoScore);
-  const comment = pick(band.comments, kw.keyword)(kw.keyword, kw.mentions);
-  const remember = pick(band.remembers, kw.keyword)(kw.keyword, kw.mentions);
+  const comment = pick(band.comments, kw.keyword)(kw.keyword);
+  const remember = pick(band.remembers, kw.keyword)(kw.keyword);
   return {
     id: kw.keyword,
     keyword: kw.keyword,
@@ -181,6 +209,7 @@ export function buildKeywordCard(kw: ScoredKeyword): KeywordCard {
     fomoScore: kw.fomoScore,
     comment,
     related: kw.related,
+    sources: buildSources(kw.articles),
     depth: {
       whyTitle: band.whyTitle,
       why: buildWhy(kw),
@@ -297,8 +326,9 @@ export function buildKeywordCommentPrompt(
     "3) 전문용어 금지. 꼭 나오면 친구가 풀어주듯 쉽게(예: \"오더블럭? 큰손들이 사 모은 가격대야\").",
     "4) 반드시 균형추(진정)로 닫는다: \"안 급해도 돼 / 기회는 또 와 / 잠깐 지켜보자\" 결.",
     "5) 점수가 높을수록(60+) 진정 톤을 더 강하게. 낮으면(40-) \"조용한 건 나쁜 게 아니야\" 결.",
+    "6) '몇 번 언급됐다 / N건 돌았다' 같은 *횟수 수치* 금지(유저에게 의미 없음). 대신 실제 기사 흐름을 자연스럽게 녹여라.",
     "",
-    'comment 는 2~3줄, why 는 왜 쏠렸는지 용어 없이, remember 는 균형추 한마디.',
+    'comment 는 2~3줄, why 는 왜 쏠렸는지 실제 기사 내용을 근거로 용어 없이, remember 는 균형추 한마디.',
     '출력은 JSON 배열만(그 외 텍스트 0): [{"keyword","comment","why","remember"}]',
     "",
     JSON.stringify(payload),

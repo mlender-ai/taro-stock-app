@@ -12,6 +12,8 @@ import type { NewsLang } from "../news-feed/types";
 export interface KeywordSourceItem {
   title: string;
   summary?: string;
+  /** 원문 링크(있으면 카드 소스에서 클릭 가능). */
+  url?: string;
   /** 발행/작성 시각 ISO. 최신성·가속 계산용(없으면 무시). */
   publishedAt?: string;
   /** 커뮤니티 참여도(upvote+댓글 합). 뉴스는 0/생략. */
