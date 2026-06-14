@@ -8,6 +8,7 @@ import type {
   ThemeStance,
 } from "./types";
 import type { RawEvidence, RawThemeInsight, RawWording } from "./parse";
+import { screenWordingRule, type WordingVerdict } from "./wording-filter";
 
 /**
  * 이해 레이어의 핵심 가드 — DATA_ENGINE_STRATEGY §6 / 운영자 강조.
@@ -69,8 +70,9 @@ function groundEvidence(
 function groundWordings(
   raw: readonly RawWording[],
   docById: Map<string, SourceDoc>
-): KeyWording[] {
+): { wordings: KeyWording[]; audit: WordingVerdict[] } {
   const out: KeyWording[] = [];
+  const audit: WordingVerdict[] = [];
   const seen = new Set<string>();
   for (const w of raw) {
     const doc = docById.get(w.sourceId);
@@ -80,9 +82,12 @@ function groundWordings(
     const key = norm(w.text);
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ text: w.text, sourceId: w.sourceId });
+    // 룰 안전 필터(욕설/단정/찌라시 명백한 것 차단). 통과/탈락 모두 감사 로그.
+    const verdict = screenWordingRule(w.text);
+    audit.push(verdict);
+    if (verdict.kept) out.push({ text: w.text, sourceId: w.sourceId });
   }
-  return out;
+  return { wordings: out, audit };
 }
 
 function decideStance(bull: number, bear: number): { stance: ThemeStance; note: string } {
@@ -150,7 +155,7 @@ export function assembleThemeInsight(
   const docById = new Map(docs.map((d) => [d.id, d]));
   const bull = groundEvidence(raw.bull, docById);
   const bear = groundEvidence(raw.bear, docById);
-  const wordings = groundWordings(raw.wordings, docById);
+  const { wordings, audit: wordingAudit } = groundWordings(raw.wordings, docById);
 
   // 원문에 언급된 종목만(가벼운 검증 — 종목명이 원문 어딘가 등장).
   const corpus = norm(docs.map((d) => `${d.title} ${d.body ?? ""}`).join(" "));
@@ -163,6 +168,7 @@ export function assembleThemeInsight(
       stocks,
       wordings,
       sources: usedSources([], [], wordings, docById),
+      wordingAudit,
     };
   }
 
@@ -183,5 +189,6 @@ export function assembleThemeInsight(
     sources: usedSources(bull, bear, wordings, docById),
     confidence,
     reason: `원문 ${docs.length}건 → grounded 강세 ${bull.length} · 약세 ${bear.length} · 워딩 ${wordings.length} (30일 기준선 없어 low)`,
+    wordingAudit,
   };
 }

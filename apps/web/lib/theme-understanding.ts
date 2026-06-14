@@ -7,6 +7,7 @@ import {
   type SourceDoc,
   type ThemeInsight,
   type KeywordSourceItem,
+  type WordingVerdict,
 } from "@fomo/core";
 import { fetchNaverBoardPosts } from "@fomo/core";
 import { fetchAllNews } from "./fomo-news-sources";
@@ -108,7 +109,59 @@ export async function collectThemeDocs(theme: string): Promise<SourceDoc[]> {
   return docs;
 }
 
-/** 테마 이해·구조화 — 수집 → LLM → grounding 검증(assemble). 실패 시 정직한 빈 상태. */
+/**
+ * 워딩 안전 LLM 판정(2단계) — 룰 필터(assemble)를 통과한 워딩을 한 번 더 본다.
+ * 거를 것: 욕설/혐오/정치선동/개인비방/특정종목 단정·매매권유/허위·찌라시. 살릴 것: 감정·심리 표현.
+ * 애매하면 unsafe(안전 우선). 실패 시 룰 통과분 유지(이미 룰-세이프). 변조 없음 — 통과/탈락만 결정.
+ */
+async function judgeWordingsSafety(
+  texts: readonly string[],
+  apiKey: string
+): Promise<Map<string, { safe: boolean; reason: string }>> {
+  const out = new Map<string, { safe: boolean; reason: string }>();
+  if (texts.length === 0) return out;
+  const prompt = [
+    "너는 투자 감정 앱의 커뮤니티 워딩 안전 심사관이다. 각 표현을 카드에 그대로 노출해도 되는지 판정해라.",
+    "거를 것(safe=false): 욕설/비방/혐오, 정치 선동, 개인 비방, 특정 종목 단정('무조건 간다/판다')·매매 권유, 허위·찌라시('내부정보/카더라').",
+    "살릴 것(safe=true): 투자자의 감정·심리를 드러내는 생생한 표현(예: '전강후약 쎄함', '존버 지친다').",
+    "애매하면 safe=false(안전 우선). 표현을 고치지 말고 판정만.",
+    '출력은 JSON 배열만: [{"text":"원문그대로","safe":true,"reason":"짧은 사유"}]',
+    "",
+    JSON.stringify(texts),
+  ].join("\n");
+  try {
+    const res = await fetch(AI_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: MODEL, temperature: 0, messages: [{ role: "user", content: prompt }] }),
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (!res.ok) {
+      console.warn("[wording-judge] LLM", res.status, "— 룰 통과분 유지");
+      return out;
+    }
+    const data = (await res.json()) as LlmResponse;
+    const content = data.choices?.[0]?.message?.content ?? "";
+    const start = content.indexOf("[");
+    const end = content.lastIndexOf("]");
+    if (start === -1 || end <= start) return out;
+    const arr = JSON.parse(content.slice(start, end + 1)) as unknown;
+    if (Array.isArray(arr)) {
+      for (const r of arr) {
+        if (r && typeof r === "object") {
+          const o = r as Record<string, unknown>;
+          const text = typeof o.text === "string" ? o.text.trim() : "";
+          if (text) out.set(text, { safe: o.safe === true, reason: typeof o.reason === "string" ? o.reason : "" });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[wording-judge] error — 룰 통과분 유지", err);
+  }
+  return out;
+}
+
+/** 테마 이해·구조화 — 수집 → LLM → grounding 검증(assemble) → 워딩 LLM 안전 판정. 실패 시 정직한 빈 상태. */
 export async function understandTheme(theme: string): Promise<ThemeInsight> {
   const docs = await collectThemeDocs(theme);
   if (docs.length === 0) return emptyThemeInsight(theme, "수집된 원문이 없음(소스 도달 실패 또는 매칭 0)");
@@ -135,7 +188,30 @@ export async function understandTheme(theme: string): Promise<ThemeInsight> {
     }
     const data = (await res.json()) as LlmResponse;
     const raw = parseThemeInsightResponse(data.choices?.[0]?.message?.content ?? "");
-    return assembleThemeInsight(theme, docs, raw);
+    const insight = assembleThemeInsight(theme, docs, raw);
+
+    // 2단계: 룰 통과 워딩을 LLM 으로 한 번 더 안전 판정(욕설/단정/혐오/찌라시 — 룰이 못 잡는 뉘앙스).
+    if (insight.wordings.length === 0) return insight;
+    const judged = await judgeWordingsSafety(insight.wordings.map((w) => w.text), apiKey);
+    const llmAudit: WordingVerdict[] = insight.wordings.map((w) => {
+      const v = judged.get(w.text);
+      return {
+        text: w.text,
+        kept: v ? v.safe : true, // 판정 누락(LLM 실패) → 룰-세이프이므로 유지
+        reason: v ? v.reason || "LLM 판정" : "LLM 판정 생략(폴백 — 룰 통과 유지)",
+        stage: "llm",
+      };
+    });
+    const safeWordings = insight.wordings.filter((w) => (judged.get(w.text)?.safe ?? true));
+    const dropped = llmAudit.filter((a) => !a.kept);
+    if (dropped.length > 0) {
+      console.warn("[wording-judge] dropped:", dropped.map((d) => `"${d.text}"(${d.reason})`).join(" | "));
+    }
+    return {
+      ...insight,
+      wordings: safeWordings,
+      wordingAudit: [...(insight.wordingAudit ?? []), ...llmAudit],
+    };
   } catch (err) {
     console.warn("[theme-understanding] error", err);
     return emptyThemeInsight(theme, "이해 레이어 호출 실패 — 정직한 빈 상태");

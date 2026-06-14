@@ -40,6 +40,8 @@ export interface KeyWording {
   sourceId: string;
 }
 
+export type { WordingVerdict } from "./wording-filter";
+
 export type ThemeStance = "balanced" | "bull-dominant" | "bear-dominant" | "insufficient";
 export type ThemeInsightConfidence = "ok" | "low" | "insufficient";
 
@@ -71,4 +73,6 @@ export interface ThemeInsight {
   confidence: ThemeInsightConfidence;
   /** 정직성/디버그 — 왜 이 confidence·stance 인지. */
   reason: string;
+  /** 워딩 필터 전/후 감사 로그(통과·탈락 + 사유, 검수용). */
+  wordingAudit?: import("./wording-filter").WordingVerdict[];
 }
