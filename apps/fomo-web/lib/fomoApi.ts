@@ -89,6 +89,13 @@ export interface KeywordsResponse {
 }
 export const fetchKeywords = () => get<KeywordsResponse>("/api/fomo/keywords");
 
+/** 테마 이해·응축(데이터 엔진 Track A+B) — 뎁스 페이지가 카드 탭 시 lazy 로 부른다. */
+export type { CondensedInsight } from "@fomo/core";
+export const fetchThemeInsight = (theme: string) =>
+  get<import("@fomo/core").CondensedInsight>(
+    `/api/fomo/theme-insight?theme=${encodeURIComponent(theme)}`
+  );
+
 export const fetchCalendar = (sessionId: string, month?: string) =>
   get<CalendarResponse>(
     `/api/fomo/emotions/calendar?sessionId=${encodeURIComponent(sessionId)}${month ? `&month=${month}` : ""}`

@@ -5,7 +5,9 @@ import {
   parseThemeInsightResponse,
   buildThemeInsightPrompt,
   parseNaverBoardPosts,
+  condenseThemeInsight,
   type SourceDoc,
+  type ThemeInsight,
 } from "../src";
 import type { RawThemeInsight } from "../src/theme-understanding/parse";
 
@@ -136,6 +138,62 @@ describe("parse / prompt / 커뮤니티 원문 보존", () => {
     expect(p).toContain("일반론");
     expect(p).toMatch(/강세|약세/);
     expect(p).toContain("quote");
+  });
+
+  it("condenseThemeInsight — 응축은 grounded claim 만 조립(새 사실 없음) + 균형 유지", () => {
+    const insight: ThemeInsight = {
+      theme: "반도체",
+      stocks: ["삼성전자"],
+      bull: [
+        { claim: "외국인이 삼성전자를 담았어", sourceId: "S1", quote: "외국인 매수세가 삼성전자" },
+        { claim: "소부장 ETF가 뛰었어", sourceId: "S2", quote: "소부장 ETF 뛰었다" },
+        { claim: "세번째 강세", sourceId: "S1", quote: "외국인 매수세" },
+      ],
+      bear: [{ claim: "투톱이 주춤했어", sourceId: "S2", quote: "주춤할 때" }],
+      wordings: [
+        { text: "전강후약 쎄함", sourceId: "S3" },
+        { text: "불기둥", sourceId: "S3" },
+        { text: "세번째워딩", sourceId: "S3" },
+      ],
+      stance: "balanced",
+      stanceNote: "강세와 약세 관점이 원문에 둘 다 있어.",
+      sources: [{ id: "S1", kind: "news", title: "t1", url: "https://x/1" }],
+      confidence: "low",
+    };
+    const c = condenseThemeInsight(insight, { maxPerSide: 2, maxWordings: 2 });
+    expect(c.bull).toHaveLength(2); // maxPerSide
+    expect(c.bear).toHaveLength(1);
+    expect(c.wordings).toHaveLength(2); // maxWordings
+    // whyHot 의 사실 문장은 전부 A의 claim 그대로(환각 없음).
+    expect(c.whyHot).toContain("외국인이 삼성전자를 담았어");
+    expect(c.whyHot).toContain("투톱이 주춤했어");
+    // 출처(링크) 유지.
+    expect(c.sources[0]!.url).toBe("https://x/1");
+    expect(c.confidence).toBe("low");
+  });
+
+  it("condense — 강세만이면 약세 안 보임 정직 표기(균형)", () => {
+    const insight: ThemeInsight = {
+      theme: "반도체",
+      stocks: [],
+      bull: [{ claim: "강세근거", sourceId: "S1", quote: "q" }],
+      bear: [],
+      wordings: [],
+      stance: "bull-dominant",
+      stanceNote: "약세 관점은 원문에서 안 보여.",
+      sources: [],
+      confidence: "low",
+    };
+    const c = condenseThemeInsight(insight);
+    expect(c.whyHot).toContain("약세 관점은 원문에서 안 보여");
+    expect(c.bear).toHaveLength(0);
+  });
+
+  it("condense — insufficient 면 가짜 응축 없이 빈 상태 통과", () => {
+    const c = condenseThemeInsight(emptyThemeInsight("반도체", "원문 없음"));
+    expect(c.confidence).toBe("insufficient");
+    expect(c.bull).toEqual([]);
+    expect(c.bear).toEqual([]);
   });
 
   it("parseNaverBoardPosts — 제목 보존 + 감성 분류(개수 아님)", () => {
