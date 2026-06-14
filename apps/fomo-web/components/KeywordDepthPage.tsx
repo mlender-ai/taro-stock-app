@@ -1,13 +1,63 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { scoreToColor, type KeywordCard } from "@fomo/core";
+import { fetchThemeInsight, type CondensedInsight } from "@/lib/fomoApi";
 
 /**
  * 키워드 뎁스 페이지 — 카드/히스토리에서 공용. KEYWORD_CARD_FEED_DEV_SPEC v3 §3.
- * "오늘 왜 쏠렸어" + "근데 이건 기억해"(균형추) + 관련 종목 미니 + 유료자리 표시 + 면책.
+ *
+ * 데이터 엔진 Track A+B: 카드 탭 시 /api/fomo/theme-insight 를 lazy fetch 해
+ * "강세 관점 / 약세 관점 / 사람들 워딩"(원문 grounded 응축)을 보여준다. 출처 링크로 원문 검증 가능.
+ * 응축이 아직(로딩)이거나 데이터 부족(insufficient)이면 기존 뉴스 소스(#500)로 정직하게 폴백.
+ * 메인 카드·스와이프는 안 건드린다 — 뎁스 콘텐츠만.
  */
 export function KeywordDepthPage({ card, onClose }: { card: KeywordCard; onClose: () => void }) {
   const color = scoreToColor(card.fomoScore);
+  const [insight, setInsight] = useState<CondensedInsight | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setInsight(null);
+    fetchThemeInsight(card.keyword)
+      .then((r) => alive && setInsight(r))
+      .catch(() => alive && setInsight(null))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [card.keyword]);
+
+  const hasInsight =
+    !!insight && insight.confidence !== "insufficient" && insight.bull.length + insight.bear.length > 0;
+
+  // sourceId → 원문(링크용).
+  const srcOf = (id: string) => insight?.sources.find((s) => s.id === id);
+
+  const evidenceItem = (claim: string, sourceId: string, key: string) => {
+    const s = srcOf(sourceId);
+    return (
+      <li key={key} className="rounded-lg border border-hairline bg-surface px-3 py-2">
+        <span className="block text-sm leading-5 text-whiteout">{claim}</span>
+        {s &&
+          (s.url ? (
+            <a
+              href={s.url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 block text-[11px] text-muted hover:text-whiteout"
+            >
+              ↳ {s.source ?? s.title} · 원문 보기 →
+            </a>
+          ) : (
+            <span className="mt-1 block text-[11px] text-muted">↳ {s.source ?? s.title}</span>
+          ))}
+      </li>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-[60] bg-black">
       <div className="mx-auto flex h-full max-w-md flex-col">
@@ -27,39 +77,91 @@ export function KeywordDepthPage({ card, onClose }: { card: KeywordCard; onClose
         <div className="scrollbar-none flex-1 overflow-y-auto px-6 py-6">
           <p className="text-sm leading-6 text-whiteout">{card.comment}</p>
 
+          {/* 왜 떴나 — 응축이 있으면 grounded whyHot, 없으면 기존 키워드 why */}
           <section className="mt-7">
             <p className="font-pixel text-sm text-whiteout">{card.depth.whyTitle}</p>
-            <p className="mt-2 text-sm leading-6 text-muted">{card.depth.why}</p>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              {hasInsight ? insight!.whyHot : card.depth.why}
+            </p>
           </section>
 
-          {card.sources.length > 0 && (
-            <section className="mt-6">
-              <p className="font-pixel text-sm text-whiteout">오늘 이런 뉴스가 돌았어</p>
-              <ul className="mt-2 space-y-2">
-                {card.sources.map((s, i) =>
-                  s.url ? (
-                    <li key={i}>
-                      <a
-                        href={s.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block rounded-lg border border-hairline bg-surface px-3 py-2 transition-colors hover:border-whiteout/30"
-                      >
-                        <span className="block text-sm leading-5 text-whiteout">{s.title}</span>
-                        {s.source && (
-                          <span className="mt-0.5 block text-[11px] text-muted">{s.source} · 원문 보기 →</span>
-                        )}
-                      </a>
-                    </li>
-                  ) : (
-                    <li key={i} className="rounded-lg border border-hairline bg-surface px-3 py-2">
-                      <span className="block text-sm leading-5 text-whiteout">{s.title}</span>
-                      {s.source && <span className="mt-0.5 block text-[11px] text-muted">{s.source}</span>}
-                    </li>
-                  )
+          {hasInsight ? (
+            <>
+              <section className="mt-6">
+                <p className="font-pixel text-sm" style={{ color: "var(--up, #ff5a5f)" }}>
+                  📈 강세 관점
+                </p>
+                {insight!.bull.length > 0 ? (
+                  <ul className="mt-2 space-y-2">
+                    {insight!.bull.map((p, i) => evidenceItem(p.claim, p.sourceId, `bull-${i}`))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-sm leading-6 text-muted">원문에서 강세 근거는 안 보였어.</p>
                 )}
-              </ul>
-            </section>
+              </section>
+
+              <section className="mt-6">
+                <p className="font-pixel text-sm" style={{ color: "var(--down, #4f8cff)" }}>
+                  📉 약세 관점
+                </p>
+                {insight!.bear.length > 0 ? (
+                  <ul className="mt-2 space-y-2">
+                    {insight!.bear.map((p, i) => evidenceItem(p.claim, p.sourceId, `bear-${i}`))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-sm leading-6 text-muted">{insight!.stanceNote}</p>
+                )}
+              </section>
+
+              {insight!.wordings.length > 0 && (
+                <section className="mt-6">
+                  <p className="font-pixel text-sm text-whiteout">🗣️ 사람들 워딩</p>
+                  <ul className="mt-2 space-y-2">
+                    {insight!.wordings.map((w, i) => {
+                      const s = srcOf(w.sourceId);
+                      return (
+                        <li key={`w-${i}`} className="rounded-lg border border-hairline bg-surface px-3 py-2">
+                          <span className="block text-sm leading-5 text-whiteout">“{w.text}”</span>
+                          {s && <span className="mt-1 block text-[11px] text-muted">↳ {s.source ?? s.title}</span>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              )}
+            </>
+          ) : (
+            // 폴백 — 로딩 중이거나 응축 부족: 기존 뉴스 소스(#500). 빈 화면 금지.
+            card.sources.length > 0 && (
+              <section className="mt-6">
+                <p className="font-pixel text-sm text-whiteout">오늘 이런 뉴스가 돌았어</p>
+                {loading && <p className="mt-1 text-[11px] text-muted">원문 읽는 중…</p>}
+                <ul className="mt-2 space-y-2">
+                  {card.sources.map((s, i) =>
+                    s.url ? (
+                      <li key={i}>
+                        <a
+                          href={s.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block rounded-lg border border-hairline bg-surface px-3 py-2 transition-colors hover:border-whiteout/30"
+                        >
+                          <span className="block text-sm leading-5 text-whiteout">{s.title}</span>
+                          {s.source && (
+                            <span className="mt-0.5 block text-[11px] text-muted">{s.source} · 원문 보기 →</span>
+                          )}
+                        </a>
+                      </li>
+                    ) : (
+                      <li key={i} className="rounded-lg border border-hairline bg-surface px-3 py-2">
+                        <span className="block text-sm leading-5 text-whiteout">{s.title}</span>
+                        {s.source && <span className="mt-0.5 block text-[11px] text-muted">{s.source}</span>}
+                      </li>
+                    )
+                  )}
+                </ul>
+              </section>
+            )
           )}
 
           <section className="mt-6">
