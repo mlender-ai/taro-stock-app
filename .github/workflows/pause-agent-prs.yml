@@ -1,0 +1,35 @@
+name: Pause Agent PRs
+
+# [PAUSED 2026-06-14] 에이전트 자율 루프 정지 — 외부 예약 루틴(Claude Code 'CEO Brief Agent' 등)이
+# 자동으로 여는 `agent/*` 브랜치 PR을 즉시 닫는다. 레포 밖 스케줄러는 이 세션에서 끌 수 없으므로,
+# 그 산출물(PR)을 레포에서 차단해 실효적으로 멈춘다.
+# 사람/세션 PR(claude/*, feat/*, fix/* 등)은 영향 없음. 제품(키워드 엔진) 개발 완료 후 재개 시 이 파일 삭제.
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close-agent-pr:
+    if: startsWith(github.event.pull_request.head.ref, 'agent/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: "🛑 에이전트 자율 루프 일시 정지 중입니다. 외부 예약 루틴이 자동 생성한 `agent/*` PR이라 자동으로 닫습니다. 현재 활성 작업은 키워드 엔진 Phase 트랙이며, 제품 개발 완료 후 루프를 재개할 때 `.github/workflows/pause-agent-prs.yml`을 제거합니다.",
+            });
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              state: "closed",
+            });
