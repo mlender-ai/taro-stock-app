@@ -9,10 +9,12 @@ import type { ExtractedKeyword } from "./extract";
  * §4.3 4신호 가중 평균: (a)언급볼륨 0.35 (b)언급가속 0.30 (c)톤강도 0.20 (d)커뮤니티열 0.15.
  * (c)는 news-feed/score.ts(기사 단위 surge/rise/damp 점수기)를 재활용해 키워드 평균으로 집계.
  *
- * ⚠️ 정직성(§4.3 단서): (a)(b)는 30일 기준선/시계열이 있어야 산출 가능.
- *   Phase 1엔 누적 스냅샷이 없으므로 (a)(b)는 산출하지 않고(null) confidence "low"로 표기,
- *   (c)(d)만 재정규화해 점수를 낸다. 가짜 기준선은 절대 만들지 않는다.
- *   (a)(b)와 high/medium confidence는 Phase 2+(스냅샷 누적) 도입.
+ * ⚠️ 정직성(§4.3 단서): (b)accel 은 인트라데이 시계열이 있어야 산출 가능 → 아직 null.
+ *   (a)volume 은 30일 기준선이 없으므로 **당일 키워드 간 상대 mention 량**(mention / 당일 max)으로
+ *   채운다. 절대 기준선이 아님을 confidence "low"로 정직하게 노출한다(가짜 기준선 금지).
+ *   b(null) 제외하고 {a,c,d} 를 재정규화: wa 0.500 / wc 0.286 / wd 0.214.
+ *   제품 정의("다들 뭐에 쏠렸나", PRODUCT_TRUTH §1)에 맞춰 volume 을 주신호로, tone 은 보조로 둔다.
+ *   (d)community 는 옵션 F(글 수 단위)로 산출(community.ts). high/medium 은 Phase 4(스냅샷 기준선).
  */
 
 export type KeywordConfidence = "high" | "medium" | "low" | "fallback";
@@ -20,11 +22,11 @@ export type KeywordConfidence = "high" | "medium" | "low" | "fallback";
 export interface KeywordSignals {
   /** (c) 톤 강도 0~1 — 키워드 기사들의 FOMO 점수 평균(surge 키워드↑). */
   tone: number;
-  /** (d) 커뮤니티 열 0~1 — 오늘 키워드들 중 상대 참여도(engagement-weighted). */
+  /** (d) 커뮤니티 열 0~1 — 오늘 키워드들 중 상대 글 수(옵션 F). 커뮤니티 전무한 날 0. */
   community: number;
-  /** (a) 언급 볼륨 0~1 — 30일 기준선 대비. 미보유 시 null(Phase 2+). */
-  volume: number | null;
-  /** (b) 언급 가속 0~1 — 최근 6h vs 직전 6h. 시계열 미보유 시 null(Phase 2+). */
+  /** (a) 언급 볼륨 0~1 — 당일 상대 mention(mention/당일max). 30일 기준선은 Phase 4(그땐 절대값). */
+  volume: number;
+  /** (b) 언급 가속 0~1 — 최근 6h vs 직전 6h. 인트라데이 시계열 미보유 시 null(Phase 4+). */
   accel: number | null;
 }
 
@@ -37,7 +39,7 @@ export interface ScoredKeyword extends ExtractedKeyword {
   reason: string;
 }
 
-// §4.3 가중치.
+// §4.3 가중치(원본). b(accel)=null 이라 산출 시 {a,c,d} 로 재정규화한다.
 const W = { volume: 0.35, accel: 0.3, tone: 0.2, community: 0.15 } as const;
 
 function clamp01(n: number): number {
@@ -73,26 +75,44 @@ export interface ScoreOptions {
 
 /**
  * 추출된 키워드 → 포모 점수. 점수 내림차순 정렬.
- * Phase 1: (c)(d)만으로 산출 + confidence "low"(30일 기준선 부재). (a)(b)는 null.
+ * (a)volume=당일 상대 mention 주신호, (c)tone 보조, (d)community 옵션 F. (b)accel=null → 가중치 재정규화.
+ * confidence "low"(30일 절대 기준선 부재 — 당일 상대값임을 정직하게 노출).
  */
 export function scoreKeywords(keywords: ExtractedKeyword[], opts: ScoreOptions): ScoredKeyword[] {
-  // (d) 커뮤니티 열은 오늘 키워드들 사이의 상대 참여도 — 가짜 기준선 없이 자체 정규화.
-  const maxEngagement = Math.max(1, ...keywords.map((k) => k.engagement));
+  // 당일 키워드 간 상대화 — 가짜 기준선 없이 자체 정규화.
+  const maxMention = Math.max(1, ...keywords.map((k) => k.mentions));
+  const maxCommunity = Math.max(0, ...keywords.map((k) => k.engagement)); // 옵션 F: engagement=글 수
+  const anyCommunity = maxCommunity > 0;
+
+  // b(accel)=null 제외 후 재정규화. 커뮤니티 전무한 날은 d 도 빼고 {a,c}.
+  const w = anyCommunity
+    ? {
+        volume: W.volume / (W.volume + W.tone + W.community), // 0.500
+        tone: W.tone / (W.volume + W.tone + W.community), // 0.286
+        community: W.community / (W.volume + W.tone + W.community), // 0.214
+      }
+    : {
+        volume: W.volume / (W.volume + W.tone), // 0.636
+        tone: W.tone / (W.volume + W.tone), // 0.364
+        community: 0,
+      };
 
   const scored = keywords.map((kw): ScoredKeyword => {
     const tone = toneSignal(kw, opts.nowMs);
-    const community = clamp01(kw.engagement / maxEngagement);
+    const volume = clamp01(kw.mentions / maxMention);
+    const community = anyCommunity ? clamp01(kw.engagement / maxCommunity) : 0;
 
-    // 30일 기준선 없음 → (a)(b) 미산출, (c)(d)만 재정규화.
-    const wSum = W.tone + W.community;
-    const fomoScore = clamp100(((W.tone * tone + W.community * community) / wSum) * 100);
+    const fomoScore = clamp100((w.volume * volume + w.tone * tone + w.community * community) * 100);
 
     return {
       ...kw,
       fomoScore,
       confidence: "low",
-      signals: { tone, community, volume: null, accel: null },
-      reason: `tone=${tone.toFixed(2)} community=${community.toFixed(2)} | (a)volume·(b)accel 미산출(30일 기준선 부재) → confidence low`,
+      signals: { tone, community, volume, accel: null },
+      reason:
+        `volume=${volume.toFixed(2)} tone=${tone.toFixed(2)} community=${community.toFixed(2)} ` +
+        `(w ${w.volume.toFixed(2)}/${w.tone.toFixed(2)}/${w.community.toFixed(2)}) | ` +
+        `(a)volume=당일 상대mention, (b)accel 미산출, 30일 절대기준선 부재 → confidence low`,
     };
   });
 
