@@ -41,6 +41,20 @@ export function HomeView({
   const [tab, setTab] = useState<Tab>("card");
   const color = index ? scoreToColor(index.score) : undefined;
 
+  /**
+   * 전체 폴백 판정: 4개 Heat가 모두 중립 기본값(market/community/emotion=15, whale=0)이고
+   * aiSummary가 비어 있으면, 실제 데이터 없이 산출된 폴백 상태다.
+   * 이 상태를 "진짜 숫자처럼" 노출하면 정직한 숫자 원칙(PRODUCT_TRUTH §4) 위반.
+   * @author 안티그래비티
+   */
+  const isFullFallback = index
+    ? index.components.market === 15 &&
+      index.components.community === 15 &&
+      index.components.emotion === 15 &&
+      index.components.whale === 0 &&
+      !index.aiSummary
+    : false;
+
   return (
     <>
       <main className="fomo-phase-in mx-auto flex min-h-screen max-w-md flex-col px-6 pb-20 pt-4">
@@ -50,8 +64,8 @@ export function HomeView({
           <span className="text-xs text-muted">가입 없이 둘러보기</span>
         </div>
 
-        {/* 시장 온도(FOMO Index) + 어제 대비 변화 — 얇은 띠 */}
-        {index && (
+        {/* 시장 온도(FOMO Index) — 전체 폴백이면 정직하게 "수집 중" 표시 @author 안티그래비티 */}
+        {index && !isFullFallback && (
           <div className="mt-3 flex items-center justify-between rounded-xl border border-hairline bg-surface px-4 py-2.5">
             <span className="text-xs text-muted">오늘의 시장 온도</span>
             <div className="flex items-baseline gap-2">
@@ -67,6 +81,12 @@ export function HomeView({
                 </span>
               )}
             </div>
+          </div>
+        )}
+        {index && isFullFallback && (
+          <div className="mt-3 flex items-center justify-between rounded-xl border border-hairline bg-surface px-4 py-2.5">
+            <span className="text-xs text-muted">오늘의 시장 온도</span>
+            <span className="font-pixel text-[11px] text-muted">데이터 수집 중…</span>
           </div>
         )}
 
