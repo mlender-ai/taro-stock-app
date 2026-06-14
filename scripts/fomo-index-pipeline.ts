@@ -58,7 +58,8 @@ function kstDate(offsetDays = 0): string {
 async function loadPrisma() {
   if (!process.env.DATABASE_URL) return null;
   try {
-    const mod = await import("../apps/web/lib/tarot/prisma");
+    // Phase 0(#490)에서 lib/tarot/prisma → lib/prisma 로 이동(named export `prisma`).
+    const mod = await import("../apps/web/lib/prisma");
     return mod.prisma;
   } catch (err) {
     process.stderr.write(`prisma load 실패(드라이런 진행): ${String(err)}\n`);
