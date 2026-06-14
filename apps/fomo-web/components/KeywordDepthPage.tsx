@@ -32,6 +32,36 @@ export function KeywordDepthPage({ card, onClose }: { card: KeywordCard; onClose
             <p className="mt-2 text-sm leading-6 text-muted">{card.depth.why}</p>
           </section>
 
+          {card.sources.length > 0 && (
+            <section className="mt-6">
+              <p className="font-pixel text-sm text-whiteout">오늘 이런 뉴스가 돌았어</p>
+              <ul className="mt-2 space-y-2">
+                {card.sources.map((s, i) =>
+                  s.url ? (
+                    <li key={i}>
+                      <a
+                        href={s.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block rounded-lg border border-hairline bg-surface px-3 py-2 transition-colors hover:border-whiteout/30"
+                      >
+                        <span className="block text-sm leading-5 text-whiteout">{s.title}</span>
+                        {s.source && (
+                          <span className="mt-0.5 block text-[11px] text-muted">{s.source} · 원문 보기 →</span>
+                        )}
+                      </a>
+                    </li>
+                  ) : (
+                    <li key={i} className="rounded-lg border border-hairline bg-surface px-3 py-2">
+                      <span className="block text-sm leading-5 text-whiteout">{s.title}</span>
+                      {s.source && <span className="mt-0.5 block text-[11px] text-muted">{s.source}</span>}
+                    </li>
+                  )
+                )}
+              </ul>
+            </section>
+          )}
+
           <section className="mt-6">
             <p className="font-pixel text-sm text-whiteout">{card.depth.rememberTitle}</p>
             <p className="mt-2 text-sm leading-6 text-muted">{card.depth.remember}</p>

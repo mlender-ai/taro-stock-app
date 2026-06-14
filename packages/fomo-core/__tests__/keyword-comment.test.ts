@@ -111,10 +111,46 @@ describe("코멘트 변주 (밴드 중복 해소)", () => {
     const b = buildKeywordCard({ ...base, keyword: "금리", emoji: "💵", fomoScore: 30, mentions: 7 });
     expect(a.comment).not.toBe(b.comment);
   });
-  it("코멘트에 mention 수가 반영된다", () => {
+  it("언급 횟수(N번/N건)는 유저 텍스트에 노출하지 않는다 (운영자 피드백)", () => {
     const base = scoreSample()[0]!;
-    const card = buildKeywordCard({ ...base, keyword: "AI", fomoScore: 66, mentions: 23 });
-    expect(card.comment.includes("23")).toBe(true);
+    // mention 수가 커도 코멘트/why 에 숫자+번/건 패턴이 안 나와야 한다.
+    for (const score of [5, 35, 55, 75, 95]) {
+      const card = buildKeywordCard({ ...base, keyword: "AI", emoji: "🤖", fomoScore: score, mentions: 23 });
+      const blob = `${card.comment} ${card.depth.why} ${card.depth.remember}`;
+      expect(blob, `밴드 ${score} 언급수 노출`).not.toMatch(/\d+\s*(번|건)/);
+    }
+  });
+});
+
+describe("핵심 뉴스 소스 (실제 근거 노출, 추상 브리핑 대체)", () => {
+  const withArticles: ScoredKeyword = {
+    ...scoreSample().find((k) => k.keyword === "반도체")!,
+    articles: [
+      { title: "엔비디아 신고가 급등", source: "한국경제", url: "https://x/1", publishedAt: "2026-06-13T11:00:00Z" },
+      { title: "삼성전자 반도체 랠리", source: "매일경제", url: "https://x/2", publishedAt: "2026-06-13T12:00:00Z" },
+      { title: "삼성전자 반도체 랠리", source: "중복", publishedAt: "2026-06-13T09:00:00Z" }, // 제목 중복 → 제외
+      { title: "HBM 수요 폭발", source: "전자신문", publishedAt: "2026-06-13T08:00:00Z" },
+      { title: "네번째", source: "x", publishedAt: "2026-06-13T07:00:00Z" }, // MAX_SOURCES 초과 → 제외
+    ],
+  };
+
+  it("카드에 실제 기사 제목/출처/링크가 상위 N건(최신순, 중복 제거) 담긴다", () => {
+    const card = buildKeywordCard(withArticles);
+    expect(card.sources.length).toBe(3);
+    expect(card.sources[0]).toEqual({ title: "삼성전자 반도체 랠리", source: "매일경제", url: "https://x/2" }); // 최신
+    expect(card.sources.map((s) => s.title)).not.toContain("네번째"); // N 초과 제외
+    // 같은 제목 중복은 한 번만.
+    expect(card.sources.filter((s) => s.title === "삼성전자 반도체 랠리").length).toBe(1);
+  });
+
+  it("기사가 없으면 sources 빈 배열(에러 없음)", () => {
+    const card = buildKeywordCard({ ...withArticles, articles: [] });
+    expect(card.sources).toEqual([]);
+  });
+
+  it("LLM 프롬프트는 횟수 언급을 금지한다", () => {
+    const p = buildKeywordCommentPrompt([{ keyword: "반도체", score: 88, titles: ["엔비디아 급등"], related: ["삼성전자"] }]);
+    expect(p).toMatch(/횟수/);
   });
 });
 

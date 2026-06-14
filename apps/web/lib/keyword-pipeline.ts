@@ -38,6 +38,7 @@ export async function computeKeywordCards(): Promise<KeywordPayloadCore> {
       items.push({
         title: a.title,
         ...(a.summary ? { summary: a.summary } : {}),
+        ...(a.url ? { url: a.url } : {}),
         publishedAt: a.publishedAt,
         source: a.source,
         lang: a.lang,
