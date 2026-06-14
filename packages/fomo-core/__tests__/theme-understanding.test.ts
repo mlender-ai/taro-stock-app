@@ -6,6 +6,7 @@ import {
   buildThemeInsightPrompt,
   parseNaverBoardPosts,
   condenseThemeInsight,
+  screenWordingRule,
   type SourceDoc,
   type ThemeInsight,
 } from "../src";
@@ -109,6 +110,50 @@ describe("균형(강세/약세) 정직 표기", () => {
   });
 });
 
+describe("워딩 안전 필터 (룰 단계, Track C 선행)", () => {
+  it("욕설/혐오 → 탈락", () => {
+    expect(screenWordingRule("시발 존버 지친다").kept).toBe(false);
+    expect(screenWordingRule("틀딱들 다 팔아").kept).toBe(false);
+  });
+  it("종목 단정/매매신호/찌라시 → 탈락", () => {
+    expect(screenWordingRule("삼성 무조건 간다").kept).toBe(false);
+    expect(screenWordingRule("내부 정보 입수했다").kept).toBe(false);
+    expect(screenWordingRule("이거 100% 상한가").kept).toBe(false);
+  });
+  it("감정·심리 표현 → 통과(원문 그대로)", () => {
+    expect(screenWordingRule("전강후약 쎄함").kept).toBe(true);
+    expect(screenWordingRule("존버 지친다").kept).toBe(true);
+    expect(screenWordingRule("국장 장투할거야? 난 치고 빠질래").kept).toBe(true);
+  });
+  it("탈락 사유(reason)를 남긴다(검수용)", () => {
+    expect(screenWordingRule("시발").reason).toContain("욕설");
+    expect(screenWordingRule("무조건 간다").reason).toMatch(/단정|매매|찌라시/);
+  });
+
+  it("assemble: 룰 위반 워딩은 wordings 에서 빠지고 audit 에 사유로 남는다", () => {
+    const docs: SourceDoc[] = [
+      { id: "S1", kind: "news", title: "외국인 매수세가 삼성전자", source: "한국경제" },
+      { id: "S3", kind: "community", title: "전강후약 쎄함 씨발 무조건 간다", source: "종토방" },
+    ];
+    const raw = {
+      stocks: [],
+      bull: [{ claim: "외국인이 담았어", sourceId: "S1", quote: "외국인 매수세가 삼성전자" }],
+      bear: [],
+      wordings: [
+        { text: "전강후약 쎄함", sourceId: "S3" },
+        { text: "씨발 무조건 간다", sourceId: "S3" },
+      ],
+      stanceNote: "",
+    };
+    const r = assembleThemeInsight("반도체", docs, raw);
+    expect(r.wordings.map((w) => w.text)).toEqual(["전강후약 쎄함"]); // 욕설/단정 워딩 제거
+    expect(r.wordingAudit).toBeDefined();
+    const bad = r.wordingAudit!.find((a) => a.text === "씨발 무조건 간다")!;
+    expect(bad.kept).toBe(false);
+    expect(bad.reason).toContain("욕설");
+  });
+});
+
 describe("워딩(여론 원문) grounding", () => {
   it("커뮤니티 원문에 실재하는 워딩만 통과", () => {
     const raw: RawThemeInsight = {
@@ -194,6 +239,27 @@ describe("parse / prompt / 커뮤니티 원문 보존", () => {
     expect(c.confidence).toBe("insufficient");
     expect(c.bull).toEqual([]);
     expect(c.bear).toEqual([]);
+  });
+
+  it("condense — 출처 다양성: 한 매체뿐이면 singleOutlet, 여러 매체면 false", () => {
+    const mk = (sources: { id: string; source: string }[]): ThemeInsight => ({
+      theme: "반도체",
+      stocks: [],
+      bull: [{ claim: "강세", sourceId: sources[0]!.id, quote: "q" }],
+      bear: [],
+      wordings: [],
+      stance: "bull-dominant",
+      stanceNote: "약세 안 보임",
+      sources: sources.map((s) => ({ id: s.id, kind: "news" as const, title: "t", source: s.source })),
+      confidence: "low",
+      reason: "r",
+    });
+    const single = condenseThemeInsight(mk([{ id: "S1", source: "매일경제" }, { id: "S2", source: "매일경제" }]));
+    expect(single.outlets).toEqual(["매일경제"]);
+    expect(single.singleOutlet).toBe(true);
+    const multi = condenseThemeInsight(mk([{ id: "S1", source: "매일경제" }, { id: "S2", source: "한국경제" }]));
+    expect(multi.outlets.sort()).toEqual(["한국경제", "매일경제"].sort());
+    expect(multi.singleOutlet).toBe(false);
   });
 
   it("parseNaverBoardPosts — 제목 보존 + 감성 분류(개수 아님)", () => {

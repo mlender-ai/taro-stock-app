@@ -87,6 +87,12 @@ export function KeywordDepthPage({ card, onClose }: { card: KeywordCard; onClose
 
           {hasInsight ? (
             <>
+              {insight!.singleOutlet && insight!.outlets.length > 0 && (
+                <p className="mt-3 rounded-lg border border-hairline bg-surface px-3 py-2 text-[11px] leading-5 text-muted">
+                  ⚠️ 오늘은 <span className="text-whiteout">{insight!.outlets[0]}</span> 한 곳 기준이야 — 한 매체 안의 시각일 수 있어.
+                </p>
+              )}
+
               <section className="mt-6">
                 <p className="font-pixel text-sm" style={{ color: "var(--up, #ff5a5f)" }}>
                   📈 강세 관점

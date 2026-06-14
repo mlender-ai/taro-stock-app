@@ -37,9 +37,15 @@ export interface CondensedInsight {
   stanceNote: string;
   /** 근거가 가리킨 원문(원문 보기 링크용 — 검증 가능하게 유지). */
   sources: InsightSourceRef[];
+  /** 서로 다른 매체/소스 이름(출처 다양성). 1개뿐이면 "한 곳 기준"을 정직 표기. */
+  outlets: string[];
+  /** 출처가 한 매체에만 쏠렸나(true면 "한 곳 안의 균형"일 뿐 — UI/정직성 표기). */
+  singleOutlet: boolean;
   confidence: ThemeInsightConfidence;
   /** 정직성/진단 — 왜 이 confidence·stance 인지(A의 reason 그대로). 빈 상태 원인 추적용. */
   reason: string;
+  /** 워딩 필터 감사 로그(통과·탈락 + 사유, 검수용). */
+  wordingAudit?: import("./types").WordingVerdict[];
 }
 
 export interface CondenseOptions {
@@ -57,13 +63,20 @@ export function condenseThemeInsight(
   const maxPerSide = opts.maxPerSide ?? 2;
   const maxWordings = opts.maxWordings ?? 2;
 
+  // 출처 다양성 — 서로 다른 매체 이름. 소스를 늘리는 건 C 의 몫이고, 여기선 *쏠림을 정직히 표기*만.
+  const outlets = [...new Set(insight.sources.map((s) => s.source).filter((x): x is string => !!x))];
+  const singleOutlet = outlets.length <= 1;
+
   const base = {
     theme: insight.theme,
     stance: insight.stance,
     stanceNote: insight.stanceNote,
     sources: insight.sources,
+    outlets,
+    singleOutlet,
     confidence: insight.confidence,
     reason: insight.reason,
+    ...(insight.wordingAudit ? { wordingAudit: insight.wordingAudit } : {}),
   };
 
   // 정직한 빈 상태 — A가 근거를 못 뽑았으면 응축도 비운다(가짜 생성 금지).
