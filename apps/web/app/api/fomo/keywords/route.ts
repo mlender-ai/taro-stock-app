@@ -1,34 +1,24 @@
 import { NextResponse } from "next/server";
-import {
-  extractKeywords,
-  mergeCommunityEngagement,
-  scoreKeywords,
-  buildKeywordCards,
-  overallConfidence,
-  fetchCommunity,
-  MOCK_KEYWORD_CARDS,
-  type KeywordCard,
-  type KeywordConfidence,
-  type KeywordSourceItem,
-} from "@fomo/core";
+import type { KeywordCard, KeywordConfidence } from "@fomo/core";
 import { withCors, kstDate } from "../../../../lib/fomo";
-import { fetchAllNews } from "../../../../lib/fomo-news-sources";
-import { addKeywordCardComments } from "../../../../lib/fomo-keyword-comment";
+import { computeKeywordCards } from "../../../../lib/keyword-pipeline";
+import { readKeywordSnapshot } from "../../../../lib/keyword-snapshot";
 
 /**
- * 키워드 카드 API — "오늘 사람들 시선이 가장 쏠린 키워드" 실데이터 산출. KEYWORD_ENGINE_SPEC §4.6 / Phase 2.
+ * 키워드 카드 API — "오늘 사람들 시선이 가장 쏠린 키워드" 실데이터 산출. KEYWORD_ENGINE_SPEC §4.6.
  *
- * 파이프라인: 뉴스 RSS + 커뮤니티(Promise.allSettled 병렬) → extract → community 가산 → score → 룰 폴백 코멘트.
- * 코멘트는 Phase 2 라 LLM 없이 룰 폴백 템플릿만(LLM 은 Phase 3).
+ * 응답 경로(§4.6 — 절대 빈값 없음):
+ *   1) 오늘 KeywordCardSnapshot 있으면 그대로 반환(live:false) — Phase 4 cron 이 미리 채운 것.
+ *   2) 없으면(스냅샷 전/테이블 미생성) 라이브 산출(live:true). 산출·검증·코멘트는 computeKeywordCards 공유.
+ *   3) 라이브도 실패하면 mock 명시적 폴백(confidence:"fallback").
  *
  * 응답 정직성(§5): confidence 를 반드시 동봉. 30일 기준선이 아직 없어 라이브는 'low'(가짜 high 금지).
- * 라이브 산출이 키워드 0건이면 mock 을 *명시적 폴백*(confidence:"fallback")으로 반환 — 진짜처럼 위장하지 않는다.
  *
- * 스냅샷-우선(§4.6 1단계: 오늘 스냅샷 있으면 그대로)은 Phase 4(cron + DDL 승인)에서 이 앞에 붙는다.
- * 지금은 스냅샷 테이블에 의존하지 않고 라이브 산출을 메인 경로로 둔다(prisma db push 미실행).
+ * db push 게이트: KeywordCardSnapshot 테이블이 아직 prod 에 없을 수 있어, 스냅샷 조회는 실패해도
+ *   조용히 라이브로 폴백한다(readKeywordSnapshot 내부 try/catch). 테이블이 생기면 1)이 자동 활성화.
  */
 export const dynamic = "force-dynamic";
-// 외부 소스(뉴스 RSS·커뮤니티 HTML) 수집이 수초 걸릴 수 있어 데드라인 넉넉히.
+// 외부 소스(뉴스 RSS·커뮤니티 HTML) + LLM 코멘트가 수초 걸릴 수 있어 데드라인 넉넉히.
 export const maxDuration = 30;
 
 export function OPTIONS() {
@@ -45,67 +35,41 @@ interface KeywordsPayload {
 // ── 라이브 결과 메모리 캐시(TTL) + in-flight dedup ──────────────────────────
 // snapshot-first 정신(§4.6): 한 사용자의 새로고침/동시 접속이 외부 소스를 반복 폭격하지 않게,
 // 라이브 산출 결과를 서버 인스턴스 단위로 짧게 캐시하고 동시 요청은 진행 중 Promise 를 공유한다.
-// (Phase 4 의 일일 DB 스냅샷이 들어오면 이 메모리 캐시는 백업 역할로 내려간다.)
+// (Phase 4 의 일일 DB 스냅샷이 메인이면 이 메모리 캐시는 스냅샷 미스 시 백업.)
 const TTL_MS = 30 * 60 * 1000;
 let cache: { at: number; payload: KeywordsPayload } | null = null;
 let inflight: Promise<KeywordsPayload> | null = null;
 
-/** 뉴스/커뮤니티 실수집 → 키워드 카드 산출. 실패해도 throw 없이 mock 폴백을 돌려준다. */
+/** 라이브 산출(공유 파이프라인). 실패해도 throw 없이 mock 폴백. */
 async function computeLive(date: string): Promise<KeywordsPayload> {
-  const [newsResult, communityResult] = await Promise.allSettled([fetchAllNews(), fetchCommunity()]);
-
-  const items: KeywordSourceItem[] = [];
-  if (newsResult.status === "fulfilled") {
-    for (const a of newsResult.value) {
-      items.push({
-        title: a.title,
-        ...(a.summary ? { summary: a.summary } : {}),
-        publishedAt: a.publishedAt,
-        source: a.source,
-        lang: a.lang,
-      });
-    }
-  } else {
-    console.warn("[fomo/keywords] news error", newsResult.reason);
+  try {
+    const { cards, confidence } = await computeKeywordCards();
+    return { date, cards, confidence, live: true };
+  } catch (err) {
+    console.warn("[fomo/keywords] live compute failed — mock fallback", err);
+    const { MOCK_KEYWORD_CARDS } = await import("@fomo/core");
+    return { date, cards: MOCK_KEYWORD_CARDS, confidence: "fallback", live: false };
   }
-
-  const communitySignals =
-    communityResult.status === "fulfilled" ? communityResult.value.sources : [];
-  if (communityResult.status === "rejected") {
-    console.warn("[fomo/keywords] community error", communityResult.reason);
-  }
-
-  // 뉴스 추출 → 커뮤니티 참여도 가산(뉴스로 확인된 테마에만, §4.3 보수적) → 점수.
-  const extracted = mergeCommunityEngagement(extractKeywords(items), communitySignals);
-  const scored = scoreKeywords(extracted, { nowMs: Date.now() });
-  const ruleCards = buildKeywordCards(scored);
-
-  // 키워드 0건 = 보여줄 게 없음 → mock 명시적 폴백(가짜 점수 강제 생성 금지, §5).
-  if (ruleCards.length === 0) {
-    return { date, cards: MOCK_KEYWORD_CARDS, confidence: "fallback", live: true };
-  }
-
-  // Phase 3: 코멘트를 LLM 1차로(가드레일 + 룰 폴백 강등). 점수 로직은 그대로 — 코멘트 텍스트만 교체.
-  const cards = await addKeywordCardComments(scored, ruleCards);
-  return { date, cards, confidence: overallConfidence(scored), live: true };
 }
 
-/** TTL 캐시 + dedup 래퍼. */
+/** 스냅샷-우선 → 캐시 → 라이브 dedup. */
 async function getPayload(date: string): Promise<KeywordsPayload> {
+  // 1) 오늘 스냅샷(테이블 없으면 null) — cron 이 채운 안정 데이터를 외부 호출 없이 즉시 반환.
+  const snap = await readKeywordSnapshot(date);
+  if (snap) return { date, cards: snap.cards, confidence: snap.confidence, live: false };
+
+  // 2) 메모리 캐시.
   if (cache && Date.now() - cache.at < TTL_MS && cache.payload.date === date) {
     return cache.payload;
   }
   if (inflight) return inflight;
 
+  // 3) 라이브 산출(dedup).
   inflight = (async () => {
     try {
       const payload = await computeLive(date);
       cache = { at: Date.now(), payload };
       return payload;
-    } catch (err) {
-      // 라이브 경로 자체가 깨져도 빈 화면 금지 — mock 명시적 폴백.
-      console.warn("[fomo/keywords] live compute failed — mock fallback", err);
-      return { date, cards: MOCK_KEYWORD_CARDS, confidence: "fallback" as const, live: false };
     } finally {
       inflight = null;
     }

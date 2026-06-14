@@ -51,13 +51,6 @@ export function KeywordDepthPage({ card, onClose }: { card: KeywordCard; onClose
             </div>
           </section>
 
-          <div className="mt-8 rounded-xl border border-dashed border-hairline px-4 py-4">
-            <p className="font-pixel text-[11px] text-muted">곧 추가될 거야</p>
-            <p className="mt-1.5 text-sm leading-6 text-muted">
-              이 테마 더 깊이 보기 · 관심 종목 모아보기
-            </p>
-          </div>
-
           <p className="mt-8 text-center text-[11px] leading-5 text-muted">
             지난 흐름을 친구처럼 풀어준 거예요. 투자 조언이 아니에요.
           </p>
