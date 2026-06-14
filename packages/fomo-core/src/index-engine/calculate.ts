@@ -46,6 +46,15 @@ export function computeFomoIndex(inputs: FomoIndexInputs, date: string): FomoInd
     safeHeat("emotion",   () => emotionHeat(inputs.emotion),     fallbackHeat("emotion",   30)),
     safeHeat("whale",     () => whaleHeat(inputs.whale),         fallbackHeat("whale",     10)),
   ];
+
+  // 폴백 사용 현황 요약 로그 — 운영자가 어떤 소스가 누락됐는지 빠르게 파악할 수 있도록.
+  const fallbacks = components
+    .filter((c) => c.meta?.confidence === "fallback")
+    .map((c) => `${c.key}(${c.meta?.fallbackReason ?? "unknown"})`);
+  if (fallbacks.length > 0) {
+    console.warn(`[fomo-core/computeFomoIndex] fallback heats: ${fallbacks.join(", ")} — date=${date}`);
+  }
+
   const score = components.reduce((acc, c) => acc + c.score, 0);
   return { date, score, state: scoreToState(score), components };
 }

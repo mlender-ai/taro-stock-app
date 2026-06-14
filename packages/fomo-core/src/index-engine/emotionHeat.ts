@@ -41,8 +41,9 @@ export function emotionHeat(tally: EmotionTally = {}): HeatComponent {
     if (total === 0) {
       const meta: HeatMeta = {
         confidence: "fallback",
-        sourcesTotal: 1, // 단일 소스: 사용자 투표
+        sourcesTotal: 1,
         sourcesAvailable: 0,
+        fallbackReason: "no_data",
       };
       return { key: "emotion", score: NEUTRAL, max: EMOTION_HEAT_MAX, meta };
     }
@@ -66,7 +67,7 @@ export function emotionHeat(tally: EmotionTally = {}): HeatComponent {
       key: "emotion",
       score: NEUTRAL,
       max: EMOTION_HEAT_MAX,
-      meta: { confidence: "fallback", sourcesTotal: 1, sourcesAvailable: 0 },
+      meta: { confidence: "fallback", sourcesTotal: 1, sourcesAvailable: 0, fallbackReason: "error" },
     };
   }
 }

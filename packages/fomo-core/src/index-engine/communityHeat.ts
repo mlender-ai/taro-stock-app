@@ -117,10 +117,12 @@ export function communityHeat(signals: CommunitySignals = {}): HeatComponent {
         : Math.round((parts.reduce((a, b) => a + b, 0) / parts.length) * COMMUNITY_HEAT_MAX);
 
     // ── 신뢰도 메타 (1-B) ──
+    const confidence = determineConfidence(sourcesAvailable, SOURCES_TOTAL);
     const meta: HeatMeta = {
-      confidence: determineConfidence(sourcesAvailable, SOURCES_TOTAL),
+      confidence,
       sourcesTotal: SOURCES_TOTAL,
       sourcesAvailable,
+      ...(confidence === "fallback" && { fallbackReason: "no_data" }),
     };
 
     return { key: "community", score: clamp(score), max: COMMUNITY_HEAT_MAX, meta };
@@ -130,7 +132,7 @@ export function communityHeat(signals: CommunitySignals = {}): HeatComponent {
       key: "community",
       score: NEUTRAL,
       max: COMMUNITY_HEAT_MAX,
-      meta: { confidence: "fallback", sourcesTotal: 3, sourcesAvailable: 0 },
+      meta: { confidence: "fallback", sourcesTotal: 3, sourcesAvailable: 0, fallbackReason: "error" },
     };
   }
 }

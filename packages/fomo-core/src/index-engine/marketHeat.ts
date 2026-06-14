@@ -46,10 +46,12 @@ export function marketHeat(signals: MarketSignals = {}): HeatComponent {
         ? NEUTRAL
         : Math.round((parts.reduce((a, b) => a + b, 0) / parts.length) * MARKET_HEAT_MAX);
 
+    const confidence = determineConfidence(sourcesAvailable, SOURCES_TOTAL);
     const meta: HeatMeta = {
-      confidence: determineConfidence(sourcesAvailable, SOURCES_TOTAL),
+      confidence,
       sourcesTotal: SOURCES_TOTAL,
       sourcesAvailable,
+      ...(confidence === "fallback" && { fallbackReason: "no_data" }),
     };
 
     return { key: "market", score: clamp(score), max: MARKET_HEAT_MAX, meta };
@@ -59,7 +61,7 @@ export function marketHeat(signals: MarketSignals = {}): HeatComponent {
       key: "market",
       score: NEUTRAL,
       max: MARKET_HEAT_MAX,
-      meta: { confidence: "fallback", sourcesTotal: 4, sourcesAvailable: 0 },
+      meta: { confidence: "fallback", sourcesTotal: 4, sourcesAvailable: 0, fallbackReason: "error" },
     };
   }
 }

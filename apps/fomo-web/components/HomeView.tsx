@@ -4,6 +4,7 @@ import { useState } from "react";
 import { scoreToColor, type EmotionType } from "@fomo/core";
 import { KeywordCardFeed } from "@/components/KeywordCardFeed";
 import { KeywordHistory } from "@/components/KeywordHistory";
+import { FomoIndexSkeleton } from "@/components/SkeletonLoader";
 import type {
   FomoIndexResponse,
   TallyResponse,
@@ -51,7 +52,7 @@ export function HomeView({
         </div>
 
         {/* 시장 온도(FOMO Index) + 어제 대비 변화 — 얇은 띠 */}
-        {index && (
+        {index ? (
           <div className="mt-3 flex items-center justify-between rounded-xl border border-hairline bg-surface px-4 py-2.5">
             <span className="text-xs text-muted">오늘의 시장 온도</span>
             <div className="flex items-baseline gap-2">
@@ -68,6 +69,8 @@ export function HomeView({
               )}
             </div>
           </div>
+        ) : (
+          <FomoIndexSkeleton />
         )}
 
         <div className="mt-3">

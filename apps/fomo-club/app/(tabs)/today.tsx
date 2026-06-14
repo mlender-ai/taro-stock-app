@@ -63,6 +63,7 @@ export default function Today() {
                 FOMO INDEX · {index.state}
                 {index.prevDayDelta ? ` · 전일 ${index.prevDayDelta > 0 ? "+" : ""}${index.prevDayDelta}` : ""}
               </Text>
+              <Text style={styles.contextLine}>오늘의 집단 감정은 {index.state} 상태예요.</Text>
             </>
           ) : (
             <Text style={styles.indexMeta}>불러오는 중…</Text>
@@ -95,6 +96,7 @@ const styles = StyleSheet.create({
   indexBox: { alignItems: "center", marginTop: Spacing.s12 },
   score: { fontSize: 40, fontWeight: "800", lineHeight: 44 },
   indexMeta: { color: FomoColors.muted, fontSize: 12, marginTop: 6 },
+  contextLine: { color: FomoColors.muted, fontSize: 13, marginTop: 8, textAlign: "center" },
   line: { color: FomoColors.whiteout, fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: Spacing.s12, maxWidth: 300 },
   disclaimer: { color: FomoColors.muted, fontSize: 11, lineHeight: 20, textAlign: "center", marginTop: Spacing.s24 },
   bold: { color: FomoColors.whiteout },

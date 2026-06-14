@@ -38,6 +38,12 @@ export interface HeatMeta {
   sourcesAvailable: number;
   /** 캐시 사용 시 타임스탬프(ISO 8601). 미사용이면 undefined. */
   cachedAt?: string;
+  /**
+   * 폴백 사용 사유 — confidence="fallback"일 때 이유 기록.
+   * "no_data": 입력 데이터 없음. "error": 산출 중 예외 발생.
+   * 이슈 #415 (CTO): 폴백-적용 상황 명확화.
+   */
+  fallbackReason?: "no_data" | "error";
 }
 
 // ---------------------------------------------------------------------------
