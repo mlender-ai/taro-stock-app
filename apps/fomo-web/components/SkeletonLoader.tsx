@@ -13,12 +13,15 @@ function SkeletonBox({ className = "" }: { className?: string }) {
   );
 }
 
-/** FOMO Index 숫자 + 상태 라벨 영역 스켈레톤. */
+/** FOMO Index 스트립 영역 스켈레톤 — HomeView 상단 띠와 동일 레이아웃. */
 export function FomoIndexSkeleton() {
   return (
-    <div className="mt-3 flex flex-col items-center gap-2">
-      <SkeletonBox className="h-10 w-16" />
-      <SkeletonBox className="h-3 w-32" />
+    <div className="mt-3 flex items-center justify-between rounded-xl border border-hairline bg-surface px-4 py-2.5">
+      <SkeletonBox className="h-3 w-24" />
+      <div className="flex items-baseline gap-2">
+        <SkeletonBox className="h-6 w-8" />
+        <SkeletonBox className="h-3 w-10" />
+      </div>
     </div>
   );
 }

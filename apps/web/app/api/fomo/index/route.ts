@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { scoreToColor, scoreToDescription } from "@fomo/core";
+import { scoreToColor, scoreToDescription, buildSummary } from "@fomo/core";
 import { prisma } from "../../../../lib/prisma";
 import { kstDate, computeLiveFomoIndex, corsJson, withCors } from "../../../../lib/fomo";
 import { createLogger } from "../../../../lib/logger";
@@ -54,7 +54,7 @@ export async function GET() {
         emotion:   comp("emotion"),
         whale:     comp("whale"),
       },
-      aiSummary:    "",
+      aiSummary:    buildSummary(idx),
       prevDayDelta: 0,
       avg30Delta:   0,
       live: true,
