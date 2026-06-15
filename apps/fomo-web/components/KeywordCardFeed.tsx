@@ -167,6 +167,11 @@ function KeywordDeck({
     recordViewed(card, Date.now());
     setSelected(card);
   };
+  // CTA "관심"(A안) — "이거 더 볼래" → 관심 기록 + 뎁스 열기. 다음 카드 넘김은 뎁스 닫을 때(closeDepth).
+  const openInterest = (card: KeywordCard) => {
+    recordInterest(card.id, "more", Date.now());
+    openDepth(card);
+  };
   // 뎁스 닫으면 본 카드가 스르륵 넘어가며 다음 카드 노출.
   const closeDepth = () => {
     setSelected(null);
@@ -297,9 +302,9 @@ function KeywordDeck({
           ✕
         </button>
         <button
-          onClick={() => advance("right")}
+          onClick={() => openInterest(top)}
           disabled={!!exiting}
-          aria-label="관심"
+          aria-label="관심 — 자세히 보기"
           className="flex h-14 flex-1 items-center justify-center rounded-full font-pixel text-sm text-white transition-opacity disabled:opacity-40"
           style={{ backgroundColor: UP }}
         >
