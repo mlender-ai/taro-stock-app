@@ -20,6 +20,73 @@ const DOCS: SourceDoc[] = [
 
 const baseRaw: RawThemeInsight = { stocks: [], bull: [], bear: [], wordings: [], stanceNote: "" };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ★ 불변 규칙 (회귀 방지, BTRACK_VERIFIED_HANDOFF §1) — 절대 원칙의 코드화.
+// 이 5종이 빨개지면 그건 회귀다. 테스트를 약화시키지 말고 코드를 고친다.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("★ 불변 규칙 (회귀 방지)", () => {
+  const fullRaw: RawThemeInsight = {
+    stocks: ["삼성전자"],
+    bull: [{ claim: "외국인이 담았어", sourceId: "S1", quote: "외국인 매수세가 삼성전자" }],
+    bear: [{ claim: "단기 차익실현이 나왔어", sourceId: "S2", quote: "차익실현에 나섰다" }],
+    wordings: [{ text: "가즈아 풀매수", sourceId: "S3" }],
+    stanceNote: "",
+  };
+
+  it("불변1 — 결정성: 같은 input 이면 항상 같은 output(강세/약세/워딩 동일)", () => {
+    const a = assembleThemeInsight("반도체", DOCS, fullRaw);
+    const b = assembleThemeInsight("반도체", DOCS, fullRaw);
+    expect(a).toEqual(b);
+    expect(a.bull.length).toBe(b.bull.length);
+    expect(a.bear.length).toBe(b.bear.length);
+    expect(a.wordings).toEqual(b.wordings);
+  });
+
+  it("불변2a — 워딩은 community 만(news/official 워딩 폐기)", () => {
+    const raw: RawThemeInsight = {
+      ...baseRaw,
+      bull: [{ claim: "외국인이 담았어", sourceId: "S1", quote: "외국인 매수세가 삼성전자" }],
+      wordings: [{ text: "외국인 매수세가 삼성전자", sourceId: "S1" }], // news → 폐기
+    };
+    expect(assembleThemeInsight("반도체", DOCS, raw).wordings).toHaveLength(0);
+  });
+
+  it("불변2b — 강세/약세 근거는 news/official 만(community 근거 폐기)", () => {
+    const raw: RawThemeInsight = {
+      ...baseRaw,
+      bull: [{ claim: "가즈아 분위기", sourceId: "S3", quote: "가즈아 풀매수" }], // community → 폐기
+    };
+    expect(assembleThemeInsight("반도체", DOCS, raw).bull).toHaveLength(0);
+  });
+
+  it("불변3 — grounding: 원문에 없는 quote(환각)는 폐기", () => {
+    const raw: RawThemeInsight = {
+      ...baseRaw,
+      bull: [{ claim: "지어낸 일반론", sourceId: "S1", quote: "이 문장은 원문에 절대 없다" }],
+    };
+    expect(assembleThemeInsight("반도체", DOCS, raw).bull).toHaveLength(0);
+  });
+
+  it("불변4 — 균형/정직: 약세 0이면 stance 가 '약세 안 보여'로 정직 표기(가짜 안 채움)", () => {
+    const raw: RawThemeInsight = {
+      ...baseRaw,
+      bull: [{ claim: "외국인이 담았어", sourceId: "S1", quote: "외국인 매수세가 삼성전자" }],
+    };
+    const r = assembleThemeInsight("반도체", DOCS, raw);
+    expect(r.stance).toBe("bull-dominant");
+    expect(r.bear).toHaveLength(0);
+    expect(r.stanceNote).toMatch(/약세.*안 보여/);
+  });
+
+  it("불변5 — 투자조언 차단: 매수/매도/예측 명령형 claim 은 폐기", () => {
+    const raw: RawThemeInsight = {
+      ...baseRaw,
+      bull: [{ claim: "지금 삼성전자 매수해라", sourceId: "S1", quote: "외국인 매수세가 삼성전자" }],
+    };
+    expect(assembleThemeInsight("반도체", DOCS, raw).bull).toHaveLength(0);
+  });
+});
+
 describe("assembleThemeInsight — grounding 가드(환각 차단)", () => {
   it("원문에 박힌 quote 만 통과, 지어낸 quote 는 폐기", () => {
     const raw: RawThemeInsight = {
