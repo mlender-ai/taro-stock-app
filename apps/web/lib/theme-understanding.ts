@@ -206,10 +206,86 @@ function officialFactsFrom(docs: readonly SourceDoc[]): OfficialFact[] {
     }));
 }
 
-/** 테마 이해·구조화 — 수집 → LLM → grounding 검증(assemble) → 워딩 LLM 안전 판정. 실패 시 정직한 빈 상태. */
-export async function understandTheme(theme: string): Promise<ThemeInsight> {
-  const docs = await collectThemeDocs(theme);
-  if (docs.length === 0) return emptyThemeInsight(theme, "수집된 원문이 없음(소스 도달 실패 또는 매칭 0)");
+/** 종목명 → 네이버 종토방 코드(국내 상장만). 해외주(엔비디아 등)는 종토방 없음 → 뉴스+디시만. */
+const STOCK_NAVER_CODES: Record<string, string> = {
+  삼성전자: "005930",
+  SK하이닉스: "000660",
+  카카오: "035720",
+  NAVER: "035420",
+  에코프로비엠: "247540",
+  LG에너지솔루션: "373220",
+  셀트리온: "068270",
+  삼성바이오로직스: "207940",
+};
+
+/** 개별 종목 원문 수집(작업3) — 뉴스(종목명 필터) + 종토방(국내) + 디시(종목명 필터). FRED 없음. */
+export async function collectStockDocs(stock: string): Promise<SourceDoc[]> {
+  const code = STOCK_NAVER_CODES[stock];
+  const [newsRes, dcRes, commRes] = await Promise.allSettled([
+    fetchAllNews(),
+    fetchDcStockTitles(),
+    code ? fetchNaverBoardPosts(code) : Promise.resolve([]),
+  ]);
+
+  const docs: SourceDoc[] = [];
+  let n = 0;
+  const nextId = () => `S${++n}`;
+  const mentions = (s: string) => s.includes(stock);
+
+  // 뉴스 — 종목명이 제목/요약에 등장하는 기사만.
+  if (newsRes.status === "fulfilled") {
+    const hit = newsRes.value.filter((a) => mentions(`${a.title} ${a.summary ?? ""}`)).slice(0, MAX_NEWS);
+    for (const a of hit) {
+      docs.push({
+        id: nextId(),
+        kind: "news",
+        title: a.title,
+        ...(a.summary ? { body: a.summary } : {}),
+        ...(a.source ? { source: a.source } : {}),
+        ...(a.url ? { url: a.url } : {}),
+        ...(a.publishedAt ? { publishedAt: a.publishedAt } : {}),
+        tier: a.tier ?? "news-mid",
+      });
+    }
+  } else {
+    console.warn("[stock-understanding] news error", newsRes.reason);
+  }
+
+  // 종토방(국내 종목) — 그 종목 토론방 제목 원문.
+  if (commRes.status === "fulfilled") {
+    for (const post of commRes.value.slice(0, MAX_COMMUNITY)) {
+      docs.push({
+        id: nextId(),
+        kind: "community",
+        title: post.title,
+        source: `네이버 종토방 ${stock}`,
+        ...(post.tsMs ? { publishedAt: new Date(post.tsMs).toISOString() } : {}),
+        tier: "community-mid",
+      });
+    }
+  }
+
+  // 디시 — 종목명 언급 글만(community-low). 워딩 필터가 진입 전 거른다.
+  if (dcRes.status === "fulfilled") {
+    for (const t of dcRes.value.filter(mentions).slice(0, 6)) {
+      docs.push({ id: nextId(), kind: "community", title: t, source: "디시 주식갤러리", tier: "community-low" });
+    }
+  }
+
+  return docs;
+}
+
+/** 개별 종목 이해·구조화(작업3, BM 심장) — 테마와 동일 구조/가드. 자료 적으면 정직한 빈 상태. */
+export async function understandStock(stock: string): Promise<ThemeInsight> {
+  return runUnderstanding(stock, await collectStockDocs(stock));
+}
+
+/**
+ * 이해 코어(테마/종목 공용) — 수집된 docs 를 LLM 으로 읽고 grounding 검증(assemble) → 워딩 안전 판정.
+ * subject 는 테마명 또는 종목명. 실패/미설정/빈 docs → 정직한 빈 상태.
+ */
+async function runUnderstanding(subject: string, docs: SourceDoc[]): Promise<ThemeInsight> {
+  if (docs.length === 0) return emptyThemeInsight(subject, "수집된 원문이 없음(소스 도달 실패 또는 매칭 0)");
 
   // 공식 지표 팩트(FRED) — LLM 결과와 별개로 항상 노출(있으면). 강세/약세로 해석하지 않는다.
   const officialFacts = officialFactsFrom(docs);
@@ -218,7 +294,7 @@ export async function understandTheme(theme: string): Promise<ThemeInsight> {
 
   const apiKey = resolveAiKey();
   if (!AI_API_URL || !apiKey) {
-    return withFacts(emptyThemeInsight(theme, "AI 미설정 — 이해 레이어 비활성(정직한 빈 상태)"));
+    return withFacts(emptyThemeInsight(subject, "AI 미설정 — 이해 레이어 비활성(정직한 빈 상태)"));
   }
 
   try {
@@ -228,17 +304,17 @@ export async function understandTheme(theme: string): Promise<ThemeInsight> {
       body: JSON.stringify({
         model: MODEL,
         temperature: TEMPERATURE,
-        messages: [{ role: "user", content: buildThemeInsightPrompt(theme, docs) }],
+        messages: [{ role: "user", content: buildThemeInsightPrompt(subject, docs) }],
       }),
       signal: AbortSignal.timeout(45_000),
     });
     if (!res.ok) {
-      console.warn("[theme-understanding] LLM", res.status);
-      return withFacts(emptyThemeInsight(theme, `LLM ${res.status} — 정직한 빈 상태`));
+      console.warn("[understanding] LLM", res.status);
+      return withFacts(emptyThemeInsight(subject, `LLM ${res.status} — 정직한 빈 상태`));
     }
     const data = (await res.json()) as LlmResponse;
     const raw = parseThemeInsightResponse(data.choices?.[0]?.message?.content ?? "");
-    const insight = assembleThemeInsight(theme, docs, raw);
+    const insight = assembleThemeInsight(subject, docs, raw);
 
     // 2단계: 룰 통과 워딩을 LLM 으로 한 번 더 안전 판정(욕설/단정/혐오/찌라시 — 룰이 못 잡는 뉘앙스).
     if (insight.wordings.length === 0) return withFacts(insight);
@@ -263,7 +339,12 @@ export async function understandTheme(theme: string): Promise<ThemeInsight> {
       wordingAudit: [...(insight.wordingAudit ?? []), ...llmAudit],
     });
   } catch (err) {
-    console.warn("[theme-understanding] error", err);
-    return withFacts(emptyThemeInsight(theme, "이해 레이어 호출 실패 — 정직한 빈 상태"));
+    console.warn("[understanding] error", err);
+    return withFacts(emptyThemeInsight(subject, "이해 레이어 호출 실패 — 정직한 빈 상태"));
   }
+}
+
+/** 테마 이해·구조화 — 테마 docs 수집 후 공용 코어. */
+export async function understandTheme(theme: string): Promise<ThemeInsight> {
+  return runUnderstanding(theme, await collectThemeDocs(theme));
 }
