@@ -96,6 +96,12 @@ export const fetchThemeInsight = (theme: string) =>
     `/api/fomo/theme-insight?theme=${encodeURIComponent(theme)}`
   );
 
+/** 개별 종목 이해·응축(작업3) — 종목 라벨 탭 시 lazy 로 부른다(테마 뎁스와 동일 구조). */
+export const fetchStockInsight = (stock: string) =>
+  get<import("@fomo/core").CondensedInsight>(
+    `/api/fomo/stock-insight?stock=${encodeURIComponent(stock)}`
+  );
+
 export const fetchCalendar = (sessionId: string, month?: string) =>
   get<CalendarResponse>(
     `/api/fomo/emotions/calendar?sessionId=${encodeURIComponent(sessionId)}${month ? `&month=${month}` : ""}`
