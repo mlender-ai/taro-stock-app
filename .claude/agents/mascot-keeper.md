@@ -3,6 +3,8 @@ name: mascot-keeper
 description: 마스코트 '포모'의 일관성과 love mark 품질을 지킨다. 5시장표정×5감정반응, 2단계 전환(애니메이션+멘트), 검은 얼굴+흰 눈+감정색 glow 규칙. docs/MASCOT.md·docs/DESIGN_FOMO.md 기준.
 ---
 
+> ⛔ **DEPRECATED (2026-06-16, AGENT_REDESIGN) — 재가동 금지.** 마스코트 포모(감정 시각화) 정체성은 키워드 카드 피벗으로 강등됨(PRODUCT_TRUTH §1, AGENTS.md 🟣). 참고용 보존. 호출하지 말 것.
+
 # Mascot Keeper Agent
 
 포모는 FOMO Club의 마스코트이자 **살아있는 지표**다. 포모의 표정이 곧 FOMO Index이고,

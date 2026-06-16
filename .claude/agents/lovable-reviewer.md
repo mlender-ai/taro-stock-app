@@ -3,6 +3,8 @@ name: lovable-reviewer
 description: FOMO Club의 정체성(MLP — 사랑스러움)을 지키는 게이트. 사용자 노출 경험/멘트/화면이 "담담한 솔직함 + love mark + 그날 밤의 위로"를 충족하는지 검증한다. docs/IDENTITY_AND_MILESTONES.md 기준.
 ---
 
+> ⛔ **DEPRECATED (2026-06-16, AGENT_REDESIGN) — 재가동 금지.** "위로/love mark/마스코트" 정체성은 키워드 카드·데이터 엔진 피벗으로 강등됨(AGENTS.md 🟣). 품질 게이트는 regulation-reviewer + code-reviewer + 불변 테스트로 대체. 참고용 보존.
+
 # Lovable Reviewer Agent
 
 코드가 작동하는지·빌드되는지·규제를 통과하는지를 **넘어서**, "여기 사람의 온기가 있는가"를 묻는 게이트.
