@@ -52,21 +52,21 @@ export default function Today() {
           </View>
         )}
 
-        <Text style={styles.faceLabel}>오늘의 포모</Text>
-        <FomoFace face={index ? scoreToFace(index.score) : "curious"} size={96} glow={color} />
-
-        <View style={styles.indexBox}>
-          {index ? (
-            <>
-              <Text style={[styles.score, { color }]}>{index.score}</Text>
-              <Text style={styles.indexMeta}>
-                FOMO INDEX · {index.state}
-                {index.prevDayDelta ? ` · 전일 ${index.prevDayDelta > 0 ? "+" : ""}${index.prevDayDelta}` : ""}
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.indexMeta}>불러오는 중…</Text>
-          )}
+        <View style={styles.fomoRow}>
+          <FomoFace face={index ? scoreToFace(index.score) : "curious"} size={80} glow={color} />
+          <View style={styles.indexBox}>
+            {index ? (
+              <>
+                <Text style={[styles.score, { color }]}>{index.score}</Text>
+                <Text style={styles.indexMeta}>
+                  FOMO INDEX · {index.state}
+                  {index.prevDayDelta ? ` · 전일 ${index.prevDayDelta > 0 ? "+" : ""}${index.prevDayDelta}` : ""}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.indexMeta}>불러오는 중…</Text>
+            )}
+          </View>
         </View>
 
         {state && <Text style={styles.line}>{marketLine(state)}</Text>}
@@ -92,7 +92,8 @@ const styles = StyleSheet.create({
   sub: { color: FomoColors.muted, fontSize: 12 },
   block: { width: "100%", marginVertical: Spacing.s16 },
   faceLabel: { color: FomoColors.muted, fontSize: 12, marginBottom: Spacing.s8 },
-  indexBox: { alignItems: "center", marginTop: Spacing.s12 },
+  fomoRow: { flexDirection: "row", alignItems: "center", gap: Spacing.s16, marginTop: Spacing.s12 },
+  indexBox: { alignItems: "flex-start" },
   score: { fontSize: 40, fontWeight: "800", lineHeight: 44 },
   indexMeta: { color: FomoColors.muted, fontSize: 12, marginTop: 6 },
   line: { color: FomoColors.whiteout, fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: Spacing.s12, maxWidth: 300 },
