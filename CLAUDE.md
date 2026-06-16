@@ -1,20 +1,24 @@
-# Trading Taro — 증권 시장 타로 해석 앱
+# FOMO Club — 투자 판단력을 기르는 정보 피드
 
 ## 사용자 (최광혁)
 
-- Trading Taro 1인 개발자 겸 프로덕트 오너
+- FOMO Club 1인 개발자 겸 프로덕트 오너
 - Next.js, TypeScript, React Native, Prisma에 익숙한 풀스택 개발자
 - 여러 세션/기기에서 병렬로 작업함 → 토큰 효율 중요
 
 ## 프로젝트 컨텍스트
 
-- **레포**: `mlender-ai/taro-stock-app`
-- **제품**: 증권 시장의 기술적 지표를 AI가 분석하여 타로 카드 형식으로 해석을 제공하는 네이티브 앱
-- **리포지셔닝 (현재 최우선)**: 본 프로젝트는 **FOMO CLUB**으로 리포지셔닝 중이다(MVP 우선 출시). 타로 엔진/코드는 모노레포 내 보존하며 해석 백엔드로 후속 연계한다. 레포 디렉토리·패키지 리네이밍(@trading/*, @taro/*, tarot-mobile 등)은 출시 전후 별도 정리 라운드로 연기한다. 정의/지표/마스코트는 `docs/FOMO_CLUB.md`, `docs/FOMO_INDEX.md`, `docs/MASCOT.md` 참조.
-- **FOMO Club 방향 전환(docs/PIVOT_FEED_FIRST.md)**: 액션 제로, 감정 탭 피드 중심. 감정 기록/캘린더는 flag로 숨김(packages/fomo-core/src/features.ts — 삭제 금지, 복원 가능).
-- **🚫 타로 신규 작업 거부 (확정 — 모든 세션·에이전트 준수)**: 앞으로 **FOMO Club이 최우선이자 유일한 제품 개발 대상**이다. 타로(tarot-core 프롬프트/해석, tarot-mobile 화면·UX, Signal Engine 등) 관련 **신규 기능·개선·이슈·PR은 거부**한다. 기존 타로 코드는 보존만 하며 손대지 않는다. 에이전트 카운슬(github-actions)이 타로 관련 제안을 올리면 구현하지 말고 조용히 close(not_planned). FOMO Club과 직접 연계되는 해석 백엔드 작업만 예외적으로 후속 라운드에서 검토한다.
-- **모노레포 구조**: `apps/web` (API + 어드민), `apps/api` (Fastify 백엔드/워커), `apps/tarot-mobile` (React Native), `packages/shared` (공용 타입), `packages/tarot-core` (비즈니스 로직). FOMO Club 신설 예정: `apps/fomo-club`, `apps/fomo-web`, `packages/fomo-core`.
-- **기능명세서**: `docs/기능명세서.md` 참조
+- **레포**: `mlender-ai/taro-stock-app` (디렉토리·패키지명은 타로 시절 잔재 — 리네이밍은 후속 정리 라운드로 연기. 제품 정체성과 무관).
+- **제품**: **파편화된 투자 정보(섹터·종목·뉴스·여론·공식 데이터)를 한 곳에 응축해, 사용자가 스스로 판단력을 기르도록 돕는 피드.** 시장을 대신 분석해주거나 위로하는 앱이 아니라, *판단 재료*를 모아 보여주는 곳이다.
+  - 핵심 경험: **키워드 카드**(오늘 쏠린 키워드) + **이해 레이어**(theme/stock-insight — 원문 grounded 강세/약세 관점·사람들 워딩). 수집→이해→재가공→응축의 데이터 엔진이 제품의 심장.
+- **정체성 정본(SSOT)**: 아래 4문서가 최상위 기준이다. 충돌 시 이 문서들이 이긴다.
+  - `docs/PRODUCT_TRUTH.md` — 제품 정의·폐기물
+  - `docs/PRODUCT_VISION.md` — 취향 기반 알고리즘 피드 비전(위로 아님 — 파편 정보 응축으로 판단력)
+  - `docs/DATA_ENGINE_STRATEGY.md` — 데이터 엔진 고도화(수집→이해→재가공→응축), tier, 머지정책
+  - `docs/AGENT_REDESIGN.md` — 에이전트 재설계 정본
+- **🚫 타로 신규 작업 거부 (확정 — 모든 세션·에이전트 준수)**: **FOMO Club이 유일한 제품 개발 대상**이다. 타로(tarot-core 프롬프트/해석, tarot-mobile 화면·UX, Signal Engine 등) 관련 **신규 기능·개선·이슈·PR은 거부**한다. 기존 타로 코드는 **보존만**(삭제 금지) 하며 손대지 않는다. 에이전트가 타로 관련 제안을 올리면 구현하지 말고 조용히 close(not_planned).
+- **감정 기능(기록/캘린더/투표)**: flag로 숨김 상태(`packages/fomo-core/src/features.ts` — 삭제 금지, 복원 가능). **현재 정체성이 아님** — 데이터 엔진 피벗으로 강등됨.
+- **모노레포 구조**: `apps/web` (API + 어드민), `apps/api` (Fastify 백엔드/워커), `apps/tarot-mobile` (React Native, 보존), `packages/shared` (공용 타입), `packages/tarot-core` (타로 로직, 보존). FOMO Club: `apps/fomo-web`, `apps/fomo-club`, `packages/fomo-core`.
 
 ---
 
@@ -55,36 +59,35 @@
 7. react-native-svg 사용 시 lib/svg.ts 래퍼 import. 새 SVG 컴포넌트 추가 시 svg.ts에도 추가.
 ```
 
-### 제품 정체성 (North Star — MLP)
+### 제품 정체성 (현재 방향)
 
-FOMO Club은 MVP가 아니라 **MLP(Minimum Lovable Product)**다. 정체성 정본: `docs/IDENTITY_AND_MILESTONES.md` (모든 화면·기능 결정의 최상위 기준).
+정체성 정본은 **SSOT 4문서**(`docs/PRODUCT_TRUTH.md` / `docs/PRODUCT_VISION.md` / `docs/DATA_ENGINE_STRATEGY.md` / `docs/AGENT_REDESIGN.md`). 모든 화면·기능 결정의 최상위 기준이며, 충돌 시 이 문서들이 이긴다.
 
-- **시금석(모든 결정)**: *"내가 물렸던 그날 밤, 진짜 열고 싶었던 앱 — 그날 밤의 내가 이걸 보고 조금 덜 외로웠을까?"*
-- **톤 3원칙**: ①담담한 솔직함(가짜긍정 "곧 반등" ❌ / 거침 "존버 가즈아" ❌ / 사실 인정 + 혼자 아님 ⭕) ②형태가 곧 윤리(자유 텍스트 날것 ❌ / 규칙·형태로 담기 ⭕) ③깊이 있는 단순함(인디게임 만듦새).
-- **love mark는 nice-to-have가 아니라 의도적 우선순위**(포모의 한마디, 전환 애니메이션, 캘린더의 만족감 등). 일정이 빠듯해도 자르지 않는다.
-- **제품에 대한 FOMO 경계**: 기능 비대화(타로+감정+사주+피드 다 넣기)는 금물. 좁은 범위 안에서 사랑스러움만 maximum. 한 번에 하나씩.
-- 머지/출시 전 **Lovable 게이트**(HARNESS Gate 6, lovable-reviewer)를 통과해야 한다.
+- **핵심**: 파편화된 투자 정보를 응축해 사용자가 *스스로 판단*하게 한다. 시장 대리 분석·대리 결정·위로가 아니라 **판단 재료** 제공.
+- **톤**: 담담한 사실 제공. 위로/감정 진정 톤("곧 반등"·과잉 위로) ❌, 거침("존버 가즈아") ❌, 단정·투자 조언 ❌.
+- **형태가 곧 윤리**: 자유 텍스트 날것 ❌ / 규칙·형태로 담기 ⭕. 강세/약세·워딩은 원문 grounded(지어내기 금지).
+- **깊이 있는 단순함**: 인디게임 만듦새. 기능 비대화 금물 — 좁은 범위, 한 번에 하나씩.
+- **머지 기준**: CI(typecheck/test/build) + 불변 테스트 + 광혁 검수. (구 Lovable 게이트 / HARNESS Gate 6 / lovable-reviewer 는 폐기 — `docs/AGENT_REDESIGN.md`.)
 
-### FOMO Club
+### FOMO Club 데이터 엔진
 
-docs/FOMO_CLUB.md, docs/FOMO_INDEX.md 참조. 모노레포 내 별도 앱(apps/fomo-club, apps/fomo-web)으로 신설한다.
+`docs/DATA_ENGINE_STRATEGY.md` 참조. 수집→이해→재가공→응축이 제품의 심장. 앱: `apps/fomo-web`, `apps/fomo-club`.
 
-- **정직한 숫자 원칙**: 가짜 데이터 금지, 실제 집계값만. 사용자 0~소수여도 그대로 표기.
-- **무가입 웹**: apps/fomo-web은 가입 없이 방문 가능 (익명 세션 기반 집계). 가입은 푸시/기록 저장 등 부가 기능에만 요구.
-- **FOMO Index**: packages/fomo-core에서 산출. 체감 온도계이지 금융 지표가 아니다(투자 조언 아님).
-- **MVP**: 홈 화면 하나에 핵심 경험 집중. 커뮤니티/감정피드는 후속.
-- **스타일링**: apps/fomo-club은 **NativeWind** 사용(마스터 프롬프트 확정). 기존 tarot-mobile은 raw StyleSheet + constants/theme.ts 유지 — 두 앱의 스타일 패턴 공존을 허용한다.
+- **정직한 숫자 원칙**: 가짜 데이터 금지, 실제 집계값만. 사용자 0~소수여도 그대로 표기. 데이터 부족 시 confidence 정직 노출(가짜 응축 금지).
+- **무가입 웹**: apps/fomo-web은 가입 없이 방문 가능 (익명 세션 기반). 가입은 푸시/기록 저장 등 부가 기능에만 요구.
+- **FOMO Index**: fear&greed 식 **보조 지표**(쏠림/관심도). 투자 조언 아니며, 강세/약세 판단 재료 중 하나다. (구 "감정 체감 온도계" 프레이밍은 폐기.)
+- **출처 tier 정직 표기**: 공식 데이터/뉴스/커뮤니티 종류를 라벨로 구분 — 섞지 않는다.
+- **스타일링**: apps/fomo-web·fomo-club은 **NativeWind**. tarot-mobile은 raw StyleSheet + constants/theme.ts 유지 — 공존 허용. 색·토큰 하드코딩 금지(`design/tokens.json` 참조).
 
-### FOMO Club 마스코트 (포모)
+### ⚠️ [폐기 2026-06-16] 구 정체성 — 마스코트·감정 온도계·MLP
 
-docs/MASCOT.md 참조. 포모는 FOMO Club의 마스코트이자 살아있는 지표다.
+아래는 키워드 카드·데이터 엔진 피벗 **이전**의 정체성이다. **현재 기준이 아님(히스토리 보존 — 가역적).** 새 작업·에이전트는 위 SSOT를 따르고, 아래를 정체성으로 되살리지 마라.
 
-- 포모의 표정이 곧 FOMO Index다. 홈 화면의 주인공은 숫자가 아니라 표정 짓는 포모.
-- 두 단계 감정 변화는 필수 구현: ①시장의 포모(진입 직후, FOMO Index 표현) → ②나의 포모(감정 선택 후 반응).
-- 화면 설계 시 이 두 상태와 전환(애니메이션 + 멘트)을 반드시 포함한다.
-- 디자인: 검은 얼굴 + 흰 눈, 얼굴 중심. 배경 검정, 감정 색은 포인트로만. 화면 밀도는 기리고처럼 비운다.
-- 색 체계: FOMO=빨강 / 공포=파랑 / 후회=보라 / 탐욕=초록 / 확신=노랑.
-- **디자인 시스템 정본**: `docs/DESIGN_FOMO.md` (DESIGN.md 표준). 토큰 단일 소스(DTCG): `design/tokens.json`. Figma 연결/왕복: `docs/FIGMA_WORKFLOW.md`. 앱별 포인터: `apps/fomo-web/DESIGN.md`, `apps/fomo-club/DESIGN.md`. 색·토큰 하드코딩 금지 — 토큰 참조.
+- 마스코트 "포모"(표정 = FOMO Index, 2단계 감정 변화, "홈의 주인공은 표정 짓는 포모") — **부활 금지**.
+- FOMO Index = 감정 체감 온도계 프레이밍 — 보조 지표로 강등.
+- MLP / Lovable 시금석("그날 밤 덜 외로웠을까", love mark 우선) — 판단력 피드로 대체.
+- 감정 탭 피드·감정 기록·캘린더 중심 — flag로 숨김(features.ts), 정체성 아님.
+- 참조 docs(`FOMO_CLUB.md` / `FOMO_INDEX.md` / `MASCOT.md` / `IDENTITY_AND_MILESTONES.md` / `PIVOT_FEED_FIRST.md` / `DESIGN_FOMO.md`): 히스토리 보존용, 현재 기준 아님(삭제는 보류).
 
 ### 향후 피처 대비 설계 원칙 (사주팔자 통합)
 
@@ -116,7 +119,9 @@ npx prisma validate                  # 4. DB 스키마 (변경 시)
 
 ```
 CLAUDE.md          ← 지금 이 파일 (진입점)
-  → docs/IDENTITY_AND_MILESTONES.md ← 제품 정체성(North Star, MLP) — 최상위 기준
+  → docs/PRODUCT_TRUTH.md / PRODUCT_VISION.md ← 제품 정의·비전(SSOT) — 최상위 기준
+  → docs/DATA_ENGINE_STRATEGY.md ← 데이터 엔진(수집→이해→재가공→응축) + 머지정책
+  → docs/AGENT_REDESIGN.md ← 에이전트 재설계 정본
   → GSTACK.md      ← 기술 스택 참조
   → AGENTS.md      ← 에이전트 역할 정의 + 라우팅
   → SKILLS.md      ← 도메인 전문 스킬
