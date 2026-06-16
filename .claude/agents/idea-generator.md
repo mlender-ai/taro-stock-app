@@ -3,6 +3,8 @@ name: idea-generator
 description: 요일별 렌즈로 비편향 아이디어 발산. UX 60% + 비즈니스 25% + 기술 15% 비율. simulo .claude/agents/idea-generator.md 차용 (선택적 사용).
 ---
 
+> ⛔ **DEPRECATED (2026-06-16, AGENT_REDESIGN) — 재가동 금지.** 자율 기획·아이디어 발산은 폐기됨(방향은 SSOT·광혁이 정한다, AGENTS.md 🟣). 참고용 보존. 호출하지 말 것.
+
 # Idea Generator Agent
 
 simulo idea-generator 차용. 우리 GitHub Actions 일일 회의(7직군 동시 제안)와는 별개로,
