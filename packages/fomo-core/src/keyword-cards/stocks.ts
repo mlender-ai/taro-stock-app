@@ -158,6 +158,30 @@ export function extractStocks(
   return out;
 }
 
+/**
+ * 종목 아닌 카테고리·품목·산업·소재어 — LLM 이 stocks 필드에 잘못 넣는 것들("희토류", "무기 생산" 등).
+ * relatedStocks 정직성: 종목명이 아닌 것을 종목으로 노출하지 않는다(c-honest). 정확 일치만(부분일치 X — "삼성바이오로직스"의 "바이오" 보호).
+ */
+const NON_STOCK_TERMS: ReadonlySet<string> = new Set([
+  "희토류", "무기", "방산", "반도체", "이차전지", "2차전지", "배터리", "바이오", "제약",
+  "원전", "원자력", "양자", "양자컴퓨터", "로봇", "우주", "수소", "태양광", "풍력",
+  "원자재", "광물", "구리", "니켈", "리튬", "코발트", "우라늄", "곡물",
+  "공급망", "관세", "금리", "환율", "유가", "인공지능", "ai", "반도체장비", "엔터",
+  "게임", "조선", "건설", "화학", "철강", "자동차", "전기차", "메모리", "파운드리",
+  "디스플레이", "통신", "은행", "증권", "보험", "헬스케어", "방위산업",
+]);
+/** 카테고리·활동 접미사(이걸로 끝나면 종목명 아님): "무기 생산", "반도체 관련주" 등. */
+const NON_STOCK_SUFFIX = /(관련주|관련 ?주|테마주|테마|업종|섹터|산업|생산|공급|수출|수입|시장|규제|정책|밸류체인|체인)$/;
+
+/** name 이 개별 종목명으로 그럴듯한가 — relatedStocks 노출 전 필터. 품목·산업·활동어는 거른다. */
+export function isLikelyStock(name: string): boolean {
+  const n = name.trim();
+  if (n.length < 2) return false;
+  if (NON_STOCK_TERMS.has(n.toLowerCase())) return false;
+  if (NON_STOCK_SUFFIX.test(n)) return false;
+  return true;
+}
+
 /** 종목명 → 정의(소스 매핑 등에 사용). 없으면 undefined. */
 export function stockDef(canonical: string): StockDef | undefined {
   return STOCK_VOCAB.find((d) => d.canonical === canonical);
