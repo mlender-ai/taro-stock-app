@@ -583,3 +583,24 @@ describe("발굴 엔진 — 연관 확산 (BM 구멍1, 불변)", () => {
     expect(discoverRelatedStocks(insight).map((x) => x.stock)).toEqual(["제너셈"]);
   });
 });
+
+describe("parseThemeInsightResponse — 깨진 LLM JSON 복구(바이오 파싱 실패 사고)", () => {
+  it("코드펜스로 감싼 JSON 을 파싱한다", () => {
+    const r = parseThemeInsightResponse('```json\n{"stocks":["삼성전자"],"bull":[],"bear":[],"wordings":[],"stanceNote":""}\n```');
+    expect(r).not.toBeNull();
+    expect(r!.stocks).toEqual(["삼성전자"]);
+  });
+  it("스마트따옴표 + trailing comma 를 복구한다", () => {
+    const r = parseThemeInsightResponse('{“stocks”:[“SK하이닉스”,],“bull”:[],“bear”:[],“wordings”:[],“stanceNote”:“”}');
+    expect(r).not.toBeNull();
+    expect(r!.stocks).toEqual(["SK하이닉스"]);
+  });
+  it("문자열 내 raw 줄바꿈(제어문자)을 복구한다", () => {
+    const r = parseThemeInsightResponse('{"stocks":[],"bull":[{"claim":"수요\n증가","sourceId":"S1","quote":""}],"bear":[],"wordings":[],"stanceNote":""}');
+    expect(r).not.toBeNull();
+    expect(r!.bull[0]!.claim).toContain("수요");
+  });
+  it("JSON 이 전혀 없으면 null", () => {
+    expect(parseThemeInsightResponse("죄송합니다, 답변을 드릴 수 없습니다.")).toBeNull();
+  });
+});

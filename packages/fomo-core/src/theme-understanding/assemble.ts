@@ -9,6 +9,7 @@ import type {
 } from "./types";
 import type { RawEvidence, RawThemeInsight, RawWording } from "./parse";
 import { screenWordingRule, type WordingVerdict } from "./wording-filter";
+import { isLikelyStock } from "../keyword-cards/stocks";
 
 /**
  * 이해 레이어의 핵심 가드 — DATA_ENGINE_STRATEGY §6 / 운영자 강조.
@@ -167,9 +168,9 @@ export function assembleThemeInsight(
   const bear = groundEvidence(raw.bear, docById);
   const { wordings, audit: wordingAudit } = groundWordings(raw.wordings, docById);
 
-  // 원문에 언급된 종목만(가벼운 검증 — 종목명이 원문 어딘가 등장).
+  // 원문에 언급된 *종목*만 — 원문 등장 + 종목명다움(품목·산업·활동어 제외: "희토류"·"무기 생산" 등).
   const corpus = norm(docs.map((d) => `${d.title} ${d.body ?? ""}`).join(" "));
-  const stocks = raw.stocks.filter((s) => corpus.includes(norm(s)));
+  const stocks = raw.stocks.filter((s) => corpus.includes(norm(s)) && isLikelyStock(s));
 
   const grounded = bull.length + bear.length;
   if (grounded === 0) {

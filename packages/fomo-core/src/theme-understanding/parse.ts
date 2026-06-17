@@ -1,5 +1,5 @@
 /**
- * LLM 응답(JSON) 파서 — 순수. 코드펜스/잡텍스트 허용. 검증·grounding 은 assemble 이 한다.
+ * LLM 응답(JSON) 파서 — 순수. 코드펜스/잡텍스트/흔한 깨짐 허용. 검증·grounding 은 assemble 이 한다.
  */
 
 export interface RawEvidence {
@@ -53,18 +53,39 @@ function wordingArr(v: unknown): RawWording[] {
   return out;
 }
 
+// 문자열 내 raw 제어문자(줄바꿈·탭 등)는 JSON.parse 를 깨뜨린다 → 공백으로. (리터럴 제어문자 회피 위해 new RegExp 사용)
+const CONTROL_CHARS = new RegExp("[\\u0000-\\u001F]+", "g");
+
+/**
+ * 흔한 LLM JSON 깨짐을 복구해 파싱. 바닐라 → 실패 시 정리 후 재시도.
+ * 코드펜스·스마트따옴표·trailing comma·문자열 내 raw 제어문자가 원인(바이오 등 "파싱 실패" 사고).
+ */
+function parseLenient(slice: string): unknown | null {
+  try {
+    return JSON.parse(slice);
+  } catch {
+    // 무시 — 아래에서 정리 후 재시도
+  }
+  const fixed = slice
+    .replace(/```(?:json)?/gi, "") // 코드펜스 잔재
+    .replace(/[“”]/g, '"') // 스마트 더블쿼트 → "
+    .replace(/[‘’]/g, "'") // 스마트 싱글쿼트 → '
+    .replace(/,(\s*[}\]])/g, "$1") // trailing comma
+    .replace(CONTROL_CHARS, " "); // 제어문자 → 공백
+  try {
+    return JSON.parse(fixed);
+  } catch {
+    return null;
+  }
+}
+
 /** content → RawThemeInsight. 파싱 불가 시 null(호출부가 정직한 빈 상태로). */
 export function parseThemeInsightResponse(content: string): RawThemeInsight | null {
   if (!content) return null;
   const start = content.indexOf("{");
   const end = content.lastIndexOf("}");
   if (start === -1 || end <= start) return null;
-  let obj: unknown;
-  try {
-    obj = JSON.parse(content.slice(start, end + 1));
-  } catch {
-    return null;
-  }
+  const obj = parseLenient(content.slice(start, end + 1));
   if (!obj || typeof obj !== "object") return null;
   const o = obj as Record<string, unknown>;
   return {

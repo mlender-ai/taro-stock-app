@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { condenseThemeInsight, type CondensedInsight } from "@fomo/core";
-import { withCors, kstDate, kstSlot } from "../../../../lib/fomo";
+import { withCors, kstDate } from "../../../../lib/fomo";
 import { understandTheme } from "../../../../lib/theme-understanding";
 
 /**
@@ -24,22 +24,23 @@ export function OPTIONS() {
 // 인스턴스 메모리 Map 은 Vercel 서버리스 콜드/다중 인스턴스에서 미스 잦아 매번 재산출됐다.
 // → Vercel Data Cache(unstable_cache)로 영속화: 인스턴스 무관, 같은 (KST날짜,테마)면 한 번만 LLM,
 //   이후 모든 인스턴스가 즉시 읽기(warm 즉시). DDL/외부 KV 불필요(빌트인).
-// 캐시 키 = (KST날짜, 시간슬롯, 테마). 같은 슬롯 안에선 고정(깜빡임 방지), 슬롯이 바뀌면 새 키 →
-// 그날 최신 뉴스로 재산출(저녁엔 저녁 뉴스 반영). revalidate 는 키가 슬롯/날짜로 바뀌므로 상한일 뿐.
+// 캐시 키 = (KST날짜, 테마). 슬롯 분할을 제거해 cold(첫 산출 20~30초)를 하루 1회로 줄인다.
+// revalidate 6h: 그날 첫 산출 후엔 stale-while-revalidate — 사용자는 항상 즉시(warm) 받고,
+// 6시간 지난 요청은 백그라운드로 갱신(시간대 신선도는 유지하되 대기는 없앤다).
 // inflight: 한 인스턴스 내 동시 요청이 cold 산출을 중복 호출하지 않게 dedup.
+const REVALIDATE_S = 21_600; // 6h
 const inflight = new Map<string, Promise<CondensedInsight>>();
 
 async function getInsight(theme: string): Promise<CondensedInsight> {
   const today = kstDate();
-  const slot = kstSlot();
-  const key = `${today}:${slot}:${theme}`;
+  const key = `${today}:${theme}`;
   const running = inflight.get(key);
   if (running) return running;
 
   const load = unstable_cache(
     async () => condenseThemeInsight(await understandTheme(theme)),
-    ["fomo-theme-insight", today, slot, theme],
-    { revalidate: 86400 }
+    ["fomo-theme-insight", today, theme],
+    { revalidate: REVALIDATE_S }
   );
 
   const p = load().finally(() => inflight.delete(key));

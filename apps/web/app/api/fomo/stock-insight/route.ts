@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { condenseThemeInsight, type CondensedInsight } from "@fomo/core";
-import { withCors, kstDate, kstSlot } from "../../../../lib/fomo";
+import { withCors, kstDate } from "../../../../lib/fomo";
 import { understandStock } from "../../../../lib/theme-understanding";
 
 /**
@@ -18,22 +18,20 @@ export function OPTIONS() {
   return withCors(new NextResponse(null, { status: 204 }));
 }
 
-// 성능(PERF LOADING HANDOFF §1·§2): understandStock 은 종목별 LLM 이라 더 느릴 수 있다.
-// theme-insight 와 동일 정책 — Vercel Data Cache(unstable_cache)로 영속화해 (KST날짜,종목)당 한 번만 LLM.
-// 인스턴스 무관·DDL 불필요. date 를 키에 넣어 그날 고정 + 익일 자동 새 키. inflight 로 인스턴스 내 dedup.
+// theme-insight 와 동일 정책 — (KST날짜, 종목) 키로 cold 를 하루 1회로. revalidate 6h(SWR — 대기 없이 갱신).
+const REVALIDATE_S = 21_600; // 6h
 const inflight = new Map<string, Promise<CondensedInsight>>();
 
 async function getInsight(stock: string): Promise<CondensedInsight> {
   const today = kstDate();
-  const slot = kstSlot();
-  const key = `${today}:${slot}:${stock}`;
+  const key = `${today}:${stock}`;
   const running = inflight.get(key);
   if (running) return running;
 
   const load = unstable_cache(
     async () => condenseThemeInsight(await understandStock(stock)),
-    ["fomo-stock-insight", today, slot, stock],
-    { revalidate: 86400 }
+    ["fomo-stock-insight", today, stock],
+    { revalidate: REVALIDATE_S }
   );
 
   const p = load().finally(() => inflight.delete(key));
