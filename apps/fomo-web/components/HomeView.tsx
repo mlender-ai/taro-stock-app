@@ -89,7 +89,7 @@ export function HomeView({
           </div>
         )}
 
-        <div className="mt-3">
+        <div className={`mt-3 flex flex-1 flex-col ${tab === "card" ? "justify-center" : ""}`}>
           {tab === "card" ? <KeywordCardFeed /> : <KeywordHistory />}
         </div>
       </main>
