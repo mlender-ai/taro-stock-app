@@ -281,7 +281,7 @@ export function KeywordDepthPage({ card, onClose }: { card: KeywordCard; onClose
  * 그 종목의 grounded 강세/약세/워딩/공식지표를 보여준다. 테마 뎁스와 같은 grounding·정직성 규칙을 따른다.
  * (응축 부족이면 정직한 빈 상태 — 가짜로 안 채움.) 카피/전환은 임시, 최종은 광혁.
  */
-function StockInsightView({ stock, onClose }: { stock: string; onClose: () => void }) {
+export function StockInsightView({ stock, onClose }: { stock: string; onClose: () => void }) {
   const [insight, setInsight] = useState<CondensedInsight | null>(null);
   const [loading, setLoading] = useState(true);
 
