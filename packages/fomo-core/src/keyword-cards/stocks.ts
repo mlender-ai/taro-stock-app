@@ -27,6 +27,8 @@ export interface StockDef {
   country: StockCountry;
   /** 네이버 종토방 코드(국내 상장만) — 없으면 종토방 소스 미연결(미국주 등). */
   naverCode?: string;
+  /** 누구나 아는 초대형 대장주(삼성전자·엔비디아 등) — "주목해볼만한 종목" 후보에서 제외(의외성 0). */
+  marquee?: boolean;
 }
 
 /**
@@ -36,35 +38,35 @@ export interface StockDef {
  */
 export const STOCK_VOCAB: readonly StockDef[] = [
   // ── 한국(KOSPI/KOSDAQ) — 네이버 종토방 코드 보유 ──
-  { canonical: "삼성전자", aliases: ["삼성전자"], market: "KOSPI", country: "KR", naverCode: "005930" },
-  { canonical: "SK하이닉스", aliases: ["SK하이닉스", "하이닉스"], market: "KOSPI", country: "KR", naverCode: "000660" },
+  { canonical: "삼성전자", aliases: ["삼성전자"], market: "KOSPI", country: "KR", naverCode: "005930", marquee: true },
+  { canonical: "SK하이닉스", aliases: ["SK하이닉스", "하이닉스"], market: "KOSPI", country: "KR", naverCode: "000660", marquee: true },
   { canonical: "한미반도체", aliases: ["한미반도체"], market: "KOSDAQ", country: "KR", naverCode: "042700" },
   { canonical: "에코프로비엠", aliases: ["에코프로비엠"], market: "KOSDAQ", country: "KR", naverCode: "247540" },
   { canonical: "에코프로", aliases: ["에코프로"], market: "KOSDAQ", country: "KR", naverCode: "086520" },
-  { canonical: "LG에너지솔루션", aliases: ["LG에너지솔루션", "LG엔솔"], market: "KOSPI", country: "KR", naverCode: "373220" },
+  { canonical: "LG에너지솔루션", aliases: ["LG에너지솔루션", "LG엔솔"], market: "KOSPI", country: "KR", naverCode: "373220", marquee: true },
   { canonical: "삼성SDI", aliases: ["삼성SDI"], market: "KOSPI", country: "KR", naverCode: "006400" },
-  { canonical: "현대차", aliases: ["현대차", "현대자동차"], market: "KOSPI", country: "KR", naverCode: "005380" },
+  { canonical: "현대차", aliases: ["현대차", "현대자동차"], market: "KOSPI", country: "KR", naverCode: "005380", marquee: true },
   { canonical: "한화에어로스페이스", aliases: ["한화에어로스페이스", "한화에어로"], market: "KOSPI", country: "KR", naverCode: "012450" },
   { canonical: "두산에너빌리티", aliases: ["두산에너빌리티"], market: "KOSPI", country: "KR", naverCode: "034020" },
   { canonical: "셀트리온", aliases: ["셀트리온"], market: "KOSPI", country: "KR", naverCode: "068270" },
-  { canonical: "삼성바이오로직스", aliases: ["삼성바이오로직스", "삼성바이오"], market: "KOSPI", country: "KR", naverCode: "207940" },
-  { canonical: "카카오", aliases: ["카카오"], market: "KOSPI", country: "KR", naverCode: "035720" },
-  { canonical: "NAVER", aliases: ["NAVER", "네이버"], market: "KOSPI", country: "KR", naverCode: "035420" },
+  { canonical: "삼성바이오로직스", aliases: ["삼성바이오로직스", "삼성바이오"], market: "KOSPI", country: "KR", naverCode: "207940", marquee: true },
+  { canonical: "카카오", aliases: ["카카오"], market: "KOSPI", country: "KR", naverCode: "035720", marquee: true },
+  { canonical: "NAVER", aliases: ["NAVER", "네이버"], market: "KOSPI", country: "KR", naverCode: "035420", marquee: true },
 
   // ── 미국/글로벌 — 종토방 없음(레딧/외신으로 grounding, §1) ──
-  { canonical: "엔비디아", aliases: ["엔비디아", "Nvidia", "NVDA"], market: "NASDAQ", country: "US" },
-  { canonical: "TSMC", aliases: ["TSMC", "대만 TSMC", "티에스엠씨"], market: "NYSE", country: "GLOBAL" },
-  { canonical: "마이크로소프트", aliases: ["마이크로소프트", "Microsoft", "MSFT"], market: "NASDAQ", country: "US" },
-  { canonical: "애플", aliases: ["애플", "Apple", "AAPL"], market: "NASDAQ", country: "US" },
-  { canonical: "테슬라", aliases: ["테슬라", "Tesla", "TSLA"], market: "NASDAQ", country: "US" },
+  { canonical: "엔비디아", aliases: ["엔비디아", "Nvidia", "NVDA"], market: "NASDAQ", country: "US", marquee: true },
+  { canonical: "TSMC", aliases: ["TSMC", "대만 TSMC", "티에스엠씨"], market: "NYSE", country: "GLOBAL", marquee: true },
+  { canonical: "마이크로소프트", aliases: ["마이크로소프트", "Microsoft", "MSFT"], market: "NASDAQ", country: "US", marquee: true },
+  { canonical: "애플", aliases: ["애플", "Apple", "AAPL"], market: "NASDAQ", country: "US", marquee: true },
+  { canonical: "테슬라", aliases: ["테슬라", "Tesla", "TSLA"], market: "NASDAQ", country: "US", marquee: true },
   { canonical: "AMD", aliases: ["AMD"], market: "NASDAQ", country: "US" },
   { canonical: "브로드컴", aliases: ["브로드컴", "Broadcom", "AVGO"], market: "NASDAQ", country: "US" },
   { canonical: "팔란티어", aliases: ["팔란티어", "Palantir", "PLTR"], market: "NASDAQ", country: "US" },
   { canonical: "마이크론", aliases: ["마이크론", "Micron"], market: "NASDAQ", country: "US" },
 
   // ── 코인 ──
-  { canonical: "비트코인", aliases: ["비트코인", "bitcoin", "BTC"], market: "COIN", country: "GLOBAL" },
-  { canonical: "이더리움", aliases: ["이더리움", "ethereum", "ETH"], market: "COIN", country: "GLOBAL" },
+  { canonical: "비트코인", aliases: ["비트코인", "bitcoin", "BTC"], market: "COIN", country: "GLOBAL", marquee: true },
+  { canonical: "이더리움", aliases: ["이더리움", "ethereum", "ETH"], market: "COIN", country: "GLOBAL", marquee: true },
 ];
 
 /** 그날 원문에 등장한 종목(추출 결과). market/country 동봉, relatedHint 자리만 열어둠(D 이후). */
@@ -194,23 +196,27 @@ export interface SurpriseStock {
 }
 
 /**
- * 카드 1장의 "의외성 1위" 종목 — v1(광혁 피드백 루프 전제).
+ * 카드 1장의 "주목해볼만한 종목" — v2(광혁 피드백: 삼성전자 같은 초대형 대장주는 의외성 0).
  *
- * 의외성 정의(v1): **대장주(빈도 1위)가 아니면서, 덜 알려졌는데(코스닥·중소형) 그래도 여러 번 같이 뜬 종목.**
- *   = "어, 이게 왜 같이 떴지?" 직관. 대장주는 의외가 아니므로 1위는 제외.
- *   점수 = 코스닥 가중(덜 알려짐) × 저빈도 가중(주목 덜 받음). 동점은 mentions 적은 순 → 가나다.
- * 정직성: 후보 없으면(대장주만/종목 0) null → 카드에 표기 안 함(가짜로 안 채움).
+ * 의외성 정의(v2): **누구나 아는 초대형 대장주(marquee)를 전부 제외**하고, 그날 그 테마에서 같이 뜬
+ *   덜 알려진 종목 중 1개. = "어, 이게 왜 같이 떴지?". marquee(삼성전자·엔비디아·하이닉스 등) 제외가 핵심.
+ *   남은 후보 점수 = 코스닥(중소형) 가중 × 저빈도(주목 덜 받음) 가중. 동점은 mentions 적은 순 → 가나다.
+ * 정직성: marquee 빼고 후보 없으면 null → 카드 표기 안 함(가짜로 안 채움).
  */
 export function pickSurpriseStock(
   items: readonly KeywordSourceItem[],
   opts: ExtractStocksOptions = {}
 ): SurpriseStock | null {
   const stocks = extractStocks(items, { minMentions: opts.minMentions ?? 2 });
-  if (stocks.length <= 1) return null; // 대장주만 있거나 없으면 "의외"가 성립 안 함
-  const maxMentions = stocks[0]!.mentions; // 1위 빈도(정규화 기준)
-  const scored = stocks.slice(1).map((s) => {
+  const maxMentions = stocks[0]?.mentions ?? 1; // 빈도 정규화 기준(대장주 포함 1위)
+  const byCanonical = new Map(STOCK_VOCAB.map((d) => [d.canonical, d]));
+  // 초대형 대장주(marquee) 제외 — 삼성전자류는 "주목해볼만한"이 아님.
+  const candidates = stocks.filter((s) => !byCanonical.get(s.canonical)?.marquee);
+  if (candidates.length === 0) return null;
+
+  const scored = candidates.map((s) => {
     const lesserKnown = s.market === "KOSDAQ" ? 1.5 : 1.0; // 코스닥(중소형) = 덜 알려짐
-    const lowProfile = 1 - s.mentions / (maxMentions + 1); // 대장주 대비 덜 주목받을수록 ↑
+    const lowProfile = 1 - s.mentions / (maxMentions + 1); // 주목 덜 받을수록 ↑
     return { s, surprise: lesserKnown * (0.5 + lowProfile) };
   });
   scored.sort(

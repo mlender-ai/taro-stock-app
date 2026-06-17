@@ -1,22 +1,49 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { scoreToColor, scoreToEmoji, type KeywordCard, type KeywordConfidence } from "@fomo/core";
-import { KeywordDepthPage } from "@/components/KeywordDepthPage";
+import {
+  scoreToColor,
+  scoreToEmoji,
+  type KeywordCard,
+  type KeywordConfidence,
+  type SurpriseStock,
+} from "@fomo/core";
+import { KeywordDepthPage, StockInsightView } from "@/components/KeywordDepthPage";
 import { fetchKeywords, fetchThemeInsight } from "@/lib/fomoApi";
 import { recordInterest } from "@/lib/keywordInterest";
 import { recordViewed, getHistory } from "@/lib/keywordHistory";
 import { FullPageLoading, LOADING_PRESETS } from "@/components/FullPageLoading";
 
 /**
- * 키워드 카드 덱 — 자연스러운 스와이프(드래그+뒤 카드 실제 콘텐츠 노출) + 하단 버튼 2개.
- * KEYWORD_CARD_FEED_DEV_SPEC v3. 오른쪽=관심 / 왼쪽=덜관심(둘 다 다음 카드로).
- * 본 카드는 히스토리 적재 + 덱에서 제외 → 다시 와도 다음 카드부터.
- * 뎁스에서 닫으면 본 카드가 스르륵 넘어가며(자동 스와이프) 다음 카드가 보인다.
+ * 키워드 카드 덱 — 섹터(키워드) 카드 + 그 사이에 "주목해볼만한 종목" 카드를 끼워 보여준다.
+ * KEYWORD_CARD_FEED_DEV_SPEC v3. 오른쪽=관심 / 왼쪽=덜관심. 탭/관심 → 자세히(뎁스).
+ * 섹터 카드는 테마 뎁스, 종목 카드는 종목 뎁스(stock-insight)로 연결.
  */
 const THRESHOLD = 90;
 const EXIT_MS = 320;
 const UP = "#FF5A36";
+
+/** 덱 한 장 — 섹터 카드 또는 종목 카드. */
+type DeckItem =
+  | { kind: "sector"; id: string; card: KeywordCard }
+  | { kind: "stock"; id: string; stock: SurpriseStock; fromKeyword: string };
+
+/** 섹터 카드 뒤에 그 섹터의 주목 종목 카드를 끼운다(있을 때만). */
+function toDeckItems(cards: readonly KeywordCard[]): DeckItem[] {
+  const out: DeckItem[] = [];
+  for (const card of cards) {
+    out.push({ kind: "sector", id: card.id, card });
+    if (card.surpriseStock) {
+      out.push({
+        kind: "stock",
+        id: `stock:${card.keyword}:${card.surpriseStock.canonical}`,
+        stock: card.surpriseStock,
+        fromKeyword: card.keyword,
+      });
+    }
+  }
+  return out;
+}
 
 function prefersReducedMotion(): boolean {
   return (
@@ -25,8 +52,8 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-/** 카드 내용(앞/뒤 공용). progress 있으면 우하단에 n/N 표시(앞면만). */
-function CardFace({ card, progress }: { card: KeywordCard; progress?: string }) {
+/** 섹터(키워드) 카드 앞면. */
+function SectorFace({ card, progress }: { card: KeywordCard; progress?: string }) {
   const color = scoreToColor(card.fomoScore);
   return (
     <div className="flex h-full flex-col">
@@ -41,20 +68,58 @@ function CardFace({ card, progress }: { card: KeywordCard; progress?: string }) 
         <span className="font-pixel text-sm text-muted">{scoreToEmoji(card.fomoScore)} 포모 점수</span>
       </div>
       <p className="mt-6 text-lg leading-8 text-whiteout">{card.comment}</p>
-      {/* 의외의 추천 종목 — 대장주 말고 같이 뜬 종목 1개(있을 때만). 카피·디자인은 광혁 조정. */}
-      {card.surpriseStock && (
-        <div className="mt-4 flex items-center gap-2 rounded-lg border border-hairline bg-surface px-3 py-2">
-          <span className="text-sm" aria-hidden>💡</span>
-          <span className="text-xs text-muted">의외의 종목</span>
-          <span className="font-pixel text-sm" style={{ color }}>{card.surpriseStock.canonical}</span>
-        </div>
-      )}
       <div className="mt-auto flex items-center justify-between pt-6">
         <span className="font-pixel text-[11px] text-muted">더보기 →</span>
         {progress && <span className="font-pixel text-[11px] text-muted">{progress}</span>}
       </div>
     </div>
   );
+}
+
+/** 종목 카드 앞면 — 섹터 카드와 같은 틀. 카피는 임시(광혁 조정). */
+function StockFace({
+  stock,
+  fromKeyword,
+  progress,
+}: {
+  stock: SurpriseStock;
+  fromKeyword: string;
+  progress?: string;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-2">
+        <span className="text-2xl font-bold text-whiteout">{stock.canonical}</span>
+        <span className="text-xl" aria-hidden>💡</span>
+      </div>
+      <p className="mt-3 font-pixel text-sm" style={{ color: UP }}>
+        주목해볼만한 종목
+      </p>
+      <p className="mt-6 text-lg leading-8 text-whiteout">
+        ‘{fromKeyword}’ 흐름에서 대장주 말고 같이 움직인 종목이야.
+        <br />
+        왜 같이 떴는지 한번 볼래?
+      </p>
+      <div className="mt-auto flex items-center justify-between pt-6">
+        <span className="font-pixel text-[11px] text-muted">더보기 →</span>
+        {progress && <span className="font-pixel text-[11px] text-muted">{progress}</span>}
+      </div>
+    </div>
+  );
+}
+
+function FaceOf({ item, progress }: { item: DeckItem; progress?: string }) {
+  const p = progress !== undefined ? { progress } : {};
+  return item.kind === "sector" ? (
+    <SectorFace card={item.card} {...p} />
+  ) : (
+    <StockFace stock={item.stock} fromKeyword={item.fromKeyword} {...p} />
+  );
+}
+
+/** 카드 좌측 색 띠 — 섹터는 포모색, 종목은 강조색. */
+function colorOf(item: DeckItem): string {
+  return item.kind === "sector" ? scoreToColor(item.card.fomoScore) : UP;
 }
 
 /** confidence 정직 한마디(§5). high 면 노출 안 함. */
@@ -84,7 +149,7 @@ function DeckEmpty() {
 
 /**
  * 데이터 로딩 래퍼 — /api/fomo/keywords 실데이터를 받아 덱에 넘긴다.
- * 로딩=스켈레톤, 실패=담담한 빈 상태(무한 로딩 금지). confidence 는 덱 상단 한마디로.
+ * 로딩=전체화면 프로그레스, 실패=담담한 빈 상태(무한 로딩 금지). confidence 는 덱 상단 한마디로.
  */
 export function KeywordCardFeed() {
   const [state, setState] = useState<
@@ -123,9 +188,7 @@ function KeywordDeck({
   cards: readonly KeywordCard[];
   confidence: KeywordConfidence;
 }) {
-  // 마운트 시점의 "오늘 이미 본" 집합 — 본 카드는 덱에서 제외(다시 와도 다음 카드부터).
-  // ★버그: card.id 가 키워드("반도체")라 날짜 무관 고정 → 전체기간 히스토리로 거르면 어제 본 게
-  //   오늘도 걸려 덱이 비고 "다 봤다" 끝-상태가 최초 진입에 뜬다. → *오늘(KST) 본 것만* 필터링.
+  // 마운트 시점의 "오늘 이미 본" 집합 — 본 섹터 카드는 덱에서 제외(종목 카드는 섹터를 따라간다).
   const viewedIds = useState(() => {
     const kstDay = (ms: number) =>
       new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date(ms));
@@ -133,33 +196,29 @@ function KeywordDeck({
     return new Set(getHistory().filter((h) => kstDay(h.ts) === today).map((h) => h.id));
   })[0];
   const [replay, setReplay] = useState(false);
-  const deck = replay ? [...cards] : cards.filter((c) => !viewedIds.has(c.id));
+  const sectorCards = replay ? [...cards] : cards.filter((c) => !viewedIds.has(c.id));
+  const deck = toDeckItems(sectorCards);
 
   const [idx, setIdx] = useState(0);
   const [dx, setDx] = useState(0);
   const [exiting, setExiting] = useState<null | "left" | "right">(null);
-  const [selected, setSelected] = useState<KeywordCard | null>(null);
+  const [selected, setSelected] = useState<DeckItem | null>(null);
   const dragging = useRef(false);
   const startX = useRef(0);
   const moved = useRef(false);
 
-  // 뎁스 프리페치 — 지금 보이는 카드의 theme-insight 를 백그라운드로 미리 불러와 서버 캐시를 데운다.
-  // 사용자가 메인을 보는 동안 뎁스가 준비돼, 탭하면 즉시 뜬다("같이 불러오기").
-  // cron 프리워밍과 시너지: 이미 데워졌으면 캐시 히트(LLM 0). 안 데워진 카드만 산출(어차피 탭하면 발생).
-  // 본/볼 카드 종류만 1회씩(중복 제거) — 비용 최소. fire-and-forget(결과는 버리고 캐시만 채움).
+  // 뎁스 프리페치 — 보이는 섹터 카드의 theme-insight 를 백그라운드로 미리 데운다(350ms 머문 것만, 중복 제거).
   const prefetched = useRef(new Set<string>());
   useEffect(() => {
     const top = deck[idx];
-    if (!top || prefetched.current.has(top.keyword)) return;
-    // 350ms 이상 머문 카드만 프리페치 — 빠르게 스와이프해 스쳐가는 카드는 산출 안 함(비용 최소).
+    if (!top || top.kind !== "sector" || prefetched.current.has(top.card.keyword)) return;
     const t = window.setTimeout(() => {
-      prefetched.current.add(top.keyword);
-      fetchThemeInsight(top.keyword).catch(() => prefetched.current.delete(top.keyword));
+      prefetched.current.add(top.card.keyword);
+      fetchThemeInsight(top.card.keyword).catch(() => prefetched.current.delete(top.card.keyword));
     }, 350);
     return () => window.clearTimeout(t);
   }, [deck, idx]);
 
-  // 본 카드를 한쪽으로 날리고 다음 카드로. (관심 기록은 호출부에서 별도)
   const flingNext = useCallback((dir: "left" | "right") => {
     if (prefersReducedMotion()) {
       setDx(0);
@@ -176,26 +235,25 @@ function KeywordDeck({
 
   const advance = useCallback(
     (dir: "left" | "right") => {
-      const card = deck[idx];
-      if (card) {
-        recordInterest(card.id, dir === "right" ? "more" : "less", Date.now());
-        recordViewed(card, Date.now());
+      const item = deck[idx];
+      if (item) {
+        recordInterest(item.id, dir === "right" ? "more" : "less", Date.now());
+        if (item.kind === "sector") recordViewed(item.card, Date.now()); // 종목 카드는 섹터를 따라가므로 별도 기록 X
       }
       flingNext(dir);
     },
     [deck, idx, flingNext]
   );
 
-  const openDepth = (card: KeywordCard) => {
-    recordViewed(card, Date.now());
-    setSelected(card);
+  const openItem = (item: DeckItem) => {
+    if (item.kind === "sector") recordViewed(item.card, Date.now());
+    setSelected(item);
   };
-  // CTA "관심"(A안) — "이거 더 볼래" → 관심 기록 + 뎁스 열기. 다음 카드 넘김은 뎁스 닫을 때(closeDepth).
-  const openInterest = (card: KeywordCard) => {
-    recordInterest(card.id, "more", Date.now());
-    openDepth(card);
+  // CTA "관심" — "이거 더 볼래" → 관심 기록 + 자세히. 다음 카드 넘김은 닫을 때.
+  const openInterest = (item: DeckItem) => {
+    recordInterest(item.id, "more", Date.now());
+    openItem(item);
   };
-  // 뎁스 닫으면 본 카드가 스르륵 넘어가며 다음 카드 노출.
   const closeDepth = () => {
     setSelected(null);
     window.setTimeout(() => flingNext("left"), 40);
@@ -249,12 +307,12 @@ function KeywordDeck({
   }
 
   const top = deck[idx]!;
-  const color = scoreToColor(top.fomoScore);
+  const color = colorOf(top);
   const topTransform = exiting
     ? `translateX(${exiting === "right" ? 140 : -140}%) rotate(${exiting === "right" ? 16 : -16}deg)`
     : `translateX(${dx}px) rotate(${dx * 0.04}deg)`;
   const topTransition = dragging.current ? "none" : `transform ${EXIT_MS}ms cubic-bezier(0.22,1,0.36,1)`;
-  const behind = [deck[idx + 1], deck[idx + 2]].filter(Boolean) as KeywordCard[];
+  const behind = [deck[idx + 1], deck[idx + 2]].filter(Boolean) as DeckItem[];
 
   return (
     <div className="w-full">
@@ -266,21 +324,21 @@ function KeywordDeck({
       {/* 카드 스택 (뒤 카드 실제 콘텐츠 노출) */}
       <div className="relative mx-auto h-[56vh] w-full select-none">
         {behind
-          .map((card, i) => ({ card, i }))
+          .map((item, i) => ({ item, i }))
           .reverse()
-          .map(({ card, i }) => (
+          .map(({ item, i }) => (
             <div
-              key={`b-${card.id}`}
+              key={`b-${item.id}`}
               aria-hidden
               className="absolute inset-0 overflow-hidden rounded-2xl border border-hairline bg-surface px-6 py-7"
               style={{
-                borderLeft: `2px solid ${scoreToColor(card.fomoScore)}`,
+                borderLeft: `2px solid ${colorOf(item)}`,
                 transform: `translateY(${(i + 1) * 12}px) scale(${1 - (i + 1) * 0.04})`,
                 opacity: 1 - (i + 1) * 0.18,
                 zIndex: 1,
               }}
             >
-              <CardFace card={card} />
+              <FaceOf item={item} />
             </div>
           ))}
 
@@ -291,7 +349,7 @@ function KeywordDeck({
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           onClick={() => {
-            if (!moved.current && !exiting) openDepth(top);
+            if (!moved.current && !exiting) openItem(top);
           }}
           className="absolute inset-0 z-10 cursor-pointer overflow-hidden rounded-2xl border border-hairline bg-surface px-6 py-7"
           style={{ borderLeft: `2px solid ${color}`, transform: topTransform, transition: topTransition }}
@@ -310,7 +368,7 @@ function KeywordDeck({
             ← 덜 관심
           </span>
 
-          <CardFace card={top} progress={`${idx + 1} / ${deck.length}`} />
+          <FaceOf item={top} progress={`${idx + 1} / ${deck.length}`} />
         </div>
       </div>
 
@@ -335,7 +393,12 @@ function KeywordDeck({
         </button>
       </div>
 
-      {selected && <KeywordDepthPage card={selected} onClose={closeDepth} />}
+      {selected &&
+        (selected.kind === "sector" ? (
+          <KeywordDepthPage card={selected.card} onClose={closeDepth} />
+        ) : (
+          <StockInsightView stock={selected.stock.canonical} onClose={closeDepth} />
+        ))}
     </div>
   );
 }
