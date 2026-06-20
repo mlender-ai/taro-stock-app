@@ -387,7 +387,14 @@ function KeywordDeck({ cards }: { cards: readonly KeywordCard[] }) {
         (selected.kind === "sector" ? (
           <KeywordDepthPage card={selected.card} onClose={closeDepth} />
         ) : (
-          <StockInsightView stock={selected.stock.canonical} onClose={closeDepth} />
+          <StockInsightView
+            stock={selected.stock.canonical}
+            context={{
+              fromTheme: selected.fromKeyword,
+              reason: `뉴스에 ${selected.stock.mentions}번 같이 등장한 종목이야.`,
+            }}
+            onClose={closeDepth}
+          />
         ))}
     </div>
   );
