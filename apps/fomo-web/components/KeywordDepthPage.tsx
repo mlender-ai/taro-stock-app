@@ -18,7 +18,7 @@ export function KeywordDepthPage({ card, onClose }: { card: KeywordCard; onClose
   const [insight, setInsight] = useState<CondensedInsight | null>(null);
   const [loading, setLoading] = useState(true);
   // 숨은 연관주 탭 → 종목 전용 화면(stock-insight 재활용). null 이면 안 띄움.
-  const [stockSubject, setStockSubject] = useState<string | null>(null);
+  const [stockSubject, setStockSubject] = useState<(StockContext & { stock: string }) | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -194,7 +194,14 @@ export function KeywordDepthPage({ card, onClose }: { card: KeywordCard; onClose
                           type="button"
                           onClick={() => {
                             recordTaste("stock", r.stock, "tap_related"); // 트랙 B: 발굴 반응
-                            setStockSubject(r.stock);
+                            const s = srcOf(r.sourceId); // 연관 근거의 원문(항상 보여줄 맥락)
+                            setStockSubject({
+                              stock: r.stock,
+                              reason: r.reason,
+                              fromTheme: card.keyword,
+                              ...(s?.source || s?.title ? { sourceLabel: s.source ?? s.title } : {}),
+                              ...(s?.url ? { sourceUrl: s.url } : {}),
+                            });
                           }}
                           className="block w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-left transition-colors hover:border-whiteout/30"
                         >
@@ -273,7 +280,7 @@ export function KeywordDepthPage({ card, onClose }: { card: KeywordCard; onClose
 
       {/* 종목 전용 화면 — 연관주 탭 시 stock-insight(understandStock) 재활용. z-[70] 으로 뎁스 위에 덮는다. */}
       {stockSubject && (
-        <StockInsightView stock={stockSubject} onClose={() => setStockSubject(null)} />
+        <StockInsightView stock={stockSubject.stock} context={stockSubject} onClose={() => setStockSubject(null)} />
       )}
     </div>
   );
@@ -284,7 +291,27 @@ export function KeywordDepthPage({ card, onClose }: { card: KeywordCard; onClose
  * 그 종목의 grounded 강세/약세/워딩/공식지표를 보여준다. 테마 뎁스와 같은 grounding·정직성 규칙을 따른다.
  * (응축 부족이면 정직한 빈 상태 — 가짜로 안 채움.) 카피/전환은 임시, 최종은 광혁.
  */
-export function StockInsightView({ stock, onClose }: { stock: string; onClose: () => void }) {
+/** 종목 화면이 "들어온 맥락"(왜 주목 종목으로 떴는지). stock-insight 가 부족해도 이건 항상 보여준다. */
+export interface StockContext {
+  /** 연관 근거(테마 원문 grounded claim) 또는 합성 사유. */
+  reason?: string;
+  /** 근거 출처 라벨(매체 등). */
+  sourceLabel?: string;
+  /** 근거 원문 링크. */
+  sourceUrl?: string;
+  /** 어느 테마(키워드) 흐름에서 떴는지. */
+  fromTheme?: string;
+}
+
+export function StockInsightView({
+  stock,
+  context,
+  onClose,
+}: {
+  stock: string;
+  context?: StockContext;
+  onClose: () => void;
+}) {
   const [insight, setInsight] = useState<CondensedInsight | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -347,9 +374,30 @@ export function StockInsightView({ stock, onClose }: { stock: string; onClose: (
           <>
           <section>
             <p className="font-pixel text-sm text-whiteout">왜 같이 움직였나</p>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              {hasInsight ? cleanText(insight!.whyHot) : "이 종목만으로는 응축할 원문이 아직 부족해. 그것도 정상이야."}
-            </p>
+            {/* 들어온 맥락(연관 근거) — stock-insight 가 부족해도 항상 보여준다(빈 화면 금지). */}
+            {context?.reason && (
+              <div className="mt-2 rounded-lg border border-hairline bg-surface px-3 py-2">
+                {context.fromTheme && (
+                  <span className="mb-1 block text-[11px] text-muted">‘{cleanText(context.fromTheme)}’ 흐름에서</span>
+                )}
+                <span className="block text-sm leading-6 text-whiteout">{cleanText(context.reason)}</span>
+                {context.sourceUrl ? (
+                  <a href={context.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 block text-[11px] text-muted hover:text-whiteout">
+                    ↳ {cleanText(context.sourceLabel ?? "원문")} · 원문 보기 →
+                  </a>
+                ) : (
+                  context.sourceLabel && <span className="mt-1 block text-[11px] text-muted">↳ {cleanText(context.sourceLabel)}</span>
+                )}
+              </div>
+            )}
+            {/* 종목 단독 응축(understandStock)이 되면 그걸 덧붙임. 안 되면 위 맥락이 근거. */}
+            {hasInsight ? (
+              <p className="mt-2 text-sm leading-6 text-muted">{cleanText(insight!.whyHot)}</p>
+            ) : (
+              !context?.reason && (
+                <p className="mt-2 text-sm leading-6 text-muted">이 종목만으로는 응축할 원문이 아직 부족해. 그것도 정상이야.</p>
+              )
+            )}
           </section>
 
           {insight?.officialFacts && insight.officialFacts.length > 0 && (
@@ -434,7 +482,9 @@ export function StockInsightView({ stock, onClose }: { stock: string; onClose: (
             </>
           ) : (
             <p className="mt-6 text-sm leading-6 text-muted">
-              이 종목으로 모인 원문이 아직 적어. 더 쌓이면 강세·약세로 풀어줄게.
+              {context?.reason
+                ? "이 종목 단독 원문은 아직 모이는 중이야 — 위 연결이 지금까지의 근거야. 더 쌓이면 강세·약세로 풀어줄게."
+                : "이 종목으로 모인 원문이 아직 적어. 더 쌓이면 강세·약세로 풀어줄게."}
             </p>
           )}
 
