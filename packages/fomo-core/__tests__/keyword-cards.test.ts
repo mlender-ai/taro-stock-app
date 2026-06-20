@@ -3,7 +3,8 @@ import { MOCK_KEYWORD_CARDS } from "../src";
 
 const BANNED =
   /가이던스|EPS|어닝|펀더멘탈|매수|매도|롱\b|숏\b|사세요|파세요|사라\b|팔아라|오를 거|오를거|급등 예상|확실히 오/;
-const BALANCE = /조심|급할 거|안 급|천천히|휩쓸|늦춰|무서워할|아쉬워/;
+/** 폐기된 위로·진정·다독임 프레이밍(PRODUCT_VISION) — 카피에 남으면 안 됨. */
+const COMFORT = /안 급해|기회는\s*또|무서워할|아쉬워|괜찮|쉬어가|뒤로\s*빠|지켜봐도|천천히\s*봐도|급할\s*거\s*없|나쁜\s*게\s*아니|휩쓸/;
 
 function allText(): string {
   return MOCK_KEYWORD_CARDS.map(
@@ -38,9 +39,10 @@ describe("MOCK_KEYWORD_CARDS", () => {
     expect(allText()).not.toMatch(BANNED);
   });
 
-  it("모든 카드에 포모 균형추가 담겨 있다 (포모 완화)", () => {
+  it("위로·다독임 프레이밍이 없다 (폐기 — 담담한 사실만)", () => {
     for (const c of MOCK_KEYWORD_CARDS) {
-      expect(`${c.comment} ${c.depth.remember}`).toMatch(BALANCE);
+      const blob = `${c.comment} ${c.depth.why} ${c.depth.remember}`;
+      expect(COMFORT.test(blob), `카드 ${c.keyword} 위로 잔재`).toBe(false);
     }
   });
 });
