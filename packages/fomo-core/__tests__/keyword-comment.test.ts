@@ -3,7 +3,6 @@ import {
   buildKeywordCard,
   buildKeywordCards,
   overallConfidence,
-  CALM_MARKERS,
   communityEngagementByTheme,
   mergeCommunityEngagement,
   extractKeywords,
@@ -36,14 +35,16 @@ function scoreSample(): ScoredKeyword[] {
 
 /** 코멘트 가드(§2): 예측·투자조언·전문용어·거래부추김 금칙어. */
 const FORBIDDEN = /사라|팔아라|매수|매도|목표가|오를 것|내릴 것|상승할|하락할|지금 안 사면|PER|밸류에이션|추천/;
+/** 폐기된 위로·진정·다독임 프레이밍(PRODUCT_VISION) — 카피에 남으면 안 됨. */
+const COMFORT = /안 급해|기회는\s*또|무서워할|아쉬워|괜찮|조급|쉬어가|뒤로\s*빠|지켜봐도|천천히\s*봐도|급할\s*거\s*없|나쁜\s*게\s*아니/;
 
 describe("buildKeywordCards (룰 폴백 코멘트)", () => {
-  it("모든 카드 코멘트에 균형추(진정) 마커가 최소 1개", () => {
+  it("위로·다독임 프레이밍이 없다(폐기 — 담담한 사실만)", () => {
     const cards = buildKeywordCards(scoreSample());
     expect(cards.length).toBeGreaterThan(0);
     for (const c of cards) {
-      const hasCalm = CALM_MARKERS.some((m) => c.comment.includes(m) || c.depth.remember.includes(m));
-      expect(hasCalm, `카드 ${c.keyword} 균형추 누락`).toBe(true);
+      const blob = `${c.comment} ${c.depth.why} ${c.depth.remember}`;
+      expect(COMFORT.test(blob), `카드 ${c.keyword} 위로 잔재`).toBe(false);
     }
   });
 
@@ -63,13 +64,13 @@ describe("buildKeywordCards (룰 폴백 코멘트)", () => {
     }
   });
 
-  it("점수 전 구간(0~100)에서도 균형추 유지 + 금칙어 0", () => {
+  it("점수 전 구간(0~100)에서도 위로 잔재 0 + 금칙어 0", () => {
     const base = scoreSample()[0]!;
     for (const score of [5, 30, 50, 70, 95]) {
       const card = buildKeywordCards([{ ...base, fomoScore: score }])[0]!;
-      const blob = `${card.comment} ${card.depth.remember}`;
-      expect(CALM_MARKERS.some((m) => blob.includes(m))).toBe(true);
-      expect(FORBIDDEN.test(`${card.comment} ${card.depth.why} ${card.depth.remember}`)).toBe(false);
+      const blob = `${card.comment} ${card.depth.why} ${card.depth.remember}`;
+      expect(COMFORT.test(blob), `score ${score} 위로 잔재`).toBe(false);
+      expect(FORBIDDEN.test(blob)).toBe(false);
     }
   });
 
@@ -165,9 +166,9 @@ describe("핵심 뉴스 소스 (실제 근거 노출, 추상 브리핑 대체)",
 describe("Phase 3 — LLM 코멘트 가드레일 (§4.4)", () => {
   const good: LlmKeywordComment = {
     keyword: "반도체",
-    comment: "너 지금 반도체 관심 왔구나. 너만 그런 거 아니야 — 시장도 과열됐어. 잠깐 뒤로 빠져서 지켜보는 건 어때?",
-    why: "오늘 엔비디아·삼성전자 얘기가 여기저기서 돌면서 다들 시선이 쏠렸어.",
-    remember: "제일 뜨거울 때 들어가면 늦는 경우가 많아. 안 급해도 돼.",
+    comment: "오늘 반도체 얘기가 많이 돌았어요. 무엇 때문에 시선이 몰렸는지 아래에서 풀어드릴게요.",
+    why: "오늘 엔비디아·삼성전자 소식이 여기저기서 돌면서 시선이 쏠렸어요.",
+    remember: "오늘 가장 많이 회자된 키워드예요.",
   };
 
   it("정상 LLM 코멘트는 통과하고 카드에 얹힌다", () => {
@@ -196,17 +197,17 @@ describe("Phase 3 — LLM 코멘트 가드레일 (§4.4)", () => {
   });
 
   it("전문용어 주입 → 폐기", () => {
-    const bad: LlmKeywordComment = { ...good, why: "골든크로스가 떠서 다들 들떴어. 안 급해도 돼." };
+    const bad: LlmKeywordComment = { ...good, why: "골든크로스가 떠서 다들 들떴어요." };
     expect(validateLlmComment(bad)).toBe(false);
   });
 
-  it("균형추(진정 결) 누락 → 폐기", () => {
-    const bad: LlmKeywordComment = {
+  it("담담한 사실(위로 결 없음)도 통과한다 — 위로 필수 규칙 폐기", () => {
+    const plain: LlmKeywordComment = {
       ...good,
-      comment: "너 지금 반도체 관심 왔구나. 다들 여기 몰렸어.",
-      remember: "오늘 제일 뜨거운 키워드였어.",
+      comment: "오늘 반도체에 시선이 가장 많이 몰렸어요. 어떤 소식인지 아래에 정리했어요.",
+      remember: "오늘 제일 많이 회자된 키워드예요.",
     };
-    expect(validateLlmComment(bad)).toBe(false);
+    expect(validateLlmComment(plain)).toBe(true);
   });
 
   it("빈 필드(LLM 누락) → 폐기 + applyLlmComment 룰 폴백", () => {

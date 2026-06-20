@@ -1,8 +1,8 @@
 import type { KeywordCard } from "./types";
 
 /**
- * 키워드 카드 mock — 화면 먼저(§6). 친구 말투 + 균형추. KEYWORD_CARD_FEED_DEV_SPEC v3.
- * 포모 점수 높은 순(뜨거운 게 앞). 전문용어/거래부추김/예측 0 (테스트 가드).
+ * 키워드 카드 mock — 화면 먼저(§6). 정중한 해요체 + 담담한 사실(위로·다독임 폐기). v3.
+ * 포모 점수 높은 순(뜨거운 게 앞). 전문용어/거래부추김/예측/위로 0 (테스트 가드).
  */
 export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
   {
@@ -11,8 +11,8 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
     emoji: "🔥",
     fomoScore: 84,
     comment:
-      "오늘 다들 반도체 얘기뿐이에요. 혼자 놓친 것 같은 기분 들기 쉬운 날이죠. " +
-      "근데 이미 한참 오른 거 따라 들어가는 건 늘 조심하는 게 좋아요.",
+      "오늘 반도체 얘기가 가장 많이 돌았어요. " +
+      "무엇 때문에 시선이 몰렸는지 아래에서 풀어드릴게요.",
     related: ["삼성전자", "SK하이닉스", "엔비디아"],
     sources: [
       { title: "엔비디아 신고가… HBM 수요 폭발에 삼성·SK 동반 강세", source: "한국경제" },
@@ -23,10 +23,9 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
       why:
         "반도체 수요가 살아난다는 얘기가 돌면서 관련 회사들이 같이 들썩였어요. " +
         "삼성전자·SK하이닉스 같은 큰 회사들이 한꺼번에 들썩이니까 '나도 타야 하나' 하는 사람이 확 몰린 거예요. 아래 실제 뉴스가 그 근거예요.",
-      rememberTitle: "근데 이건 기억해요",
+      rememberTitle: "오늘 한 줄 정리",
       remember:
-        "다들 좋다고 몰릴 때가 보통 제일 비쌀 때예요. 뉴스 보고 들어가면 늦는 경우가 많거든요. " +
-        "오늘 못 탔다고 아쉬워할 필요 없어요. 기회는 또 와요.",
+        "오늘 가장 많이 회자된 키워드예요. 왜 몰렸는지는 아래 실제 뉴스에 담겨 있어요.",
     },
   },
   {
@@ -35,8 +34,8 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
     emoji: "🤖",
     fomoScore: 77,
     comment:
-      "AI 얘기가 또 뜨거워졌어요. 다들 이쪽으로 시선이 쏠리는 날이에요. " +
-      "휩쓸리기 쉬운 주제니까 한 박자 천천히 봐도 돼요.",
+      "AI 쪽으로 시선이 다시 많이 모였어요. " +
+      "어떤 소식이 도는지 아래에 정리했어요.",
     related: ["엔비디아", "마이크로소프트", "팔란티어"],
     sources: [
       { title: "오픈AI 새 모델 공개에 AI 관련주 일제히 강세", source: "연합뉴스" },
@@ -47,9 +46,9 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
       why:
         "AI를 만드는 큰 회사가 새 소식을 내놓으면서 'AI 관련은 다 오른다'는 분위기가 퍼졌어요. " +
         "그래서 조금이라도 AI랑 엮인 회사들로 사람들이 우르르 몰렸어요.",
-      rememberTitle: "근데 이건 기억해요",
+      rememberTitle: "오늘 한 줄 정리",
       remember:
-        "분위기로 오른 건 분위기로 빠지기도 해요. 이름에 'AI'만 붙어도 오르는 날엔 더 조심하는 게 좋아요.",
+        "관심이 모인 이유는 아래 실제 뉴스에 담겨 있어요.",
     },
   },
   {
@@ -58,8 +57,8 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
     emoji: "₿",
     fomoScore: 72,
     comment:
-      "코인판이 다시 달아올랐어요. '나만 안 탔나' 싶은 사람들이 오늘 진짜 많아요. " +
-      "딱 이럴 때가 제일 휩쓸리기 쉬워요. 따라가는 건 늦춰도 괜찮아요.",
+      "코인 쪽 거래가 다시 활발해졌어요. " +
+      "무슨 소식이 도는지 아래에 정리했어요.",
     related: ["비트코인", "이더리움"],
     sources: [
       { title: "비트코인 다시 들썩… 코인판 거래량 급증", source: "블록미디어" },
@@ -70,9 +69,9 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
       why:
         "딱 떨어지는 이유 하나라기보단, 분위기가 좋아지니까 사는 사람이 또 사는 사람을 부른 날이에요. " +
         "오르니까 더 몰리고, 몰리니까 더 오르는 식이죠.",
-      rememberTitle: "근데 이건 기억해요",
+      rememberTitle: "오늘 한 줄 정리",
       remember:
-        "코인은 '얼마 벌었다'가 없어서 분위기에 크게 출렁여요. '나만 놓쳤다'는 마음이 들 때일수록 천천히.",
+        "분위기에 따라 거래가 늘고 주는 흐름이에요. 근거는 아래 뉴스에서 확인할 수 있어요.",
     },
   },
   {
@@ -81,8 +80,8 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
     emoji: "💵",
     fomoScore: 54,
     comment:
-      "오늘은 금리 얘기로 다들 눈치 보는 날이에요. 크게 들뜨진 않았어요. " +
-      "조용히 지켜보는 분위기라 급할 거 없어요.",
+      "오늘 금리 쪽에 관심이 조금 모였어요. 크게 들뜨진 않았어요. " +
+      "무슨 일이 있었는지 아래에 담았어요.",
     related: ["은행주", "채권"],
     sources: [
       { title: "연준 FOMC 앞두고 금리 관망세", source: "연합뉴스" },
@@ -93,9 +92,9 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
       why:
         "나라에서 돈 빌릴 때 붙는 이자가 어떻게 될지 발표가 가까워지면서, 다들 그 결과를 기다리는 분위기였어요. " +
         "이게 정해지면 어디로 돈이 움직일지 갈리거든요.",
-      rememberTitle: "근데 이건 기억해요",
+      rememberTitle: "오늘 한 줄 정리",
       remember:
-        "이런 날은 섣불리 움직이기보다 결과를 보고 천천히 판단하는 사람이 많아요. 안 급해도 돼요.",
+        "발표를 앞두고 결과를 기다리는 분위기였어요. 근거는 아래 뉴스에 담겨 있어요.",
     },
   },
   {
@@ -104,8 +103,8 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
     emoji: "🔋",
     fomoScore: 38,
     comment:
-      "2차전지는 오늘 좀 가라앉았어요. 한때 엄청 뜨거웠던 곳이라 지금은 식은 느낌이에요. " +
-      "빠졌다고 무서워할 것도, 싸졌다고 급할 것도 없어요.",
+      "2차전지는 오늘 비교적 잠잠했어요. 한때 뜨거웠던 곳이라 지금은 식은 편이에요. " +
+      "눈에 띄는 소식은 적었어요.",
     related: ["에코프로비엠", "LG에너지솔루션"],
     sources: [
       { title: "전기차 둔화 우려 재부각… 2차전지주 약세", source: "이데일리" },
@@ -116,9 +115,9 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
       why:
         "전기차가 생각보다 천천히 팔린다는 얘기가 다시 나오면서 관심이 식었어요. " +
         "한때 사람들이 크게 몰렸던 곳이라 분위기가 식으면 더 조용해 보여요.",
-      rememberTitle: "근데 이건 기억해요",
+      rememberTitle: "오늘 한 줄 정리",
       remember:
-        "크게 올랐던 테마는 식을 때도 크게 식어요. 오를 때 못 탔다고 아쉬워하지 않아도 되는 이유예요.",
+        "한때 관심이 컸던 테마가 지금은 조용한 편이에요. 오늘은 눈에 띄는 흐름이 없었어요.",
     },
   },
   {
@@ -127,8 +126,8 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
     emoji: "💊",
     fomoScore: 31,
     comment:
-      "바이오는 오늘 거의 조용했어요. 다들 관심이 다른 데 가 있는 날이에요. " +
-      "조용한 건 나쁜 게 아니에요. 안 급해도 되는 날이에요.",
+      "바이오는 오늘 거의 조용했어요. 시선은 다른 곳에 가 있었어요. " +
+      "새 소식이 드문 하루였어요.",
     related: ["삼성바이오로직스", "셀트리온"],
     sources: [
       { title: "바이오, 특별한 모멘텀 없이 관망", source: "약업신문" },
@@ -138,9 +137,9 @@ export const MOCK_KEYWORD_CARDS: readonly KeywordCard[] = [
       whyTitle: "오늘은 왜 잠잠했을까요?",
       why:
         "특별한 새 소식이 없어서 사람들 시선이 머물지 않은 날이었어요. 새 소식이 없으면 이렇게 잠잠하기도 해요.",
-      rememberTitle: "근데 이건 기억해요",
+      rememberTitle: "오늘 한 줄 정리",
       remember:
-        "관심이 없다고 뭔가 잘못된 건 아니에요. 시선은 매일 다른 곳으로 옮겨다니거든요.",
+        "오늘은 시선이 다른 곳에 가 있었어요. 시선은 매일 다른 곳으로 옮겨다녀요.",
     },
   },
 ] as const;
