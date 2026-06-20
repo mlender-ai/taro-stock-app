@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { scoreToColor, type EmotionType } from "@fomo/core";
 import { KeywordCardFeed } from "@/components/KeywordCardFeed";
 import { KeywordHistory } from "@/components/KeywordHistory";
+import { FomoIndexSkeleton } from "@/components/SkeletonLoader";
 import type {
   FomoIndexResponse,
   TallyResponse,
@@ -39,7 +40,8 @@ export function HomeView({
   onLoggedIn: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("card");
-  const color = index ? scoreToColor(index.score) : undefined;
+
+  const color = useMemo(() => (index ? scoreToColor(index.score) : undefined), [index]);
 
   /**
    * 전체 폴백 판정: 4개 Heat가 모두 중립 기본값(market/community/emotion=15, whale=0)이고
@@ -47,13 +49,17 @@ export function HomeView({
    * 이 상태를 "진짜 숫자처럼" 노출하면 정직한 숫자 원칙(PRODUCT_TRUTH §4) 위반.
    * @author 안티그래비티
    */
-  const isFullFallback = index
-    ? index.components.market === 15 &&
-      index.components.community === 15 &&
-      index.components.emotion === 15 &&
-      index.components.whale === 0 &&
-      !index.aiSummary
-    : false;
+  const isFullFallback = useMemo(
+    () =>
+      index
+        ? index.components.market === 15 &&
+          index.components.community === 15 &&
+          index.components.emotion === 15 &&
+          index.components.whale === 0 &&
+          !index.aiSummary
+        : false,
+    [index],
+  );
 
   return (
     <>
@@ -63,15 +69,16 @@ export function HomeView({
           <span className="font-pixel text-base text-whiteout">FOMO CLUB</span>
         </div>
 
-        {/* 시장 온도(FOMO Index) — 전체 폴백이면 정직하게 "수집 중" 표시 @author 안티그래비티 */}
+        {/* 시장 온도(FOMO Index) — 로딩 중이면 스켈레톤, 폴백이면 수집 중 @author 안티그래비티 */}
+        {!index && <FomoIndexSkeleton />}
         {index && !isFullFallback && (
-          <div className="mt-3 flex items-center justify-between rounded-xl border border-hairline bg-surface px-4 py-2.5">
+          <div className="mt-3 flex items-center justify-between rounded-xl border border-hairline bg-surface px-4 py-3">
             <span className="text-xs text-muted">오늘의 시장 온도</span>
             <div className="flex items-baseline gap-2">
-              <span className="font-pixel text-xl leading-none" style={{ color }}>
+              <span className="font-pixel text-2xl font-bold leading-none" style={{ color }}>
                 {index.score}
               </span>
-              <span className="font-pixel text-[11px] text-muted">{index.state}</span>
+              <span className="font-pixel text-xs text-muted">{index.state}</span>
               {index.prevDayDelta !== 0 && (
                 <span className="font-pixel text-[11px]" style={{ color }}>
                   {index.prevDayDelta > 0
@@ -83,7 +90,7 @@ export function HomeView({
           </div>
         )}
         {index && isFullFallback && (
-          <div className="mt-3 flex items-center justify-between rounded-xl border border-hairline bg-surface px-4 py-2.5">
+          <div className="mt-3 flex items-center justify-between rounded-xl border border-hairline bg-surface px-4 py-3">
             <span className="text-xs text-muted">오늘의 시장 온도</span>
             <span className="font-pixel text-[11px] text-muted">데이터 수집 중…</span>
           </div>
