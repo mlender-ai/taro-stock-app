@@ -2,8 +2,23 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FOMO Club",
-  description: "투자자들이 \"나만 그런 게 아니구나\"를 확인하는 공간. FOMO Index는 감정 체감 지표이며 투자 조언이 아닙니다.",
+  title: {
+    default: "FOMO Club",
+    template: "%s | FOMO Club",
+  },
+  description: "스와이프로 투자 취향을 학습해 오늘의 테마와 종목을 쉽게 매칭하는 피드.",
+  openGraph: {
+    type: "website",
+    locale: "ko_KR",
+    siteName: "FOMO Club",
+    title: "FOMO Club — 내 취향 투자 피드",
+    description: "오늘 볼 만한 시장 테마와 종목을 넘겨 보고, 내 취향에 맞는 투자 정보를 쉽게 발견하세요.",
+  },
+  twitter: {
+    card: "summary",
+    title: "FOMO Club — 내 취향 투자 피드",
+    description: "오늘 볼 만한 시장 테마와 종목을 넘겨 보고, 내 취향에 맞는 투자 정보를 쉽게 발견하세요.",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
