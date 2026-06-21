@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { KeywordCard, SectorStock, StockSector } from "@fomo/core";
+import { buildCardFrontHook, signalsFromBasics } from "@fomo/core";
+import type { KeywordCard, SectorStock, StockSector, CardFrontHook, CardFrontSignals } from "@fomo/core";
 import { StockInsightView } from "@/components/KeywordDepthPage";
-import { fetchSectorStocks, fetchKeywords, recordTaste } from "@/lib/fomoApi";
+import { fetchSectorStocks, fetchKeywords, fetchStockBasics, recordTaste } from "@/lib/fomoApi";
 import { FullPageLoading, LOADING_PRESETS } from "@/components/FullPageLoading";
 
 /**
@@ -79,8 +80,13 @@ const MARKET_LABEL: Record<string, string> = {
   COIN: "코인",
 };
 
-/** 종목 카드 앞면 — 이름 + 시장 라벨 + (발굴주면) 왜 보여줬나 근거(카피·국기 등 비주얼은 광혁). */
-function StockCardFace({ stock, progress }: { stock: DeckStock; progress?: string }) {
+/**
+ * 종목 카드 앞면 — 이름 + 시장 라벨 + 그날 가장 센 객관 신호 후킹(PHASE0 §4).
+ * 2행 헤드라인(가격>거래량>수급>뉴스>잠잠) · 3행 쉬운 번역 · 4행 균형(있으면). 점수·판정 없이 사실만.
+ * 비주얼 디테일(국기·리치 등)은 광혁 — 여기선 구조/문구만.
+ */
+function StockCardFace({ stock, hook, progress }: { stock: DeckStock; hook: CardFrontHook; progress?: string }) {
+  const quiet = hook.source === "quiet";
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2">
@@ -90,22 +96,37 @@ function StockCardFace({ stock, progress }: { stock: DeckStock; progress?: strin
       <p className="mt-3 font-pixel text-sm text-muted">
         {MARKET_LABEL[stock.market] ?? stock.market}
       </p>
-      {stock.reason ? (
-        <>
-          <p className="mt-4 font-pixel text-sm" style={{ color: UP }}>💡 주목해볼만한 종목</p>
-          <p className="mt-3 text-base leading-7 text-whiteout">{stock.reason}</p>
-        </>
-      ) : (
-        <p className="mt-6 text-lg leading-8 text-whiteout">
-          이 종목, 오늘 어떤 흐름인지 한번 볼까요?
-        </p>
+
+      {/* 2행 — 후킹(가장 센 객관 신호 1줄) */}
+      <p
+        className="mt-5 text-xl font-bold leading-8"
+        style={quiet ? { color: "#94A3B8" } : { color: UP }}
+      >
+        {hook.headline}
+      </p>
+      {/* 3행 — 쉬운 번역(사실 묘사) */}
+      {hook.translation && (
+        <p className="mt-2 text-base leading-7 text-whiteout">{hook.translation}</p>
       )}
+      {/* 4행 — 균형(반대 방향 사실, 있을 때만) */}
+      {hook.balance && <p className="mt-2 text-sm leading-6 text-muted">{hook.balance}</p>}
+
       <div className="mt-auto flex items-center justify-between pt-6">
         <span className="font-pixel text-[11px] text-muted">더보기 →</span>
         {progress && <span className="font-pixel text-[11px] text-muted">{progress}</span>}
       </div>
     </div>
   );
+}
+
+/** 오늘(KST) "M/D" — 후킹 헤드라인 시점 라벨(§4 시점 명시). */
+function kstTodayLabel(): string {
+  try {
+    const kst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    return `${kst.getMonth() + 1}/${kst.getDate()}`;
+  } catch {
+    return "";
+  }
 }
 
 interface SectorDeckProps {
@@ -172,7 +193,32 @@ function SectorDeckInner({
   const startX = useRef(0);
   const moved = useRef(false);
 
+  // 앞면 후킹 신호 — 도달하는 카드의 baseline(가격·52주 등)을 lazy 로 불러 규칙기반 후킹(비용 방어 §5).
+  // 국내(naverCode) 종목만 가격 도출 — 없으면 발굴 근거/잠잠으로. 캐시(canonical 키)로 재방문 즉시.
+  const [signals, setSignals] = useState<Record<string, CardFrontSignals>>({});
+  const inflight = useRef<Set<string>>(new Set());
+  const asOf = useRef<string>(kstTodayLabel()).current;
+
   const at = (i: number) => stocks[((i % stocks.length) + stocks.length) % stocks.length]!;
+
+  const ensureSignals = useCallback(
+    (stock: DeckStock) => {
+      const key = stock.canonical;
+      if (!stock.naverCode || signals[key] || inflight.current.has(key)) return;
+      inflight.current.add(key);
+      fetchStockBasics(key)
+        .then((b) => setSignals((prev) => ({ ...prev, [key]: signalsFromBasics(b) })))
+        .catch((err) => console.warn("[SectorStockDeck] basics signal failed", key, err))
+        .finally(() => inflight.current.delete(key));
+    },
+    [signals]
+  );
+
+  const hookFor = (stock: DeckStock): CardFrontHook => {
+    const sig: CardFrontSignals = { ...(signals[stock.canonical] ?? {}), asOf };
+    if (stock.reason) sig.reason = stock.reason;
+    return buildCardFrontHook(sig);
+  };
 
   const flingNext = useCallback((dir: "left" | "right") => {
     if (prefersReducedMotion()) {
@@ -230,6 +276,12 @@ function SectorDeckInner({
     else setDx(0);
   };
 
+  // 보이는 카드(+다음 1장)의 신호를 미리 채운다 — 도달 종목만(비용 방어).
+  useEffect(() => {
+    ensureSignals(at(idx));
+    ensureSignals(at(idx + 1));
+  }, [idx, ensureSignals]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const top = at(idx);
   const topTransform = exiting
     ? `translateX(${exiting === "right" ? 140 : -140}%) rotate(${exiting === "right" ? 16 : -16}deg)`
@@ -255,7 +307,7 @@ function SectorDeckInner({
                 zIndex: 1,
               }}
             >
-              <StockCardFace stock={stock} />
+              <StockCardFace stock={stock} hook={hookFor(stock)} />
             </div>
           ))}
 
@@ -282,7 +334,7 @@ function SectorDeckInner({
           >
             ← 덜 관심
           </span>
-          <StockCardFace stock={top} progress={`${(idx % stocks.length) + 1} / ${stocks.length}`} />
+          <StockCardFace stock={top} hook={hookFor(top)} progress={`${(idx % stocks.length) + 1} / ${stocks.length}`} />
         </div>
       </div>
 
