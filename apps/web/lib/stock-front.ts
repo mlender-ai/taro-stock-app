@@ -83,6 +83,12 @@ export interface StockFrontData {
   signals: CardFrontSignals;
   /** 최근 3개월 종가(스파크라인) — 없으면 빈 배열. */
   sparkline: number[];
+  /** 현재가 — 예 "354,000원"(카드 1행 표기용). */
+  priceText?: string;
+  /** 등락 — 예 "2,000 (0.55%)". */
+  changeText?: string;
+  /** 등락 방향(색). */
+  changeDir?: "up" | "down" | "flat";
 }
 
 /**
@@ -114,5 +120,11 @@ export async function assembleStockFront(
   const rank = rankMap?.[code];
   if (rank) signals.marketCapRank = { scope: "market", market: rank.market, rank: rank.rank };
 
-  return { signals, sparkline };
+  return {
+    signals,
+    sparkline,
+    ...(basics?.priceText ? { priceText: basics.priceText } : {}),
+    ...(basics?.changeText ? { changeText: basics.changeText } : {}),
+    ...(basics?.changeDir ? { changeDir: basics.changeDir } : {}),
+  };
 }
