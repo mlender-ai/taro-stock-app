@@ -47,6 +47,37 @@ export function marketSummary(state: FomoState): string {
   return MARKET_SUMMARY[state];
 }
 
+/**
+ * Heat 기반 맥락 한 줄 — 상위 Heat가 "왜 이런 온도인가"를 담담히 설명.
+ * buildSummary(숫자 옆)와 달리, 마스코트 멘트 블록 아래에 붙는 보조 맥락.
+ * 투자 조언·단정 ❌. 이슈 #428 Phase 1.
+ */
+const HEAT_CONTEXT_LABELS: Record<string, string> = {
+  market: "시장 거래",
+  community: "커뮤니티 관심",
+  emotion: "감정 투표",
+  whale: "대형 이벤트",
+};
+
+export function heatContextLine(
+  components: ReadonlyArray<{ key: string; score: number; max: number }>
+): string {
+  const sorted = [...components]
+    .filter((c) => c.max > 0)
+    .map((c) => ({
+      label: HEAT_CONTEXT_LABELS[c.key] ?? c.key,
+      pct: Math.round((c.score / c.max) * 100),
+    }))
+    .sort((a, b) => b.pct - a.pct);
+
+  if (sorted.length === 0) return "아직 데이터를 모으고 있어요.";
+
+  const top = sorted[0]!;
+  if (top.pct >= 70) return `${top.label}이 ${top.pct}%로 가장 뜨거워요.`;
+  if (top.pct <= 30) return `전반적으로 조용한 흐름이에요.`;
+  return `${top.label} ${top.pct}%가 오늘의 분위기를 이끌고 있어요.`;
+}
+
 export function mineLine(emotion: EmotionType): string {
   return MINE_LINES[emotion];
 }

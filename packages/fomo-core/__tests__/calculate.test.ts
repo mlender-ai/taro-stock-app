@@ -149,3 +149,75 @@ describe("buildSummary — Heat 정보 + 정직한 숫자 (#428)", () => {
     expect(s).not.toMatch(/매수|매도|반드시|보장|폭락|급등/);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Heat 격리 — 개별 Heat 실패가 전체 파이프라인을 중단시키지 않음 (#415)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("computeFomoIndex — Heat 격리 견고성 (#415)", () => {
+  it("NaN 포함 시그널도 안전하게 처리", () => {
+    const idx = computeFomoIndex(
+      { market: { volumeChangePct: NaN, turnoverChangePct: NaN } },
+      "2026-06-11"
+    );
+    expect(Number.isNaN(idx.score)).toBe(false);
+    const m = idx.components.find((c) => c.key === "market")!;
+    expect(m.meta?.confidence).toBe("fallback");
+  });
+
+  it("whale에 빈 배열 → 0점, 다른 Heat 영향 없음", () => {
+    const idx = computeFomoIndex({ whale: [] }, "2026-06-11");
+    const w = idx.components.find((c) => c.key === "whale")!;
+    expect(w.score).toBe(0);
+    expect(idx.score).toBe(45); // 15+15+15+0
+  });
+
+  it("모든 Heat가 최대값일 때 100 초과하지 않음", () => {
+    const idx = computeFomoIndex(
+      {
+        market: { volumeChangePct: 200, turnoverChangePct: 200, searchChangePct: 200, etfInflowPct: 200 },
+        community: { mentionChangePct: 200, bullishRatio: 1.0 },
+        emotion: { fomo: 100, greed: 100 },
+        whale: [{ weight: 50 }],
+      },
+      "2026-06-11"
+    );
+    expect(idx.score).toBeLessThanOrEqual(100);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// heatContextLine — Heat 맥락 멘트 (#428)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { heatContextLine } from "../src/mascot-lines";
+
+describe("heatContextLine — Heat 기반 맥락 멘트 (#428)", () => {
+  it("상위 Heat 70%+ → '가장 뜨거워요' 포함", () => {
+    const line = heatContextLine([
+      { key: "market", score: 25, max: 30 },
+      { key: "community", score: 5, max: 30 },
+    ]);
+    expect(line).toContain("뜨거워요");
+  });
+
+  it("상위 Heat 30% 이하 → '조용한 흐름' 포함", () => {
+    const line = heatContextLine([
+      { key: "market", score: 5, max: 30 },
+      { key: "community", score: 3, max: 30 },
+    ]);
+    expect(line).toContain("조용한");
+  });
+
+  it("빈 배열 → '데이터를 모으고 있어요' 폴백", () => {
+    expect(heatContextLine([])).toContain("데이터를 모으고 있어요");
+  });
+
+  it("투자 조언·단정 표현 없음", () => {
+    const line = heatContextLine([
+      { key: "market", score: 20, max: 30 },
+      { key: "emotion", score: 25, max: 30 },
+    ]);
+    expect(line).not.toMatch(/매수|매도|반드시|보장|폭락|급등/);
+  });
+});
