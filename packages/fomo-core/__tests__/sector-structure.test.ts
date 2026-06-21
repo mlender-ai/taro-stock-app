@@ -6,6 +6,7 @@ import {
   sortStocksForFeed,
   STOCK_VOCAB,
   type SectorStock,
+  type StockSector,
 } from "../src";
 
 describe("섹터 ↔ 종목 매핑 (SECTOR_STRUCTURE §2 토대)", () => {
@@ -76,6 +77,30 @@ describe("섹터 ↔ 종목 매핑 (SECTOR_STRUCTURE §2 토대)", () => {
     // 자동차(현대차)는 대응 테마 없음 → 어떤 섹터 풀에도 없음
     expect(STOCK_VOCAB.some((d) => d.canonical === "현대차")).toBe(true);
     expect(inAnySector.has("현대차")).toBe(false);
+  });
+
+  // ── SECTOR_POOL_EXPANSION §6: 최소 풀 + 코드 위생 ──
+  // 코인은 구조적 공백(코인 자체는 상장주 아님) → 관련 상장주로 채우되 MIN 예외(화이트리스트).
+  const MIN_BASELINE = 8;
+  const MIN_EXEMPT: ReadonlySet<StockSector> = new Set<StockSector>(["코인"]);
+
+  it(`baseline(국내 상장) 풀이 각 섹터 >= ${MIN_BASELINE} (코인 예외) — 무한 스와이프 체감`, () => {
+    for (const sec of SECTORS) {
+      const n = stocksBySector(sec, { requireNaverCode: true }).length;
+      if (MIN_EXEMPT.has(sec)) {
+        expect(n, `${sec}(예외) 최소 1개는 있어야`).toBeGreaterThan(0);
+      } else {
+        expect(n, `${sec} baseline 풀 ${n} < ${MIN_BASELINE}`).toBeGreaterThanOrEqual(MIN_BASELINE);
+      }
+    }
+  });
+
+  it("naverCode 위생 — 전부 6자리 숫자 + canonical/코드 중복 없음", () => {
+    for (const d of STOCK_VOCAB) {
+      if (d.naverCode) expect(d.naverCode, `잘못된 코드 ${d.canonical}:${d.naverCode}`).toMatch(/^\d{6}$/);
+    }
+    const names = STOCK_VOCAB.map((d) => d.canonical);
+    expect(new Set(names).size, "canonical 중복").toBe(names.length);
   });
 });
 

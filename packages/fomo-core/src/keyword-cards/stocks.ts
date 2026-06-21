@@ -86,6 +86,47 @@ export const STOCK_VOCAB: readonly StockDef[] = [
   { canonical: "동진쎄미켐", aliases: ["동진쎄미켐"], market: "KOSDAQ", country: "KR", naverCode: "005290" },
   { canonical: "하나마이크론", aliases: ["하나마이크론"], market: "KOSDAQ", country: "KR", naverCode: "067310" },
   { canonical: "제너셈", aliases: ["제너셈"], market: "KOSDAQ", country: "KR", naverCode: "217190" },
+  // ── 섹터 풀 확장(SECTOR_POOL_EXPANSION) — 국내 baseline 보강. naverCode 네이버 교차검증 완료. ──
+  // AI(국내)
+  { canonical: "더존비즈온", aliases: ["더존비즈온"], market: "KOSPI", country: "KR", naverCode: "012510" },
+  { canonical: "한글과컴퓨터", aliases: ["한글과컴퓨터"], market: "KOSDAQ", country: "KR", naverCode: "030520" },
+  { canonical: "코난테크놀로지", aliases: ["코난테크놀로지"], market: "KOSDAQ", country: "KR", naverCode: "402030" },
+  { canonical: "솔트룩스", aliases: ["솔트룩스"], market: "KOSDAQ", country: "KR", naverCode: "304100" },
+  { canonical: "셀바스AI", aliases: ["셀바스AI"], market: "KOSDAQ", country: "KR", naverCode: "108860" },
+  { canonical: "루닛", aliases: ["루닛"], market: "KOSDAQ", country: "KR", naverCode: "328130" },
+  // 원자력
+  { canonical: "한국전력", aliases: ["한국전력", "한전"], market: "KOSPI", country: "KR", naverCode: "015760", marquee: true },
+  { canonical: "한전KPS", aliases: ["한전KPS"], market: "KOSPI", country: "KR", naverCode: "051600" },
+  { canonical: "우진", aliases: ["우진"], market: "KOSPI", country: "KR", naverCode: "105840" },
+  { canonical: "비에이치아이", aliases: ["비에이치아이"], market: "KOSDAQ", country: "KR", naverCode: "083650" },
+  { canonical: "일진파워", aliases: ["일진파워"], market: "KOSDAQ", country: "KR", naverCode: "094820" },
+  { canonical: "보성파워텍", aliases: ["보성파워텍"], market: "KOSDAQ", country: "KR", naverCode: "006910" },
+  // 2차전지
+  { canonical: "코스모신소재", aliases: ["코스모신소재"], market: "KOSPI", country: "KR", naverCode: "005070" },
+  { canonical: "천보", aliases: ["천보"], market: "KOSDAQ", country: "KR", naverCode: "278280" },
+  { canonical: "나노신소재", aliases: ["나노신소재"], market: "KOSDAQ", country: "KR", naverCode: "121600" },
+  { canonical: "더블유씨피", aliases: ["더블유씨피"], market: "KOSDAQ", country: "KR", naverCode: "393890" },
+  { canonical: "대주전자재료", aliases: ["대주전자재료"], market: "KOSDAQ", country: "KR", naverCode: "078600" },
+  { canonical: "금양", aliases: ["금양"], market: "KOSPI", country: "KR", naverCode: "001570" },
+  // 방산
+  { canonical: "한화시스템", aliases: ["한화시스템"], market: "KOSPI", country: "KR", naverCode: "272210" },
+  { canonical: "풍산", aliases: ["풍산"], market: "KOSPI", country: "KR", naverCode: "103140" },
+  { canonical: "빅텍", aliases: ["빅텍"], market: "KOSDAQ", country: "KR", naverCode: "065450" },
+  { canonical: "퍼스텍", aliases: ["퍼스텍"], market: "KOSDAQ", country: "KR", naverCode: "010820" },
+  { canonical: "STX엔진", aliases: ["STX엔진"], market: "KOSPI", country: "KR", naverCode: "077970" },
+  { canonical: "휴니드", aliases: ["휴니드"], market: "KOSPI", country: "KR", naverCode: "005870" },
+  // 바이오
+  { canonical: "SK바이오팜", aliases: ["SK바이오팜"], market: "KOSPI", country: "KR", naverCode: "326030" },
+  { canonical: "한미약품", aliases: ["한미약품"], market: "KOSPI", country: "KR", naverCode: "128940" },
+  { canonical: "종근당", aliases: ["종근당"], market: "KOSPI", country: "KR", naverCode: "185750" },
+  { canonical: "대웅제약", aliases: ["대웅제약"], market: "KOSPI", country: "KR", naverCode: "069620" },
+  { canonical: "펩트론", aliases: ["펩트론"], market: "KOSDAQ", country: "KR", naverCode: "087010" },
+  { canonical: "에이비엘바이오", aliases: ["에이비엘바이오"], market: "KOSDAQ", country: "KR", naverCode: "298380" },
+  // 코인 관련주(상장사 — "코인 자체"가 아니라 코인 관련 사업/투자)
+  { canonical: "우리기술투자", aliases: ["우리기술투자"], market: "KOSDAQ", country: "KR", naverCode: "041190" },
+  { canonical: "갤럭시아머니트리", aliases: ["갤럭시아머니트리"], market: "KOSDAQ", country: "KR", naverCode: "094480" },
+  { canonical: "다날", aliases: ["다날"], market: "KOSDAQ", country: "KR", naverCode: "064260" },
+  { canonical: "한화투자증권", aliases: ["한화투자증권"], market: "KOSPI", country: "KR", naverCode: "003530" },
 
   // ── 미국/글로벌 — 종토방 없음(레딧/외신으로 grounding, §1) ──
   { canonical: "엔비디아", aliases: ["엔비디아", "Nvidia", "NVDA"], market: "NASDAQ", country: "US", marquee: true },
@@ -380,21 +421,31 @@ const SECTOR_OF: Readonly<Record<string, StockSector>> = {
   동진쎄미켐: "반도체", 하나마이크론: "반도체", 제너셈: "반도체", 리노공업: "반도체",
   이오테크닉스: "반도체", HPSP: "반도체", 주성엔지니어링: "반도체",
   엔비디아: "반도체", TSMC: "반도체", AMD: "반도체", 브로드컴: "반도체", 마이크론: "반도체",
-  // AI
+  // AI (국내 SW/AI + AI 로봇)
   마이크로소프트: "AI", 팔란티어: "AI",
+  더존비즈온: "AI", 한글과컴퓨터: "AI", 코난테크놀로지: "AI", 솔트룩스: "AI",
+  셀바스AI: "AI", 루닛: "AI", 두산로보틱스: "AI", 레인보우로보틱스: "AI",
   // 2차전지
   에코프로비엠: "2차전지", 에코프로: "2차전지", LG에너지솔루션: "2차전지", 삼성SDI: "2차전지",
   포스코퓨처엠: "2차전지", 엘앤에프: "2차전지",
+  코스모신소재: "2차전지", 천보: "2차전지", 나노신소재: "2차전지", 더블유씨피: "2차전지",
+  대주전자재료: "2차전지", 금양: "2차전지",
   // 방산(군함 포함)
   한화에어로스페이스: "방산", 한국항공우주: "방산", LIG넥스원: "방산", 현대로템: "방산",
   한화오션: "방산", 삼성중공업: "방산",
+  한화시스템: "방산", 풍산: "방산", 빅텍: "방산", 퍼스텍: "방산", STX엔진: "방산", 휴니드: "방산",
   // 바이오
   셀트리온: "바이오", 삼성바이오로직스: "바이오", 알테오젠: "바이오", 유한양행: "바이오",
   HLB: "바이오", 리가켐바이오: "바이오",
+  SK바이오팜: "바이오", 한미약품: "바이오", 종근당: "바이오", 대웅제약: "바이오",
+  펩트론: "바이오", 에이비엘바이오: "바이오",
   // 원자력
   두산에너빌리티: "원자력", 한전기술: "원자력",
-  // 코인
+  한국전력: "원자력", 한전KPS: "원자력", 우진: "원자력", 비에이치아이: "원자력",
+  일진파워: "원자력", 보성파워텍: "원자력",
+  // 코인 (코인 관련 상장주 — 코인 자체 아님)
   비트코인: "코인", 이더리움: "코인",
+  우리기술투자: "코인", 갤럭시아머니트리: "코인", 다날: "코인", 한화투자증권: "코인",
 };
 
 /** 종목의 섹터(없으면 undefined — 대응 테마 없는 종목). */
