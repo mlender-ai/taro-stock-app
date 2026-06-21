@@ -80,20 +80,27 @@ const MARKET_LABEL: Record<string, string> = {
   COIN: "코인",
 };
 
-/**
- * 종목 카드 앞면 — 이름 + 시장 라벨 + 그날 가장 센 객관 신호 후킹(PHASE0 §4).
- * 2행 헤드라인(가격>거래량>수급>뉴스>잠잠) · 3행 쉬운 번역 · 4행 균형(있으면). 점수·판정 없이 사실만.
- * 비주얼 디테일(국기·리치 등)은 광혁 — 여기선 구조/문구만.
- */
 /** 강도별 헤드라인 색 — 강도 비례 톤(§3). high=코랄, medium=주황, calm=그레이. */
 const INTENSITY_COLOR: Record<string, string> = { high: UP, medium: "#F59E0B", calm: "#94A3B8" };
 
-/** 로고 폴백 — 종목명 첫 글자 원형(외부 이미지는 후속, 게이트). */
-function InitialBadge({ name }: { name: string }) {
+/** 종목 로고 — 네이버 심볼 이미지(불러와지면), 실패 시 이니셜 원형 폴백. */
+function LogoBadge({ name, code }: { name: string; code?: string | undefined }) {
+  const [failed, setFailed] = useState(false);
   const ch = name.trim().slice(0, 1) || "·";
+  if (code && !failed) {
+    return (
+      <img
+        src={`https://ssl.pstatic.net/imgstock/fn/real/logo/stock/Stock${code}.svg`}
+        alt=""
+        aria-hidden
+        onError={() => setFailed(true)}
+        className="h-9 w-9 shrink-0 rounded-full bg-white object-contain p-1"
+      />
+    );
+  }
   return (
     <span
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base font-bold text-white"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base font-bold"
       style={{ backgroundColor: "rgba(255,90,54,0.18)", color: UP }}
       aria-hidden
     >
@@ -102,11 +109,6 @@ function InitialBadge({ name }: { name: string }) {
   );
 }
 
-/**
- * 종목 카드 앞면 — FOMO 후킹 구조(rev2 §4): 정체성 / 테마태그 / 후킹 / 다가오는 재료 / baseline.
- * 강도에 비례한 톤(§3) — 핫한 종목은 세게, 조용한 종목은 차분하게. 점수·판정·예측 없음.
- * 로고 이미지·미니차트·시총순위는 후속(배포 복구 후 서버 페치) — 지금은 이니셜/태그/텍스트 골격.
- */
 /** 3개월 종가 스파크라인 — 인라인 SVG(라이브러리 없음). 추세색: 상승=코랄/하락=블루. */
 function Sparkline({ series }: { series: number[] }) {
   const paths = sparklinePath(series, 300, 44);
@@ -121,32 +123,39 @@ function Sparkline({ series }: { series: number[] }) {
   );
 }
 
+/** 등락 방향 색 — 상승 코랄/하락 블루/보합 그레이(국내 관습: 상승 적·하락 청). */
+const DIR_COLOR: Record<string, string> = { up: UP, down: "#3B82F6", flat: "#94A3B8" };
+const DIR_MARK: Record<string, string> = { up: "▲", down: "▼", flat: "" };
+
+/**
+ * 종목 카드 앞면(rev2): 정체성(로고+종목명+시장·시총순위) / 현재가 / 테마태그 / FOMO 후킹 / 스파크라인 / 재료.
+ * 강도 비례 톤(§3) — 핫하면 세게, 조용하면 차분히. 점수·판정·예측 없음. 로고는 네이버 심볼(폴백 이니셜).
+ */
 function StockCardFace({
   stock,
   hook,
-  changePct,
+  priceText,
+  changeText,
+  changeDir,
   rankLabel,
   sparkline,
   progress,
 }: {
   stock: DeckStock;
   hook: CardFrontHook;
-  changePct?: number | undefined;
+  priceText?: string | undefined;
+  changeText?: string | undefined;
+  changeDir?: "up" | "down" | "flat" | undefined;
   rankLabel?: string | undefined;
   sparkline?: number[] | undefined;
   progress?: string | undefined;
 }) {
   const color = INTENSITY_COLOR[hook.intensity] ?? "#94A3B8";
-  // 6행 baseline(위생) — 헤드라인이 이미 등락을 말하는 가격/quiet 앵글은 생략(중복 방지).
-  const showBaseline = ["named", "dday", "big", "surprise"].includes(hook.angle) && typeof changePct === "number";
-  const baseline = showBaseline
-    ? `오늘 ${changePct! > 0 ? "+" : changePct! < 0 ? "-" : ""}${Math.abs(changePct!).toFixed(1)}%`
-    : undefined;
   return (
     <div className="flex h-full flex-col">
-      {/* 1행 — 정체성: 로고(이니셜) + 종목명 + 시장 */}
+      {/* 1행 — 정체성: 로고 + 종목명 + 시장·시총순위 */}
       <div className="flex items-center gap-2.5">
-        <InitialBadge name={stock.canonical} />
+        <LogoBadge name={stock.canonical} code={stock.naverCode} />
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-2xl font-bold text-whiteout">{stock.canonical}</span>
@@ -158,6 +167,18 @@ function StockCardFace({
           </span>
         </div>
       </div>
+
+      {/* 현재가 — 시총순위줄과 테마태그 사이(시장 readout, 후킹 아님) */}
+      {priceText && (
+        <div className="mt-3 flex items-baseline gap-2">
+          <span className="text-lg font-bold text-whiteout">{priceText}</span>
+          {changeText && (
+            <span className="font-pixel text-sm" style={{ color: DIR_COLOR[changeDir ?? "flat"] }}>
+              {DIR_MARK[changeDir ?? "flat"]} {changeText}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* 2행 — 테마 태그 */}
       {hook.themeLabel && (
@@ -192,13 +213,9 @@ function StockCardFace({
         </ul>
       )}
 
-      <div className="mt-auto pt-6">
-        {/* 6행 — baseline(위생 요소, 후킹 아님) */}
-        {baseline && <p className="font-pixel text-[11px] text-muted">{baseline}</p>}
-        <div className="mt-2 flex items-center justify-between">
-          <span className="font-pixel text-[11px] text-muted">더보기 →</span>
-          {progress && <span className="font-pixel text-[11px] text-muted">{progress}</span>}
-        </div>
+      <div className="mt-auto flex items-center justify-between pt-6">
+        <span className="font-pixel text-[11px] text-muted">더보기 →</span>
+        {progress && <span className="font-pixel text-[11px] text-muted">{progress}</span>}
       </div>
     </div>
   );
@@ -280,7 +297,14 @@ function SectorDeckInner({
 
   // 앞면 FOMO 신호 — 도달하는 카드의 stock-front(가격·52주·라이브 수급 streak·시총순위·3개월 종가)를
   // lazy 로 서버에서 조립해 받는다(비용 방어 §5). 캐시(canonical 키)로 재방문 즉시.
-  const [front, setFront] = useState<Record<string, { signals: CardFrontSignals; sparkline: number[] }>>({});
+  type FrontEntry = {
+    signals: CardFrontSignals;
+    sparkline: number[];
+    priceText?: string;
+    changeText?: string;
+    changeDir?: "up" | "down" | "flat";
+  };
+  const [front, setFront] = useState<Record<string, FrontEntry>>({});
   const inflight = useRef<Set<string>>(new Set());
   const asOf = useRef<string>(kstTodayLabel()).current;
 
@@ -292,7 +316,18 @@ function SectorDeckInner({
       if (!stock.naverCode || front[key] || inflight.current.has(key)) return;
       inflight.current.add(key);
       fetchStockFront(key)
-        .then((d) => setFront((prev) => ({ ...prev, [key]: { signals: d.signals, sparkline: d.sparkline } })))
+        .then((d) =>
+          setFront((prev) => ({
+            ...prev,
+            [key]: {
+              signals: d.signals,
+              sparkline: d.sparkline,
+              ...(d.priceText ? { priceText: d.priceText } : {}),
+              ...(d.changeText ? { changeText: d.changeText } : {}),
+              ...(d.changeDir ? { changeDir: d.changeDir } : {}),
+            },
+          }))
+        )
         .catch((err) => console.warn("[SectorStockDeck] stock-front failed", key, err))
         .finally(() => inflight.current.delete(key));
     },
@@ -306,7 +341,6 @@ function SectorDeckInner({
     return sig;
   };
   const hookFor = (stock: DeckStock): CardFrontHook => buildCardFrontHook(signalsFor(stock));
-  const pctOf = (stock: DeckStock): number | undefined => front[stock.canonical]?.signals.changePct;
   const sparkOf = (stock: DeckStock): number[] | undefined => front[stock.canonical]?.sparkline;
   const rankLabelFor = (stock: DeckStock): string | undefined => {
     const r = front[stock.canonical]?.signals.marketCapRank;
@@ -400,7 +434,7 @@ function SectorDeckInner({
                 zIndex: 1,
               }}
             >
-              <StockCardFace stock={stock} hook={hookFor(stock)} changePct={pctOf(stock)} rankLabel={rankLabelFor(stock)} sparkline={sparkOf(stock)} />
+              <StockCardFace stock={stock} hook={hookFor(stock)} priceText={front[stock.canonical]?.priceText} changeText={front[stock.canonical]?.changeText} changeDir={front[stock.canonical]?.changeDir} rankLabel={rankLabelFor(stock)} sparkline={sparkOf(stock)} />
             </div>
           ))}
 
@@ -427,7 +461,7 @@ function SectorDeckInner({
           >
             ← 덜 관심
           </span>
-          <StockCardFace stock={top} hook={hookFor(top)} changePct={pctOf(top)} rankLabel={rankLabelFor(top)} sparkline={sparkOf(top)} progress={`${(idx % stocks.length) + 1} / ${stocks.length}`} />
+          <StockCardFace stock={top} hook={hookFor(top)} priceText={front[top.canonical]?.priceText} changeText={front[top.canonical]?.changeText} changeDir={front[top.canonical]?.changeDir} rankLabel={rankLabelFor(top)} sparkline={sparkOf(top)} progress={`${(idx % stocks.length) + 1} / ${stocks.length}`} />
         </div>
       </div>
 

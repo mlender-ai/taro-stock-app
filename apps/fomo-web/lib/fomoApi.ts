@@ -115,6 +115,9 @@ export type { CardFrontSignals } from "@fomo/core";
 export interface StockFrontResponse {
   signals: import("@fomo/core").CardFrontSignals;
   sparkline: number[];
+  priceText?: string;
+  changeText?: string;
+  changeDir?: "up" | "down" | "flat";
 }
 export const fetchStockFront = (stock: string) =>
   get<StockFrontResponse>(`/api/fomo/stock-front?stock=${encodeURIComponent(stock)}`);
