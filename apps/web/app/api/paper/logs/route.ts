@@ -1,20 +1,25 @@
 import { backendApiFetch } from "../../../../lib/backend-api";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeLegacyOperation } from "../../_utils";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const limit = request.nextUrl.searchParams.get("limit") ?? "60";
+  const denied = authorizeLegacyOperation(request);
+  if (denied) return denied;
+
+  const requestedLimit = Number(request.nextUrl.searchParams.get("limit") ?? "60");
+  const limit = Number.isInteger(requestedLimit)
+    ? Math.min(200, Math.max(1, requestedLimit))
+    : 60;
 
   try {
     const data = await backendApiFetch(`/paper/logs?limit=${limit}`);
     return NextResponse.json(data);
-  } catch (error) {
+  } catch {
     return NextResponse.json(
-      {
-        message: error instanceof Error ? error.message : "Proxy GET failed"
-      },
-      {
-        status: 500
-      }
+      { error: "Upstream unavailable" },
+      { status: 502 }
     );
   }
 }
