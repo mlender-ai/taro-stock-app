@@ -1,5 +1,8 @@
 import { proxyGet } from "../../_utils";
+import type { NextRequest } from "next/server";
 
-export async function GET() {
-  return proxyGet("/runtime/state");
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  return proxyGet(request, "/runtime/state");
 }
