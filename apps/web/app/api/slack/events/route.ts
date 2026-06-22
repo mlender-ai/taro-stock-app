@@ -325,7 +325,8 @@ ${taskRunList || "(없음)"}
   \`[[ACTION:select_project]] {"id":"P1"}\` — 후보 중 활성 프로젝트 선택 ("P1 시작", "P2 프로젝트 하자"). 선택 시 **기획문서(PRD)** 를 먼저 작성(아직 분해 안 함).
   \`[[ACTION:approve_plan]] {"id":"P2"}\` — 기획문서 검토 후 승인 ("P2 기획 승인", "이 기획으로 개발 진행"). 승인 시 직군(기획/백엔드/프론트·UX/품질)별 하위 이슈로 분해.
   \`[[ACTION:implement_task]] {"issue":457}\` — 특정 프로젝트 하위 task 이슈를 실제 구현 → PR ("#457 개발해", "457 구현해", "이 이슈 개발"). 번호가 명시된 task 개발 지시.
-  \`[[ACTION:monitor]]\` — Daily Product Monitor 실행. critical 없으면 보고만 하고 스킵, 있으면 task 이슈 생성 후 자동 수정 시도.
+  \`[[ACTION:monitor]]\` — Daily Product Monitor 실행. critical 없으면 보고만 하고 스킵, 있으면 task 이슈 생성 후 제한된 자동 수정 시도.
+  \`[[ACTION:monitor]] {"auto_fix":false}\` — Daily Product Monitor 보고 전용 실행. critical이 있어도 자동 수정은 하지 않음.
   \`[[ACTION:implement]] {"target":"latest_issue"}\` — 최신 작업 이슈 구현. CEO Brief/date 기반 auto-implement는 기본 경로에서 제외.
   \`[[ACTION:merge]] {"pr":291}\` — 특정 PR squash 머지 ("이 PR 머지해", 번호 명시)
   \`[[ACTION:merge_all]]\` — 열린 PR 중 **이상 없는 것 전부** 머지 ("PR 전부 머지", "남은 PR 머지", "이상없으면 다 머지"). 번호 불필요 — 초안·CI미통과·충돌은 자동 제외.
@@ -341,6 +342,7 @@ ${taskRunList || "(없음)"}
 **개발/구현 실행 트리거 (자주 쓰임 — 반드시 정확히 인식)**:
 - 다음과 같은 발화는 **제품 모니터링 실행 지시**다 → \`[[ACTION:monitor]]\` 토큰을 출력한다:
   "데일리 모니터링 돌려", "제품 상태 체크해", "오늘 제품 모니터링", "크리티컬 있나 봐줘".
+- "보고만", "수정 없이", "개발 없이", "no-fix"가 붙으면 → \`[[ACTION:monitor]] {"auto_fix":false}\` 토큰을 출력한다.
 - 다음과 같은 발화는 **최신 작업 이슈 구현 지시**다 → \`[[ACTION:implement]] {"target":"latest_issue"}\` 토큰을 출력한다:
   "개발해", "구현해", "작업 진행해" 처럼 번호는 없지만 이미 열린 작업 이슈를 진행하라는 말.
 - CEO Brief/date 기반 구현은 사용하지 않는다.
@@ -468,8 +470,11 @@ async function executeAction(
         return "🧪 *integrity-checker 접수* — 정합성 검수 작업 이슈를 생성합니다. 투자조언·근거·강세/약세 균형을 우선 확인합니다.";
       }
       case "monitor": {
-        await triggerWorkflow("daily-product-monitor.yml", { auto_fix: "true" });
-        return "🩺 *Daily Product Monitor 실행* — critical 없으면 보고만 하고 스킵, 있으면 작업 이슈를 만들고 자동 수정 시도합니다.";
+        const autoFix = action.payload.auto_fix === false ? "false" : "true";
+        await triggerWorkflow("daily-product-monitor.yml", { auto_fix: autoFix });
+        return autoFix === "false"
+          ? "🩺 *Daily Product Monitor 보고 전용 실행* — critical이 있어도 이슈만 만들고 자동 수정은 하지 않습니다."
+          : "🩺 *Daily Product Monitor 실행* — critical 없으면 보고만 하고 스킵, 있으면 작업 이슈를 만들고 제한된 자동 수정까지 시도합니다.";
       }
       case "implement": {
         if (action.payload.target === "latest_issue") {

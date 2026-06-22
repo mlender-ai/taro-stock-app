@@ -124,9 +124,12 @@ export function routeNaturalLanguage(input: string): NaturalRoute {
   }
 
   if (/(데일리|daily|매일|제품).*(모니터|monitor|점검|체크)|모니터링.*(실행|돌려|시작)/i.test(text)) {
+    const autoFix = !/(no-fix|nofix|report-only|보고만|수정\s*없이|자동\s*수정\s*없이|개발\s*없이|스킵만)/i.test(text);
     return route(
-      [{ name: "monitor", payload: {} }],
-      "🩺 Daily Product Monitor 실행 요청으로 이해했어요. critical 없으면 보고만 하고 스킵할게요.",
+      [{ name: "monitor", payload: { auto_fix: autoFix } }],
+      autoFix
+        ? "🩺 Daily Product Monitor 실행 요청으로 이해했어요. critical 없으면 보고만 하고, 있으면 제한된 자동 수정까지 시도할게요."
+        : "🩺 Daily Product Monitor 보고 전용 실행으로 이해했어요. critical이 있어도 자동 수정은 하지 않을게요.",
       "monitor",
     );
   }

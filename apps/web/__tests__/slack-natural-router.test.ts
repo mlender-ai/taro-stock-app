@@ -25,7 +25,8 @@ describe("routeNaturalLanguage", () => {
   });
 
   it("데일리 제품 모니터링 요청을 monitor로 라우팅", () => {
-    expect(routeNaturalLanguage("데일리 제품 모니터링 돌려줘").actions[0]).toEqual({ name: "monitor", payload: {} });
+    expect(routeNaturalLanguage("데일리 제품 모니터링 돌려줘").actions[0]).toEqual({ name: "monitor", payload: { auto_fix: true } });
+    expect(routeNaturalLanguage("제품 모니터링 보고만 해줘").actions[0]).toEqual({ name: "monitor", payload: { auto_fix: false } });
   });
 
   it("조회/상태 질문은 실행하지 않음", () => {
