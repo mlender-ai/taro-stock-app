@@ -158,4 +158,8 @@ describe("select_project 액션 (톱다운 프로젝트 선택)", () => {
     expect(KNOWN_ACTIONS.has("monitor")).toBe(true);
     expect(HIGH_IMPACT_ACTIONS.has("monitor")).toBe(true);
   });
+  it("monitor 보고 전용 페이로드 파싱", () => {
+    const r = parseActions('보고만 실행\n[[ACTION:monitor]] {"auto_fix":false}');
+    expect(r.actions).toEqual([{ name: "monitor", payload: { auto_fix: false } }]);
+  });
 });

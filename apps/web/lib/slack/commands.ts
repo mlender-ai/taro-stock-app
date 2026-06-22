@@ -121,26 +121,56 @@ async function handleStatus(): Promise<CommandResult> {
     getWorkflowRuns("implement-task.yml", 3),
   ]);
 
-  const prList = (prs as { number: number; title: string }[])
-    .map((pr) => `  #${pr.number}: ${pr.title}`)
+  const prList = (prs as { number: number; title: string; html_url?: string }[])
+    .map((pr) => `  #${pr.number}: ${pr.title}${pr.html_url ? ` — ${pr.html_url}` : ""}`)
     .join("\n") || "  (없음)";
 
+  const formatRun = (r: {
+    conclusion: string | null;
+    status?: string;
+    created_at: string;
+    html_url?: string;
+    event?: string;
+  }) => {
+    const state = r.status && r.status !== "completed" ? r.status : r.conclusion || "running";
+    const icon =
+      state === "success" ? "🟢" :
+      state === "failure" ? "🔴" :
+      state === "timed_out" ? "⏱️" :
+      state === "cancelled" ? "⚪" :
+      "🟡";
+    return `  ${icon} ${state} — ${r.created_at}${r.event ? ` (${r.event})` : ""}${r.html_url ? ` — ${r.html_url}` : ""}`;
+  };
+
   const monitorList = (
-    (monitorRuns as { workflow_runs: { conclusion: string; created_at: string }[] })
+    (monitorRuns as { workflow_runs: { conclusion: string | null; status?: string; created_at: string; html_url?: string; event?: string }[] })
       .workflow_runs || []
   )
-    .map((r) => `  ${r.conclusion || "running"} — ${r.created_at}`)
+    .map(formatRun)
     .join("\n") || "  (없음)";
 
   const taskList = (
-    (taskRuns as { workflow_runs: { conclusion: string; created_at: string }[] })
+    (taskRuns as { workflow_runs: { conclusion: string | null; status?: string; created_at: string; html_url?: string; event?: string }[] })
       .workflow_runs || []
   )
-    .map((r) => `  ${r.conclusion || "running"} — ${r.created_at}`)
+    .map(formatRun)
     .join("\n") || "  (없음)";
 
   return {
-    text: `*현재 상태*\n\n*오픈 PR:*\n${prList}\n\n*Daily Product Monitor 최근 실행:*\n${monitorList}\n\n*Implement Task 최근 실행:*\n${taskList}`,
+    text: [
+      "*현재 상태*",
+      "",
+      "*오픈 PR:*",
+      prList,
+      "",
+      "*Daily Product Monitor 최근 실행:*",
+      monitorList,
+      "",
+      "*Implement Task 최근 실행:*",
+      taskList,
+      "",
+      "_해석: Monitor가 초록이면 그날은 개발 스킵일 수 있습니다. Implement Task가 빨강이면 자동 PR이 안 만들어졌다는 뜻이므로 이슈 코멘트/Actions 로그를 확인하세요._",
+    ].join("\n"),
   };
 }
 
@@ -170,10 +200,15 @@ async function handlePipeline(args: string): Promise<CommandResult> {
 }
 
 async function handleMonitor(args: string): Promise<CommandResult> {
+  const noFix = /(?:^|\s)(no-fix|nofix|report-only)(?:\s|$)|보고만|수정\s*없이/i.test(args);
   await triggerWorkflow("daily-product-monitor.yml", {
-    auto_fix: args.includes("no-fix") ? "false" : "true",
+    auto_fix: noFix ? "false" : "true",
   });
-  return { text: "🩺 Daily Product Monitor를 수동 실행했습니다. critical 없으면 보고만 하고 스킵, 있으면 이슈 생성 후 자동 수정 시도합니다." };
+  return {
+    text: noFix
+      ? "🩺 Daily Product Monitor를 보고 전용으로 수동 실행했습니다. critical이 있어도 이슈만 만들고 자동 수정은 하지 않습니다."
+      : "🩺 Daily Product Monitor를 수동 실행했습니다. critical 없으면 보고만 하고 스킵, 있으면 이슈 생성 후 제한된 자동 수정 시도까지 진행합니다.",
+  };
 }
 
 async function handleSourceDiscovery(args: string): Promise<CommandResult> {
@@ -214,6 +249,7 @@ async function handleHelp(): Promise<CommandResult> {
     text: [
       "*FOMO Club Agent 커맨드:*",
       "`/fomo monitor` — Daily Product Monitor 수동 실행",
+      "`/fomo monitor no-fix` — 보고 전용 실행(자동 수정 안 함)",
       "`/fomo implement #{이슈번호}` — 지정 작업 이슈 구현",
       "`/fomo council` — 잠김: 자율기획 루프는 실행하지 않음",
       "`/fomo status` — 오픈 PR + 모니터/구현 실행 상태 요약",
