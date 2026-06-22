@@ -3,6 +3,7 @@ import {
   computeFomoScore,
   fomoCardView,
   fomoWhy,
+  fomoWatchPoint,
   confidenceGrade,
   isLeadingSetup,
   fomoLabelTextsSafe,
@@ -148,9 +149,31 @@ describe("computeFomoScore — 포모 점수 엔진(§2)", () => {
   });
 
   it("라벨별 임계 — warming(60~80)·quiet(40~60)·silent(<40)", () => {
-    expect(computeFomoScore({ volumeRatio: 2.7, mentionScore: 60 }).label).toBe("warming"); // C≈66
-    expect(computeFomoScore({ volumeRatio: 2, mentionScore: 60 }).label).toBe("quiet"); // C≈46
+    expect(computeFomoScore({ volumeRatio: 2.7, mentionScore: 30 }).label).toBe("warming"); // A 중간
+    expect(computeFomoScore({ volumeRatio: 1.7, mentionScore: 20 }).label).toBe("quiet"); // 신호는 있지만 A 약함
     expect(computeFomoScore({ mentionScore: 10 }).label).toBe("silent"); // C=10
+  });
+
+  it("2축 핵심 — 가격 큼+주목 약은 lone(가격만 먼저)", () => {
+    const s = computeFomoScore({ volumeRatio: 1.1, changePct: 10.58, mentionScore: 10 });
+    expect(s.label).toBe("lone");
+    expect(s.priceMove).toBe("up");
+    expect(s.attentionAxis).toBeLessThan(60);
+    expect(fomoCardView(s).badge).toBe("가격만 먼저");
+    expect(fomoCardView(s).headline).toBe("가격은 크게 올랐는데, 거래량·주목은 아직 안 붙었어요.");
+  });
+
+  it("2축 핵심 — 가격 평탄+L강은 incoming, 가격 큼+A강은 hot", () => {
+    expect(
+      computeFomoScore({
+        changePct: 0.5,
+        foreignNetStreak: 5,
+        foreignNetRatio: 0.01,
+        institutionNetStreak: 5,
+        institutionNetRatio: 0.01,
+      }).label
+    ).toBe("incoming");
+    expect(computeFomoScore({ volumeRatio: 3.5, changePct: 7, mentionScore: 90 }).label).toBe("hot");
   });
 
   it("결정적 — 같은 입력 같은 출력", () => {
@@ -188,7 +211,7 @@ describe("fomoCardView — 엔진 출력 → 카드(척추 ②, 단일 출처)",
     const v = fomoCardView(s, { sector: "반도체" });
     expect(v.scoreText).toBe(`포모 ${s.fomoScore}`);
     expect(v.emoji).toBe("🔥");
-    expect(v.badge).toBe("지금 한복판");
+    expect(v.badge).toBe("한복판");
     expect(v.tone).toBe("hot");
   });
 
@@ -204,25 +227,25 @@ describe("fomoCardView — 엔진 출력 → 카드(척추 ②, 단일 출처)",
     expect(s.label).toBe("incoming");
     expect(v.isLeading).toBe(true);
     expect(v.emoji).toBe("💎");
-    expect(v.headline).toContain("이미 움직였");
+    expect(v.headline).toBe("가격·거래량은 아직 조용한데, 외국인·기관 수급이 먼저 들어오는 중이에요.");
     expect(v.headline).not.toMatch(/오를|될 것|상승할/);
   });
 
   it("강도 비례 톤 — 핫 세게(hot)·조용 차분(calm)·식는 중(cooling)", () => {
-    expect(fomoCardView(computeFomoScore({ volumeRatio: 3.5, mentionScore: 90 })).tone).toBe("hot");
+    expect(fomoCardView(computeFomoScore({ volumeRatio: 3.5, changePct: 7, mentionScore: 90 })).tone).toBe("hot");
     expect(fomoCardView(computeFomoScore({ mentionScore: 10 })).tone).toBe("calm");
     expect(fomoCardView(computeFomoScore({ volumeRatio: 3, mentionScore: 80, changePct: -7 })).tone).toBe("cooling");
   });
 
-  it("근거(reason) 우선 — incoming 아닐 때 grounded 헤드라인", () => {
-    const s = computeFomoScore({ volumeRatio: 3.5, mentionScore: 90 }); // hot
-    expect(fomoCardView(s, { sector: "반도체", reason: "HBM4 공급계약 보도" }).headline).toBe("HBM4 공급계약 보도");
+  it("근거(reason)는 헤드라인을 덮지 않음 — 상태 메시지 단일 출처", () => {
+    const s = computeFomoScore({ volumeRatio: 3.5, changePct: 7, mentionScore: 90 }); // hot
+    expect(fomoCardView(s, { sector: "반도체", reason: "HBM4 공급계약 보도" }).headline).toBe(fomoWhy(s));
   });
 
-  it("가드 위반 reason 은 폐기 → 라벨 헤드라인 폴백", () => {
-    const s = computeFomoScore({ volumeRatio: 3.5, mentionScore: 90 });
+  it("가드 위반 reason 도 헤드라인을 덮지 않음", () => {
+    const s = computeFomoScore({ volumeRatio: 3.5, changePct: 7, mentionScore: 90 });
     const v = fomoCardView(s, { sector: "반도체", reason: "지금 매수 추천! 급등할 종목" });
-    expect(v.headline).toBe("지금 반도체에서 가장 시선이 몰리는 자리예요");
+    expect(v.headline).toBe(fomoWhy(s));
   });
 
   it("데이터 0 → 점수 보류(빈 문자열), 라벨 silent", () => {
@@ -243,6 +266,18 @@ describe("fomoCardView — 엔진 출력 → 카드(척추 ②, 단일 출처)",
       const h = fomoCardView(s, { sector: "반도체" }).headline;
       expect(isFrontHookSafe(h), `금칙어: ${h}`).toBe(true);
     }
+  });
+
+  it("카드·상세 히어로 문장은 같은 상태에서 같은 단일 문장", () => {
+    const s = computeFomoScore({ volumeRatio: 1.1, changePct: 10.58, mentionScore: 10 });
+    expect(fomoCardView(s).headline).toBe(fomoWhy(s));
+    expect(fomoWatchPoint(s)).toBe("거래량·주목이 따라붙는지가 관전 포인트예요.");
+  });
+
+  it("모순 회귀 — 조용 계열과 '관심이 모였어요'류 why가 동시에 나오지 않음", () => {
+    const s = computeFomoScore({ volumeRatio: 1.1, changePct: 10.58, mentionScore: 10 });
+    const texts = `${fomoCardView(s).badge} ${fomoCardView(s).headline} ${fomoWhy(s)}`;
+    expect(texts).not.toMatch(/조용.*관심이 모였|관심이 모였.*조용/);
   });
 });
 

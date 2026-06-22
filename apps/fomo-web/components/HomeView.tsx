@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { scoreToColor, type EmotionType } from "@fomo/core";
 import { KeywordCardFeed } from "@/components/KeywordCardFeed";
 import { KeywordHistory } from "@/components/KeywordHistory";
@@ -22,6 +22,7 @@ import type {
  * (감정 게이트/캘린더/한마디 props는 보존 차원에서 시그니처에 남기되 미사용 — flag로 숨김 유지.)
  */
 type Tab = "card" | "history";
+const FIRST_VISIT_NOTICE_KEY = "fomo_first_visit_notice_v1";
 
 export function HomeView({
   index,
@@ -43,7 +44,18 @@ export function HomeView({
 }) {
   const [tab, setTab] = useState<Tab>("card");
   const [authOpen, setAuthOpen] = useState(false);
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [noticeChecked, setNoticeChecked] = useState(true);
   const color = index ? scoreToColor(index.score) : undefined;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      setNoticeOpen(window.localStorage.getItem(FIRST_VISIT_NOTICE_KEY) !== "accepted");
+    } catch {
+      setNoticeOpen(true);
+    }
+  }, []);
 
   /**
    * 전체 폴백 판정: 4개 Heat가 모두 중립 기본값(market/community/emotion=15, whale=0)이고
@@ -119,7 +131,95 @@ export function HomeView({
       {authOpen && (
         <LoginPage loggedIn={loggedIn} onClose={() => setAuthOpen(false)} onAuthed={onLoggedIn} />
       )}
+
+      {noticeOpen && (
+        <FirstVisitNoticeSheet
+          checked={noticeChecked}
+          onCheckedChange={setNoticeChecked}
+          onAccept={() => {
+            if (!noticeChecked) return;
+            try {
+              window.localStorage.setItem(FIRST_VISIT_NOTICE_KEY, "accepted");
+            } catch {
+              /* localStorage 실패 시에도 이번 세션 흐름은 막지 않는다. */
+            }
+            setNoticeOpen(false);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function FirstVisitNoticeSheet({
+  checked,
+  onCheckedChange,
+  onAccept,
+}: {
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  onAccept: () => void;
+}) {
+  const notes = [
+    "투자 자문·권유·매매 신호가 아닙니다",
+    "과거 흐름과 현재 신호가 미래 수익을 보장하지 않습니다",
+    "모든 투자 판단과 결과의 책임은 본인에게 있습니다",
+    "표시되는 가격·지표는 지연되거나 부정확할 수 있습니다",
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-labelledby="first-visit-title">
+      <div className="absolute inset-0 bg-black/72 backdrop-blur-md" />
+      <div className="absolute inset-x-0 bottom-0 mx-auto max-w-md px-0">
+        <section className="fomo-sheet-rise rounded-t-[28px] border border-hairline bg-[#1A1A1A] px-6 pb-[calc(24px+env(safe-area-inset-bottom))] pt-5">
+          <div className="mx-auto h-1 w-14 rounded-full bg-white/20" />
+          <h1 id="first-visit-title" className="mt-7 text-center text-2xl font-semibold tracking-[-0.01em] text-whiteout">
+            시작하기 전에 알려드릴게요
+          </h1>
+          <p className="mt-5 text-center text-base leading-7 text-muted">
+            <strong className="font-semibold text-whiteout">FOMO Club</strong>은 시장 분위기와 과거 흐름을
+            담담하게 보여주는 <strong className="font-semibold text-whiteout">정보 제공 서비스</strong>입니다.
+          </p>
+
+          <ul className="mt-7 space-y-4">
+            {notes.map((note) => (
+              <li key={note} className="flex items-start gap-3 text-[15px] leading-6 text-muted">
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-bold text-whiteout/80">
+                  ✓
+                </span>
+                <span>{note}</span>
+              </li>
+            ))}
+          </ul>
+
+          <label className="mt-8 flex items-center gap-3 rounded-2xl bg-white/[0.045] px-4 py-4 text-base font-semibold text-whiteout">
+            <input
+              checked={checked}
+              onChange={(event) => onCheckedChange(event.target.checked)}
+              className="peer sr-only"
+              type="checkbox"
+            />
+            <span
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 text-lg text-whiteout transition-colors"
+              style={{ backgroundColor: checked ? "#FF5A36" : "transparent" }}
+              aria-hidden
+            >
+              {checked ? "✓" : ""}
+            </span>
+            <span>위 내용을 이해했으며 동의합니다</span>
+          </label>
+
+          <button
+            className="mt-5 h-14 w-full rounded-2xl bg-[#FF5A36] text-lg font-semibold text-whiteout transition-opacity disabled:opacity-40"
+            disabled={!checked}
+            onClick={onAccept}
+            type="button"
+          >
+            동의하고 시작하기
+          </button>
+        </section>
+      </div>
+    </div>
   );
 }
 

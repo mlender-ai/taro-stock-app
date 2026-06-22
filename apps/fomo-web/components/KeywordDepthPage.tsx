@@ -7,7 +7,8 @@ import {
   cleanQuote,
   communityWordings,
   fomoCardView,
-  fomoWhy,
+  fomoStateSummary,
+  fomoWatchPoint,
   confidenceGrade,
   sparklinePath,
   seriesIsUp,
@@ -455,8 +456,9 @@ function FomoHero({ front, rankLabel }: { front: StockFrontResponse | null; rank
           {view.badge}
         </span>
       </div>
-      <p className="mt-3 text-base leading-7 text-whiteout">{fomo.labelText}</p>
-      <p className="mt-2 text-sm leading-6 text-muted">{fomoWhy(fomo)}</p>
+      <p className="mt-3 text-base leading-7 text-whiteout">{view.headline}</p>
+      <p className="mt-2 text-sm leading-6 text-muted">{fomoWatchPoint(fomo)}</p>
+      <p className="mt-2 text-sm leading-6 text-muted">{fomoStateSummary(fomo)}</p>
       <span className="mt-3 inline-flex items-center rounded-full border border-hairline px-2.5 py-1 font-pixel text-[11px] text-muted">
         {grade}
       </span>

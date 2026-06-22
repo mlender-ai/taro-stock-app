@@ -3,7 +3,7 @@
 // 포모 점수 = 군중 *주목 강도*(품질 아님). 카드 앞면·상세·발견 정렬이 전부 이 점수에서 파생.
 //   C(현재 강도 0~100) = 거래량 회전(45) + 가격 모멘텀(35) + 언급량(20). ← 카드에 보이는 숫자.
 //   L(선행 신호 0~100) = 외국인(60) + 기관(40) 순매수. ← 점수 아님, "오는 중 💎" 플래그.
-//   상태 라벨 = C × 방향 × L.
+//   상태 라벨 = 가격축(P) × 주목축(A) × 선행축(L).
 //
 // 절대 원칙(§4): 가짜숫자 금지(입력 없으면 제외+confidence↓) · 결정적 · 품질판정/추천/예측 금지
 //   (C·L 둘 다 *사실*=주목·수급만) · source-kind separation(community=주목 측정에만, 강세/약세 근거 아님)
@@ -15,6 +15,17 @@ import { isFrontHookSafe } from "./card-front-hook";
 export const C_WEIGHTS = { volume: 45, price: 35, mention: 20 } as const; // 거래량>가격>언급(트레이더 근거)
 export const L_WEIGHTS = { foreign: 60, institution: 40 } as const;
 export const FOMO_THRESHOLDS = { hot: 80, warm: 60, quiet: 40, lead: 60 } as const;
+export const PRICE_BIG = { changePct: 5, priceSub: 60 } as const;
+export const ATTENTION_STRONG = 60;
+/** 2축 상태 기준 — 가격축(P)과 주목축(A)을 C에서 분리해 라벨을 만든다. */
+export const FOMO_AXIS_THRESHOLDS = {
+  priceBigChangePct: PRICE_BIG.changePct,
+  priceBigSubScore: PRICE_BIG.priceSub,
+  attentionStrong: ATTENTION_STRONG,
+  attentionWarm: 40,
+  priceWarmSubScore: 40,
+  signalFloor: 20,
+} as const;
 /** 정규화 기준점 — 거래량 3.5배=만점, 등락 8%=만점, 수급 5일연속·시총대비 1%=만점. */
 export const FOMO_NORM = { volTopX: 3.5, priceTopPct: 8, streakTopDays: 5, ratioTopPct: 0.01 } as const;
 /** 매집 다이버전스(§6.4 — 거래량↑·가격 평탄 = 조용히 담는 중). 광혁 튜닝 전 기본 off. */
@@ -25,7 +36,8 @@ export const BOLLINGER_SQUEEZE = { enabled: false, leadBonus: 5 } as const;
 export const FOMO_DIRECTION = { flatBand: 5, strongDropDelta: 10, strongDropPct: -5 } as const;
 
 export type FomoDirection = "up" | "down" | "flat";
-export type FomoLabel = "hot" | "warming" | "incoming" | "quiet" | "silent" | "cooling";
+export type FomoLabel = "hot" | "lone" | "warming" | "incoming" | "quiet" | "silent" | "cooling";
+export type FomoPriceMove = "up" | "down" | "flat";
 
 /** 엔진 입력 — 데이터 되는 것만 채운다(없으면 그 항목 제외 + confidence↓). 배선은 후속(②③④). */
 export interface FomoScoreInputs {
@@ -68,6 +80,12 @@ export interface FomoScoreResult {
   label: FomoLabel;
   /** 라벨 한 줄(해요체 · 사실만 · 예측/판정 0). */
   labelText: string;
+  /** 가격축(P) — 등락률 부호 + 가격 하위점수로 본 현재 가격 움직임. */
+  priceMove: FomoPriceMove;
+  /** 가격축(P) 하위점수 0~100. */
+  priceAxis: number;
+  /** 주목축(A) — C의 비가격 성분(거래량+언급)만 정규화한 값. */
+  attentionAxis: number;
   /** 수급 등 시점. */
   asOf?: string;
   /** 0~1 — C 입력 충실도(가짜숫자 방지). */
@@ -102,14 +120,54 @@ function supplyTo100(streak?: number, ratio?: number): number | undefined {
   return fromStreak * 100;
 }
 
-const LABEL_TEXT: Record<FomoLabel, string> = {
-  hot: "지금 시장의 한복판이에요",
-  warming: "관심이 데워지는 중이에요",
-  incoming: "조용한데 외국인·기관은 이미 들어오는 중이에요",
-  quiet: "지금은 조용한 자리예요",
-  silent: "재료도 수급도 아직 조용해요",
-  cooling: "모였던 관심이 식는 중이에요",
+const STATE_MESSAGE: Record<FomoLabel, { headline: string; badge: string; watchPoint: string; summary: string }> = {
+  hot: {
+    headline: "오르면서 시선도 같이 몰리는 중이에요.",
+    badge: "한복판",
+    watchPoint: "거래량이 줄며 가격만 버티는지가 관전 포인트예요.",
+    summary: "가격과 주목이 같이 강한 자리예요.",
+  },
+  lone: {
+    headline: "가격은 크게 올랐는데, 거래량·주목은 아직 안 붙었어요.",
+    badge: "가격만 먼저",
+    watchPoint: "거래량·주목이 따라붙는지가 관전 포인트예요.",
+    summary: "가격·차트는 강한데 주목이 안 따라온 자리예요.",
+  },
+  warming: {
+    headline: "관심이 조금씩 데워지는 중이에요.",
+    badge: "데우는 중",
+    watchPoint: "가격과 주목이 같은 방향으로 이어지는지가 관전 포인트예요.",
+    summary: "가격이나 주목 신호가 조금씩 붙는 자리예요.",
+  },
+  incoming: {
+    headline: "가격·거래량은 아직 조용한데, 외국인·기관 수급이 먼저 들어오는 중이에요.",
+    badge: "오기 직전",
+    watchPoint: "수급이 계속 들어오는지가 관전 포인트예요.",
+    summary: "가격은 조용한데 수급이나 관심이 먼저 보이는 자리예요.",
+  },
+  quiet: {
+    headline: "지금은 조용한 자리예요.",
+    badge: "조용",
+    watchPoint: "거래량이나 수급이 새로 붙는지가 관전 포인트예요.",
+    summary: "가격·주목·수급이 모두 차분한 자리예요.",
+  },
+  silent: {
+    headline: "재료도 수급도 아직 조용해요.",
+    badge: "조용",
+    watchPoint: "새로 붙는 거래나 수급 신호가 있는지가 관전 포인트예요.",
+    summary: "아직 뚜렷한 가격·주목 신호가 적은 자리예요.",
+  },
+  cooling: {
+    headline: "모였던 관심이 식는 중이에요.",
+    badge: "식는 중",
+    watchPoint: "거래가 줄며 가격 흐름이 안정되는지가 관전 포인트예요.",
+    summary: "이전의 주목이 약해지는 자리예요.",
+  },
 };
+
+const LABEL_TEXT: Record<FomoLabel, string> = Object.fromEntries(
+  Object.entries(STATE_MESSAGE).map(([label, message]) => [label, message.headline])
+) as Record<FomoLabel, string>;
 
 /**
  * 포모 점수 산출 — C(현재 강도)·L(선행)·방향·상태 라벨. 순수·결정적.
@@ -140,6 +198,13 @@ export function computeFomoScore(input: FomoScoreInputs = {}, tuning: FomoScoreT
   }
   const C = cDen > 0 ? Math.round(cNum / cDen) : 0;
   const confidence = clamp01(cDen / (C_WEIGHTS.volume + C_WEIGHTS.price + C_WEIGHTS.mention));
+  const priceAxis = Math.round(inputs.price ?? 0);
+  const aDen =
+    (inputs.volume !== undefined ? C_WEIGHTS.volume : 0) + (inputs.mention !== undefined ? C_WEIGHTS.mention : 0);
+  const attentionAxis =
+    aDen > 0
+      ? Math.round(((inputs.volume ?? 0) * C_WEIGHTS.volume + (inputs.mention ?? 0) * C_WEIGHTS.mention) / aDen)
+      : 0;
 
   // ── L — 선행 신호(순매수만) ──
   const fComp = supplyTo100(input.foreignNetStreak, input.foreignNetRatio);
@@ -183,14 +248,28 @@ export function computeFomoScore(input: FomoScoreInputs = {}, tuning: FomoScoreT
   const strongDown =
     (typeof input.changePct === "number" && input.changePct <= FOMO_DIRECTION.strongDropPct) ||
     (typeof input.prevScore === "number" && C - input.prevScore <= -FOMO_DIRECTION.strongDropDelta);
+  const priceBig =
+    (typeof input.changePct === "number" && Math.abs(input.changePct) >= FOMO_AXIS_THRESHOLDS.priceBigChangePct) ||
+    priceAxis >= FOMO_AXIS_THRESHOLDS.priceBigSubScore;
+  const priceMove: FomoPriceMove =
+    priceBig && typeof input.changePct === "number" && input.changePct < 0
+      ? "down"
+      : priceBig && (typeof input.changePct !== "number" || input.changePct >= 0)
+        ? "up"
+        : "flat";
+  const attentionStrong = attentionAxis >= FOMO_AXIS_THRESHOLDS.attentionStrong;
+  const attentionWarm = attentionAxis >= FOMO_AXIS_THRESHOLDS.attentionWarm;
+  const priceWarm = priceAxis >= FOMO_AXIS_THRESHOLDS.priceWarmSubScore;
+  const leadStrong = L >= FOMO_THRESHOLDS.lead;
 
   // ── 상태 라벨(임계값 §2, 빈틈 없이) ──
   let label: FomoLabel;
-  if (strongDown && C >= FOMO_THRESHOLDS.warm) label = "cooling";
-  else if (C >= FOMO_THRESHOLDS.hot) label = "hot";
-  else if (C >= FOMO_THRESHOLDS.warm) label = "warming";
-  else if (L >= FOMO_THRESHOLDS.lead) label = "incoming"; // 💎 C<60 & L≥60
-  else if (C >= FOMO_THRESHOLDS.quiet) label = "quiet";
+  if ((strongDown || priceMove === "down") && C >= FOMO_THRESHOLDS.warm) label = "cooling";
+  else if (priceMove === "flat" && (attentionStrong || leadStrong)) label = "incoming";
+  else if (priceMove === "up" && attentionStrong) label = "hot";
+  else if (priceMove === "up" && !attentionStrong) label = "lone";
+  else if (attentionWarm || priceWarm || C >= FOMO_THRESHOLDS.warm) label = "warming";
+  else if (priceMove === "flat" && !attentionStrong && !leadStrong && C >= FOMO_AXIS_THRESHOLDS.signalFloor) label = "quiet";
   else label = "silent";
 
   const out: FomoScoreResult = {
@@ -199,6 +278,9 @@ export function computeFomoScore(input: FomoScoreInputs = {}, tuning: FomoScoreT
     direction,
     label,
     labelText: LABEL_TEXT[label],
+    priceMove,
+    priceAxis,
+    attentionAxis,
     confidence,
     inputs,
   };
@@ -208,7 +290,7 @@ export function computeFomoScore(input: FomoScoreInputs = {}, tuning: FomoScoreT
 
 /** 💎 "오기 직전" — 현재는 조용한데 수급이 먼저 들어오는 자리. */
 export function isLeadingSetup(score: FomoScoreResult): boolean {
-  return score.fomoScore < FOMO_THRESHOLDS.warm && score.leadSignal >= FOMO_THRESHOLDS.lead;
+  return score.label === "incoming";
 }
 
 /** 모든 라벨 문구가 가드(예측·판정·점수 어휘 0)를 통과하는지 — 불변식. */
@@ -217,25 +299,24 @@ export function fomoLabelTextsSafe(): boolean {
 }
 
 // ── 상세 페이지 표현(척추 ③ — 포모 해부·근거 등급. 단일 출처, 예측·판정 0) ──────────
-/** 이 포모 점수를 만든 *주된 동인*을 쉬운 한 줄로(왜 핫한가 / 왜 조용한가). 사실만, 예측 금지. */
+/** 상태별 통합 헤드라인 — 카드와 상세의 단일 메시지 출처. */
+export function fomoHeadline(s: FomoScoreResult): string {
+  return STATE_MESSAGE[s.label].headline;
+}
+
+/** 상세 히어로 관전 포인트 — 다음 행동이 아니라 무엇을 볼지. */
+export function fomoWatchPoint(s: FomoScoreResult): string {
+  return STATE_MESSAGE[s.label].watchPoint;
+}
+
+/** 상세 종합 — 상태를 정직하게 다시 묶는 한 줄. */
+export function fomoStateSummary(s: FomoScoreResult): string {
+  return STATE_MESSAGE[s.label].summary;
+}
+
+/** 이 포모 상태를 쉬운 한 줄로. fomoHeadline 과 같은 단일 출처(예측 금지). */
 export function fomoWhy(s: FomoScoreResult): string {
-  const i = s.inputs;
-  if (s.label === "incoming")
-    return "가격·거래량은 아직 조용한데, 외국인·기관 수급이 먼저 들어오는 중이에요.";
-  if (i.accumulationDivergence)
-    return "거래는 느는데 가격은 잠잠해요 — 누군가 조용히 담는 모양새예요.";
-  if (s.label === "cooling")
-    return "거래는 많은데 가격은 빠지고 있어요 — 모였던 관심이 식는 흐름이에요.";
-  const vol = i.volume ?? 0;
-  const price = i.price ?? 0;
-  const mention = i.mention ?? 0;
-  if (s.label === "silent" || (vol < 30 && price < 30 && mention < 30 && s.leadSignal < FOMO_THRESHOLDS.lead))
-    return "아직 큰 거래도, 끌어당기는 재료도 안 붙었어요. 조용한 자리예요.";
-  const top = Math.max(vol, price, mention);
-  if (top === vol && vol > 0) return "평소보다 훨씬 많은 거래가 몰리면서 시선이 쏠렸어요.";
-  if (top === mention && mention > 0) return "여기저기서 많이 회자되며 주목이 몰렸어요.";
-  if (top === price && price > 0) return "가격이 크게 움직이면서 관심이 모였어요.";
-  return "여러 신호가 조금씩 모이는 중이에요.";
+  return fomoHeadline(s);
 }
 
 /** 근거 등급(confidence 가시화 — StockRay "근거 보통"과 동급, 정직 원칙). */
@@ -262,15 +343,17 @@ export interface FomoCardView {
 }
 
 const BADGE: Record<FomoLabel, string> = {
-  hot: "지금 한복판",
-  warming: "데우는 중",
-  incoming: "오기 직전",
-  quiet: "조용",
-  silent: "조용",
-  cooling: "식는 중",
+  hot: STATE_MESSAGE.hot.badge,
+  lone: STATE_MESSAGE.lone.badge,
+  warming: STATE_MESSAGE.warming.badge,
+  incoming: STATE_MESSAGE.incoming.badge,
+  quiet: STATE_MESSAGE.quiet.badge,
+  silent: STATE_MESSAGE.silent.badge,
+  cooling: STATE_MESSAGE.cooling.badge,
 };
 const EMOJI: Record<FomoLabel, string> = {
   hot: "🔥",
+  lone: "",
   warming: "",
   incoming: "💎",
   quiet: "",
@@ -279,6 +362,7 @@ const EMOJI: Record<FomoLabel, string> = {
 };
 const TONE: Record<FomoLabel, FomoTone> = {
   hot: "hot",
+  lone: "warming",
   warming: "warming",
   incoming: "incoming",
   quiet: "calm",
@@ -287,46 +371,18 @@ const TONE: Record<FomoLabel, FomoTone> = {
 };
 
 /**
- * 포모 점수 → 카드 앞면 표현(점수·라벨·헤드라인·톤). 순수·결정적. 단일 출처(휴리스틱 대체).
- * 헤드라인은 강도 비례·섹터 인지. 💎는 특별 문구(예측 금지 — "이미 움직였다"는 사실까지만).
- * 근거(reason, 발굴 named)가 있으면 더 구체적이라 우선 — 단 💎는 특별 문구 유지, 가드 위반 reason 은 폐기.
+ * 포모 점수 → 카드 앞면 표현(점수·라벨·헤드라인·톤). 순수·결정적. 단일 출처.
+ * 헤드라인은 상태 메시지 함수만 사용한다. 근거(reason)는 보조 재료로만 남겨 모순을 막는다.
  */
-export function fomoCardView(score: FomoScoreResult, opts: { sector?: string; reason?: string } = {}): FomoCardView {
+export function fomoCardView(score: FomoScoreResult, _opts: { sector?: string; reason?: string } = {}): FomoCardView {
   const { label } = score;
-  const sector = opts.sector?.trim();
-  const reason = opts.reason?.trim();
   const isLeading = label === "incoming";
-
-  let headline: string;
-  if (isLeading) {
-    headline = "조용한데 외국인·기관이 이미 움직였어요 · 아직 사람들은 몰라요";
-  } else if (reason && isFrontHookSafe(reason)) {
-    headline = reason;
-  } else {
-    switch (label) {
-      case "hot":
-        headline = sector ? `지금 ${sector}에서 가장 시선이 몰리는 자리예요` : "지금 가장 시선이 몰리는 자리예요";
-        break;
-      case "warming":
-        headline = sector ? `${sector} 관심이 데워지는 중이에요` : "관심이 데워지는 중이에요";
-        break;
-      case "cooling":
-        headline = "모였던 관심이 식는 중이에요";
-        break;
-      case "silent":
-        headline = "재료도 수급도 아직 조용해요";
-        break;
-      case "quiet":
-      default:
-        headline = "지금은 조용한 자리예요";
-    }
-  }
 
   return {
     scoreText: score.confidence > 0 ? `포모 ${score.fomoScore}` : "",
     emoji: EMOJI[label],
     badge: BADGE[label],
-    headline,
+    headline: fomoHeadline(score),
     tone: TONE[label],
     isLeading,
   };
@@ -351,6 +407,7 @@ export interface RankResult {
 const FEED_BAND: Record<FomoLabel, number> = {
   hot: 0,
   incoming: 0, // 💎 — C 낮아도 반드시 상위(순수 C 내림차순이면 바닥에 묻힘 → 금지)
+  lone: 1,
   warming: 1,
   quiet: 2,
   cooling: 3,
