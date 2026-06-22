@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fomoCardView, computeFomoScore, rankFeedByFomo } from "@fomo/core";
-import type { KeywordCard, SectorStock, StockSector, CardFrontSignals, FomoScoreResult, FomoCardView, FomoTone, TaFact } from "@fomo/core";
+import { fomoCardView, computeFomoScore, rankFeedByFomo, sparklinePath } from "@fomo/core";
+import type { KeywordCard, SectorStock, StockSector, CardFrontSignals, FomoScoreResult, FomoCardView, TaFact } from "@fomo/core";
 import { StockInsightView } from "@/components/KeywordDepthPage";
 import { fetchSectorStocks, fetchKeywords, fetchStockFront, recordTaste } from "@/lib/fomoApi";
 import { getWatchlist } from "@/lib/watchlist";
@@ -141,39 +141,25 @@ function LogoBadge({ name, code }: { name: string; code?: string | undefined }) 
   );
 }
 
-/**
- * 픽셀 스파크라인(DESIGN.md §8 시그니처) — 매끈 선 아닌 *이산 픽셀 컬럼*. 오렌지 단색(가격 형태, 판정 아님).
- * 모든 증권앱의 매끈 차트와 차별. 등락색 안 씀(브랜드/봉인색 분리 원칙).
- */
+/** 미니 라인차트 — 가격 흐름만 조용히 보여준다. 프라이머리 컬러는 점수/CTA에만 남긴다. */
 function Sparkline({ series }: { series: number[] }) {
   const pts = series.filter((v) => typeof v === "number" && Number.isFinite(v));
   if (pts.length < 2) return null;
-  const cols = 28; // 이산 컬럼 수
-  const min = Math.min(...pts);
-  const max = Math.max(...pts);
-  const span = max - min || 1;
-  const step = (pts.length - 1) / (cols - 1);
-  const bars = Array.from({ length: cols }, (_, i) => {
-    const v = pts[Math.round(i * step)]!;
-    return (v - min) / span; // 0~1
-  });
   const W = 300;
   const H = 44;
-  const gap = 2;
-  const bw = (W - gap * (cols - 1)) / cols;
+  const paths = sparklinePath(pts, W, H);
+  if (!paths) return null;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="mt-4 h-11 w-full" aria-hidden>
-      {bars.map((b, i) => {
-        const h = Math.max(2, b * (H - 2));
-        return <rect key={i} x={i * (bw + gap)} y={H - h} width={bw} height={h} fill={NEON} opacity={0.25 + b * 0.6} />;
-      })}
+      <path d={paths.line} fill="none" stroke="rgba(250,250,250,0.52)" strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
 }
 
 /** 포모 강도 미터(DESIGN.md §8 모티프) — 10 도트 세그먼트, 점수만큼 오렌지 fill·나머지 dim. */
 function FomoMeter({ score, color }: { score: number; color: string }) {
-  const filled = Math.round(Math.max(0, Math.min(100, score)) / 10);
+  const normalized = Math.max(0, Math.min(100, score));
+  const filled = normalized > 0 ? Math.max(1, Math.ceil(normalized / 10)) : 0;
   return (
     <span className="inline-flex items-center gap-[3px]" aria-hidden>
       {Array.from({ length: 10 }, (_, i) => (
@@ -189,15 +175,6 @@ function FomoMeter({ score, color }: { score: number; color: string }) {
 
 /** 봉인색 — 등락 데이터 전용(DESIGN.md §2). 브랜드(오렌지/네온)와 분리. 상승 적·하락 청(KR 관습). */
 const DIR_COLOR: Record<string, string> = { up: "#FF4D4D", down: "#3B82F6", flat: "#8A8A86" };
-
-/** 포모 톤 → 색(강도 비례, DESIGN.md §2). hot=오렌지(열기)·incoming=네온(💎 발견)·warming=오렌지dim·calm/cooling=secondary. */
-const TONE_COLOR: Record<FomoTone, string> = {
-  hot: NEON,
-  incoming: NEON,
-  warming: NEON,
-  calm: "#8A8A86",
-  cooling: "#8A8A86",
-};
 
 /**
  * 종목 카드 앞면 — 포모 점수(척추 ②, 단일 출처)로 점수·라벨·헤드라인·톤. 휴리스틱 대체.
@@ -228,7 +205,6 @@ function StockCardFace({
   taFact?: TaFact | undefined;
   progress?: string | undefined;
 }) {
-  const tone = TONE_COLOR[view.tone] ?? "#94A3B8";
   return (
     <div className="flex h-full flex-col">
       {/* 1행 — 정체성: 로고 + 종목명 + 시장·시총순위 */}
@@ -265,12 +241,12 @@ function StockCardFace({
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
           <div className="flex items-baseline gap-1.5">
             <span className="text-[10px] uppercase tracking-wide text-text-secondary">포모</span>
-            <span className="font-display text-3xl leading-none" style={{ color: tone }}>
+            <span className="font-display text-3xl leading-none" style={{ color: NEON }}>
               {view.scoreText.replace(/[^0-9]/g, "")}
             </span>
           </div>
-          <FomoMeter score={Number(view.scoreText.replace(/[^0-9]/g, "")) || 0} color={tone} />
-          <span className="inline-flex items-center gap-1 text-sm font-bold" style={{ color: tone }}>
+          <FomoMeter score={Number(view.scoreText.replace(/[^0-9]/g, "")) || 0} color={NEON} />
+          <span className="inline-flex items-center gap-1 text-sm font-bold text-whiteout">
             {view.emoji === "🔥" && <FlameIcon size={15} />}
             {view.emoji === "💎" && <GemIcon size={15} />}
             {view.badge}
@@ -280,16 +256,13 @@ function StockCardFace({
 
       {/* 테마 태그 */}
       {themeLabel && (
-        <span
-          className="mt-3 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-xs"
-          style={{ backgroundColor: "rgba(216,255,58,0.10)", color: NEON }}
-        >
+        <span className="mt-3 inline-flex w-fit items-center rounded-full border border-hairline-soft bg-white/[0.04] px-2.5 py-1 text-xs text-whiteout">
           # {themeLabel}
         </span>
       )}
 
-      {/* 헤드라인 = 라벨 기반 한 줄(강도 비례 톤). 오기 직전(💎)은 보석 아이콘 강조. */}
-      <p className="mt-4 text-xl font-bold leading-8" style={{ color: tone }}>
+      {/* 헤드라인 = 라벨 기반 한 줄. 색 강조는 점수/미터/CTA에만 둔다. */}
+      <p className="mt-4 text-xl font-bold leading-8 text-whiteout">
         {view.isLeading && <GemIcon size={18} className="mr-1 inline-block align-[-2px]" />}
         {view.headline}
       </p>
@@ -310,7 +283,7 @@ function StockCardFace({
         <ul className="mt-4 flex flex-col gap-1.5">
           {catalysts.map((c, i) => (
             <li key={i} className="flex gap-2 text-sm leading-6 text-whiteout">
-              <span aria-hidden style={{ color: NEON }}>•</span>
+              <span className="text-muted" aria-hidden>•</span>
               <span>{c}</span>
             </li>
           ))}
