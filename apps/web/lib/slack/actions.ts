@@ -18,6 +18,9 @@ export type ActionName =
   | "select_project"
   | "approve_plan"
   | "implement_task"
+  | "pipeline_check"
+  | "source_discovery"
+  | "integrity_check"
   | "implement"
   | "merge"
   | "merge_all"
@@ -34,6 +37,9 @@ export const KNOWN_ACTIONS: ReadonlySet<string> = new Set<ActionName>([
   "select_project",
   "approve_plan",
   "implement_task",
+  "pipeline_check",
+  "source_discovery",
+  "integrity_check",
   "implement",
   "merge",
   "merge_all",
@@ -56,6 +62,9 @@ export const HIGH_IMPACT_ACTIONS: ReadonlySet<string> = new Set<ActionName>([
   "select_project",
   "approve_plan",
   "implement_task",
+  "pipeline_check",
+  "source_discovery",
+  "integrity_check",
 ]);
 
 export interface ParsedAction {

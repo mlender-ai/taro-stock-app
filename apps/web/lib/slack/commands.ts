@@ -15,10 +15,36 @@ interface CommandResult {
 type CommandHandler = (args: string, userId: string) => Promise<CommandResult>;
 
 // GitHub API 다중 호출 등 3초 초과 가능성 있는 커맨드
-export const SLOW_COMMANDS = new Set(["status", "implement", "council", "merge", "constraints"]);
+export const SLOW_COMMANDS = new Set([
+  "status",
+  "implement",
+  "council",
+  "merge",
+  "constraints",
+  "pipeline",
+  "source",
+  "integrity",
+  "파이프라인",
+  "소스",
+  "정합성",
+]);
 
 // 알려진 커맨드 목록 — events/route.ts에서 chat vs command 분기에 사용
-export const KNOWN_COMMANDS = new Set(["implement", "council", "status", "approve", "merge", "help", "constraints"]);
+export const KNOWN_COMMANDS = new Set([
+  "implement",
+  "council",
+  "status",
+  "approve",
+  "merge",
+  "help",
+  "constraints",
+  "pipeline",
+  "source",
+  "integrity",
+  "파이프라인",
+  "소스",
+  "정합성",
+]);
 
 const commands: Record<string, CommandHandler> = {
   implement: handleImplement,
@@ -27,6 +53,12 @@ const commands: Record<string, CommandHandler> = {
   approve: handleApprove,
   merge: handleMerge,
   constraints: handleConstraints,
+  pipeline: handlePipeline,
+  source: handleSourceDiscovery,
+  integrity: handleIntegrityCheck,
+  파이프라인: handlePipeline,
+  소스: handleSourceDiscovery,
+  정합성: handleIntegrityCheck,
   help: handleHelp,
 };
 
@@ -117,6 +149,21 @@ async function handleMerge(args: string): Promise<CommandResult> {
   return { text: `PR #${prNum} 머지 완료 (squash)` };
 }
 
+async function handlePipeline(args: string): Promise<CommandResult> {
+  await triggerWorkflow("agent-ops.yml", { mode: "pipeline-monitor", query: args });
+  return { text: "🛠️ pipeline-monitor 작업 이슈 생성을 요청했습니다. 수집량·fallback·confidence·빈 카드 기준으로 점검합니다." };
+}
+
+async function handleSourceDiscovery(args: string): Promise<CommandResult> {
+  await triggerWorkflow("agent-ops.yml", { mode: "source-discovery", query: args });
+  return { text: "🔎 source-discovery 작업 이슈 생성을 요청했습니다. 실제 연동은 하지 않고 후보·리스크·tier만 보고합니다." };
+}
+
+async function handleIntegrityCheck(args: string): Promise<CommandResult> {
+  await triggerWorkflow("agent-ops.yml", { mode: "integrity-checker", query: args });
+  return { text: "🧪 integrity-checker 작업 이슈 생성을 요청했습니다. 원문 grounding·tier·금칙어·강세/약세 균형을 검수합니다." };
+}
+
 interface ActiveConstraint {
   rule: string;
   scope: string[];
@@ -150,6 +197,9 @@ async function handleHelp(): Promise<CommandResult> {
       "`/fomo approve {이슈#}` — 이슈에 implement-approved 라벨 추가",
       "`/fomo merge {PR#}` — PR squash 머지",
       "`/fomo constraints` — 현재 등록된 standing constraints 목록",
+      "`/fomo pipeline {요청}` — pipeline-monitor 점검 이슈 생성",
+      "`/fomo source {요청}` — source-discovery 소스 후보 리포트 이슈 생성",
+      "`/fomo integrity {요청}` — integrity-checker 정합성 검수 이슈 생성",
       "`/fomo help` — 이 도움말",
       "",
       "*직군 에이전트와 대화:*",

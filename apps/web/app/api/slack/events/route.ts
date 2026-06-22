@@ -22,6 +22,7 @@ import {
   getTodayAutoPRs,
 } from "@/lib/slack/github";
 import { classifyIntent, truncate } from "@/lib/slack/intent";
+import { routeNaturalLanguage } from "@/lib/slack/natural-router";
 import { resolveAgent, axisIdentity, axisHeader } from "@/lib/slack/agents";
 import {
   isCeoDecisionThread,
@@ -152,6 +153,25 @@ async function handleAgentChat(
   rootThreadTs: string | undefined,
   currentMsgTs: string
 ) {
+  const naturalRoute = routeNaturalLanguage(question);
+  if (naturalRoute.confidence === "high" && naturalRoute.actions.length > 0) {
+    const axis = resolveAgent(question);
+    const identity = axisIdentity(axis);
+    const header = axisHeader(axis);
+    try {
+      let reply = naturalRoute.reply;
+      for (const action of naturalRoute.actions) {
+        reply += "\n\n" + (await executeAction(action, channel, rootThreadTs || threadTs));
+      }
+      if (header) reply = `${header}\n${reply}`;
+      await postMessage(channel, reply, threadTs, identity);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await postMessage(channel, `❌ 자연어 라우팅 실패: ${msg}`, threadTs, identity).catch(() => {});
+    }
+    return;
+  }
+
   // Groq (무료, OpenAI-compat) — console.groq.com에서 무료 발급
   const GROQ_API_KEY = process.env.GROQ_API_KEY;
   const AI_URL = "https://api.groq.com/openai/v1/chat/completions";
@@ -445,6 +465,21 @@ async function executeAction(
         if (!Number.isInteger(issue) || issue <= 0) return "⚠️ implement_task: 이슈 번호가 올바르지 않아 실행하지 않았습니다.";
         await triggerWorkflow("implement-task.yml", { issue: String(issue) });
         return `🚀 *#${issue} 구현 시작* — Claude Code 가 이슈 스펙대로 구현 후 PR을 올립니다(수 분). CI 후 리뷰/머지하세요. (Prisma·보안 변경은 자동 머지 차단)`;
+      }
+      case "pipeline_check": {
+        const query = typeof action.payload.query === "string" ? action.payload.query : "";
+        await triggerWorkflow("agent-ops.yml", { mode: "pipeline-monitor", query });
+        return "🛠️ *pipeline-monitor 접수* — 파이프라인 점검 작업 이슈를 생성합니다. Slack에는 링크 중심으로 후속 보고하세요.";
+      }
+      case "source_discovery": {
+        const query = typeof action.payload.query === "string" ? action.payload.query : "";
+        await triggerWorkflow("agent-ops.yml", { mode: "source-discovery", query });
+        return "🔎 *source-discovery 접수* — 소스 후보 리포트 작업 이슈를 생성합니다. 실제 연동은 광혁 승인 전까지 하지 않습니다.";
+      }
+      case "integrity_check": {
+        const query = typeof action.payload.query === "string" ? action.payload.query : "";
+        await triggerWorkflow("agent-ops.yml", { mode: "integrity-checker", query });
+        return "🧪 *integrity-checker 접수* — 정합성 검수 작업 이슈를 생성합니다. 투자조언·근거·강세/약세 균형을 우선 확인합니다.";
       }
       case "implement": {
         const raw = action.payload.date;
