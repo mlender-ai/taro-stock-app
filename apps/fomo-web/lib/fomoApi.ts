@@ -10,12 +10,28 @@ import type {
   ScoredArticle,
 } from "@fomo/core";
 import { getSessionId } from "@/lib/session";
+import { cachedGet, readCached } from "./apiCache";
 
 export type { BannerItem } from "@fomo/core";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_FOMO_API_BASE?.replace(/\/$/, "") ||
   "https://fomo-club-backend.vercel.app";
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const CACHE_TTL = {
+  keywords: 10 * MINUTE,
+  sectorStocks: HOUR,
+  stockFront: 10 * MINUTE,
+  stockBasics: 6 * HOUR,
+  themeInsight: 6 * HOUR,
+  stockInsight: 6 * HOUR,
+} as const;
+
+function kstDateKey(now = new Date()): string {
+  return new Date(now.getTime() + 9 * HOUR).toISOString().slice(0, 10);
+}
 
 export interface FomoIndexResponse {
   date: string;
@@ -83,44 +99,53 @@ export interface KeywordsResponse {
   stale?: boolean;
   snapshotDate?: string | null;
 }
-let keywordsCache: KeywordsResponse | null = null;
-let keywordsInflight: Promise<KeywordsResponse> | null = null;
+const keywordsKey = () => `keywords:${kstDateKey()}`;
 
-export const getCachedKeywords = () => keywordsCache;
+export const getCachedKeywords = () => readCached<KeywordsResponse>(keywordsKey());
 
 export const fetchKeywords = async () => {
-  const res = await get<KeywordsResponse>("/api/fomo/keywords");
-  keywordsCache = res;
-  return res;
+  return cachedGet(
+    keywordsKey(),
+    () => get<KeywordsResponse>("/api/fomo/keywords"),
+    CACHE_TTL.keywords
+  );
 };
 
-export const warmKeywords = () => {
-  if (!keywordsInflight) {
-    keywordsInflight = fetchKeywords().finally(() => {
-      keywordsInflight = null;
-    });
-  }
-  return keywordsInflight;
-};
+export const warmKeywords = () => fetchKeywords();
 
 /** 테마 이해·응축(데이터 엔진 Track A+B) — 뎁스 페이지가 카드 탭 시 lazy 로 부른다. */
 export type { CondensedInsight } from "@fomo/core";
 export const fetchThemeInsight = (theme: string) =>
-  get<import("@fomo/core").CondensedInsight>(
-    `/api/fomo/theme-insight?theme=${encodeURIComponent(theme)}`
+  cachedGet(
+    `theme-insight:${theme}`,
+    () =>
+      get<import("@fomo/core").CondensedInsight>(
+        `/api/fomo/theme-insight?theme=${encodeURIComponent(theme)}`
+      ),
+    CACHE_TTL.themeInsight
   );
 
 /** 개별 종목 이해·응축(작업3) — 종목 라벨 탭 시 lazy 로 부른다(테마 뎁스와 동일 구조). */
 export const fetchStockInsight = (stock: string) =>
-  get<import("@fomo/core").CondensedInsight>(
-    `/api/fomo/stock-insight?stock=${encodeURIComponent(stock)}`
+  cachedGet(
+    `stock-insight:${stock}`,
+    () =>
+      get<import("@fomo/core").CondensedInsight>(
+        `/api/fomo/stock-insight?stock=${encodeURIComponent(stock)}`
+      ),
+    CACHE_TTL.stockInsight
   );
 
 /** 종목 기본 정보(바닥 — 주가·개요·시총·지표·재무). 항상 깔린다(원문 무관). */
 export type { StockBasics } from "@fomo/core";
 export const fetchStockBasics = (stock: string) =>
-  get<import("@fomo/core").StockBasics>(
-    `/api/fomo/stock-basics?stock=${encodeURIComponent(stock)}`
+  cachedGet(
+    `stock-basics:${stock}`,
+    () =>
+      get<import("@fomo/core").StockBasics>(
+        `/api/fomo/stock-basics?stock=${encodeURIComponent(stock)}`
+      ),
+    CACHE_TTL.stockBasics
   );
 
 /** 카드 앞면 FOMO 신호(rev2 후속) — baseline·라이브 수급 streak·시총순위·3개월 스파크라인. 도달 종목 lazy. */
@@ -137,7 +162,11 @@ export interface StockFrontResponse {
   changeDir?: "up" | "down" | "flat";
 }
 export const fetchStockFront = (stock: string) =>
-  get<StockFrontResponse>(`/api/fomo/stock-front?stock=${encodeURIComponent(stock)}`);
+  cachedGet(
+    `stock-front:${stock}`,
+    () => get<StockFrontResponse>(`/api/fomo/stock-front?stock=${encodeURIComponent(stock)}`),
+    CACHE_TTL.stockFront
+  );
 
 /** 섹터 → 종목 풀(섹터구조 ②). 콜드스타트 노출 순. baseline=true 면 baseline 보장(국내) 종목만. */
 export type { StockSector, SectorStock } from "@fomo/core";
@@ -146,8 +175,13 @@ export interface SectorStocksResponse {
   stocks: import("@fomo/core").SectorStock[];
 }
 export const fetchSectorStocks = (sector: string, baselineOnly = false) =>
-  get<SectorStocksResponse>(
-    `/api/fomo/sector-stocks?sector=${encodeURIComponent(sector)}${baselineOnly ? "&baseline=1" : ""}`
+  cachedGet(
+    `sector-stocks:${sector}:${baselineOnly ? "baseline" : "all"}`,
+    () =>
+      get<SectorStocksResponse>(
+        `/api/fomo/sector-stocks?sector=${encodeURIComponent(sector)}${baselineOnly ? "&baseline=1" : ""}`
+      ),
+    CACHE_TTL.sectorStocks
   );
 
 export const fetchCalendar = (sessionId: string, month?: string) =>
