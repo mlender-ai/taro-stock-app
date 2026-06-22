@@ -14,7 +14,7 @@ import {
 } from "@fomo/core";
 import { fetchAllNews } from "./fomo-news-sources";
 import { addKeywordCardComments } from "./fomo-keyword-comment";
-import { readLatestSupplyDemand } from "./supply-demand-store";
+import { readLatestSupplyDemandByTickers } from "./supply-demand-store";
 
 /**
  * 키워드별 수급 보조 신호(0~1, 장마감 확정 방향). SUPPLY DEMAND SCORE HANDOFF §3.
@@ -25,20 +25,22 @@ async function buildSupplyByKeyword(
   extracted: readonly { keyword: string; articles: KeywordSourceItem[] }[]
 ): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
-  await Promise.all(
-    extracted.map(async (kw) => {
-      const codes = extractStocks(kw.articles, { minMentions: 1 })
-        .map((s) => s.naverCode)
-        .filter((c): c is string => !!c);
-      if (codes.length === 0) return;
-      const flows = (await Promise.all(codes.map((c) => readLatestSupplyDemand(c)))).filter(
-        (f): f is NonNullable<typeof f> => f != null
-      );
-      if (flows.length === 0) return; // 데이터 없으면 생략(가짜 금지)
-      const net = flows.reduce((s, f) => s + f.foreignNet + f.institutionNet, 0);
-      out[kw.keyword] = net > 0 ? 0.65 : net < 0 ? 0.35 : 0.5;
-    })
+  const codesByKeyword = extracted.map((kw) => ({
+    keyword: kw.keyword,
+    codes: extractStocks(kw.articles, { minMentions: 1 })
+      .map((s) => s.naverCode)
+      .filter((c): c is string => !!c),
+  }));
+  const flowsByTicker = await readLatestSupplyDemandByTickers(
+    codesByKeyword.flatMap((kw) => kw.codes)
   );
+
+  for (const kw of codesByKeyword) {
+    const flows = kw.codes.map((code) => flowsByTicker[code]).filter((f) => f != null);
+    if (flows.length === 0) continue; // 데이터 없으면 생략(가짜 금지)
+    const net = flows.reduce((s, f) => s + f.foreignNet + f.institutionNet, 0);
+    out[kw.keyword] = net > 0 ? 0.65 : net < 0 ? 0.35 : 0.5;
+  }
   return out;
 }
 

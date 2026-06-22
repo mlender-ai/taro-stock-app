@@ -62,6 +62,36 @@ export async function readLatestSupplyDemand(ticker: string): Promise<InvestorFl
   }
 }
 
+/** 여러 종목의 최신 수급을 한 번에 조회. 키워드 파이프라인에서 DB 세션 폭주를 막기 위한 배치 경로. */
+export async function readLatestSupplyDemandByTickers(
+  tickers: readonly string[]
+): Promise<Record<string, InvestorFlow>> {
+  const unique = Array.from(new Set(tickers.filter(Boolean)));
+  if (unique.length === 0) return {};
+
+  try {
+    const rows = await prisma.supplyDemandDaily.findMany({
+      where: { ticker: { in: unique } },
+      orderBy: [{ ticker: "asc" }, { date: "desc" }],
+    });
+
+    const out: Record<string, InvestorFlow> = {};
+    for (const row of rows) {
+      if (out[row.ticker]) continue;
+      out[row.ticker] = {
+        date: row.date,
+        foreignNet: row.foreignNet,
+        institutionNet: row.institutionNet,
+        ...(row.individualNet != null ? { individualNet: row.individualNet } : {}),
+      };
+    }
+    return out;
+  } catch (err) {
+    console.warn("[supply-demand-store] batch read skipped (table missing?)", (err as Error)?.message);
+    return {};
+  }
+}
+
 /** 한 종목의 최근 N거래일 수급(최신순). 연속 순매수/순매도(streak) 계산용. 테이블 미생성이면 빈 배열. */
 export async function readSupplyDemandHistory(
   ticker: string,

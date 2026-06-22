@@ -11,6 +11,7 @@ import { prisma } from "./prisma";
  */
 
 export interface KeywordSnapshot {
+  date: string;
   cards: readonly KeywordCard[];
   confidence: KeywordConfidence;
 }
@@ -21,6 +22,7 @@ export async function readKeywordSnapshot(date: string): Promise<KeywordSnapshot
     const row = await prisma.keywordCardSnapshot.findUnique({ where: { date } });
     if (!row) return null;
     return {
+      date: row.date,
       cards: row.cards as unknown as KeywordCard[],
       confidence: row.confidence as KeywordConfidence,
     };
@@ -31,10 +33,29 @@ export async function readKeywordSnapshot(date: string): Promise<KeywordSnapshot
   }
 }
 
+/** 가장 최근(KST date 이하) 스냅샷. 오늘 스냅샷이 없어도 유저 요청에서 라이브 산출로 빠지지 않게 한다. */
+export async function readLatestKeywordSnapshot(date: string): Promise<KeywordSnapshot | null> {
+  try {
+    const row = await prisma.keywordCardSnapshot.findFirst({
+      where: { date: { lte: date } },
+      orderBy: { date: "desc" },
+    });
+    if (!row) return null;
+    return {
+      date: row.date,
+      cards: row.cards as unknown as KeywordCard[],
+      confidence: row.confidence as KeywordConfidence,
+    };
+  } catch (err) {
+    console.warn("[keyword-snapshot] latest read skipped (table missing?)", (err as Error)?.message);
+    return null;
+  }
+}
+
 /** 스냅샷 upsert(날짜 unique). cron 전용. 실패 시 throw — 스크립트가 비정상 종료로 가시화. */
 export async function writeKeywordSnapshot(
   date: string,
-  snapshot: KeywordSnapshot
+  snapshot: Omit<KeywordSnapshot, "date">
 ): Promise<void> {
   await prisma.keywordCardSnapshot.upsert({
     where: { date },

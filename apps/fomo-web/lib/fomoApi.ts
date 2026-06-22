@@ -80,6 +80,8 @@ export interface KeywordsResponse {
   cards: KeywordCard[];
   confidence: KeywordConfidence;
   live: boolean;
+  stale?: boolean;
+  snapshotDate?: string | null;
 }
 let keywordsCache: KeywordsResponse | null = null;
 let keywordsInflight: Promise<KeywordsResponse> | null = null;

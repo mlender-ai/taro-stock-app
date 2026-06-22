@@ -3,15 +3,16 @@ import { unstable_cache } from "next/cache";
 import type { KeywordCard, KeywordConfidence } from "@fomo/core";
 import { withCors, kstDate, cacheVersion } from "../../../../lib/fomo";
 import { computeKeywordCards } from "../../../../lib/keyword-pipeline";
-import { readKeywordSnapshot } from "../../../../lib/keyword-snapshot";
+import { readKeywordSnapshot, readLatestKeywordSnapshot } from "../../../../lib/keyword-snapshot";
 
 /**
  * 키워드 카드 API — "오늘 사람들 시선이 가장 쏠린 키워드" 실데이터 산출. KEYWORD_ENGINE_SPEC §4.6.
  *
- * 응답 경로(§4.6 — 절대 빈값 없음):
- *   1) 오늘 KeywordCardSnapshot 있으면 그대로 반환(live:false) — Phase 4 cron 이 미리 채운 것.
- *   2) 없으면(스냅샷 전/테이블 미생성) 라이브 산출(live:true). 산출·검증·코멘트는 computeKeywordCards 공유.
- *   3) 라이브도 실패하면 mock 명시적 폴백(confidence:"fallback").
+ * 응답 경로(Performance Spine Phase 3 — 유저 요청에서 무거운 엔진 금지):
+ *   1) 오늘 KeywordCardSnapshot 있으면 그대로 반환(live:false, stale:false)
+ *   2) 오늘 스냅샷이 없으면 가장 최근 스냅샷 반환(live:false, stale:true)
+ *   3) 최근 스냅샷도 없으면 mock 명시적 폴백(confidence:"fallback", live:false)
+ *   4) 라이브 산출은 /api/fomo/keywords?live=1 로 명시했을 때만 허용(개발/운영 확인용).
  *
  * 응답 정직성(§5): confidence 를 반드시 동봉. 30일 기준선이 아직 없어 라이브는 'low'(가짜 high 금지).
  *
@@ -31,6 +32,8 @@ interface KeywordsPayload {
   cards: readonly KeywordCard[];
   confidence: KeywordConfidence;
   live: boolean;
+  stale: boolean;
+  snapshotDate: string | null;
 }
 
 // ── 영속 캐시(Vercel Data Cache) + in-flight dedup ──────────────────────────
@@ -51,21 +54,63 @@ async function computeLive(date: string): Promise<KeywordsPayload> {
       { revalidate: 1800 }
     );
     const { cards, confidence } = await load();
-    return { date, cards, confidence, live: true };
+    return { date, cards, confidence, live: true, stale: false, snapshotDate: null };
   } catch (err) {
     console.warn("[fomo/keywords] live compute failed — mock fallback", err);
     const { MOCK_KEYWORD_CARDS } = await import("@fomo/core");
-    return { date, cards: MOCK_KEYWORD_CARDS, confidence: "fallback", live: false };
+    return {
+      date,
+      cards: MOCK_KEYWORD_CARDS,
+      confidence: "fallback",
+      live: false,
+      stale: true,
+      snapshotDate: null,
+    };
   }
 }
 
-/** 스냅샷-우선 → 라이브(Data Cache, dedup). */
-async function getPayload(date: string): Promise<KeywordsPayload> {
+/** 스냅샷-우선 → 최근 스냅샷 → lightweight fallback. 라이브는 일반 앱 요청에서 돌리지 않는다. */
+async function getSnapshotPayload(date: string): Promise<KeywordsPayload> {
   // 1) 오늘 스냅샷(테이블 없으면 null) — cron 이 채운 안정 데이터를 외부 호출 없이 즉시 반환.
   const snap = await readKeywordSnapshot(date);
-  if (snap) return { date, cards: snap.cards, confidence: snap.confidence, live: false };
+  if (snap) {
+    return {
+      date,
+      cards: snap.cards,
+      confidence: snap.confidence,
+      live: false,
+      stale: false,
+      snapshotDate: snap.date,
+    };
+  }
 
-  // 2) 라이브 산출 — Data Cache 가 영속 캐시, inflight 가 인스턴스 내 동시 dedup.
+  // 2) 오늘 스냅샷이 아직 없으면 최근 스냅샷을 즉시 반환한다. 사용자 요청에서 LLM/뉴스 수집을 돌리지 않기 위함.
+  const latest = await readLatestKeywordSnapshot(date);
+  if (latest) {
+    return {
+      date,
+      cards: latest.cards,
+      confidence: latest.confidence,
+      live: false,
+      stale: latest.date !== date,
+      snapshotDate: latest.date,
+    };
+  }
+
+  // 3) 최근 스냅샷도 없으면 lightweight fallback. 빈 배열/무한 로딩 금지, confidence 는 fallback.
+  const { MOCK_KEYWORD_CARDS } = await import("@fomo/core");
+  return {
+    date,
+    cards: MOCK_KEYWORD_CARDS,
+    confidence: "fallback",
+    live: false,
+    stale: true,
+    snapshotDate: null,
+  };
+}
+
+/** 명시적 live=1 확인용 경로 — Data Cache 가 영속 캐시, inflight 가 인스턴스 내 동시 dedup. */
+async function getLivePayload(date: string): Promise<KeywordsPayload> {
   if (inflight) return inflight;
   inflight = computeLive(date).finally(() => {
     inflight = null;
@@ -73,9 +118,10 @@ async function getPayload(date: string): Promise<KeywordsPayload> {
   return inflight;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const date = kstDate();
-  const payload = await getPayload(date);
+  const live = new URL(request.url).searchParams.get("live") === "1";
+  const payload = live ? await getLivePayload(date) : await getSnapshotPayload(date);
   return withCors(
     NextResponse.json(payload, {
       // 엣지 캐시 — 외부 소스 레이트리밋 보호(피드/배너와 동일 정책).
