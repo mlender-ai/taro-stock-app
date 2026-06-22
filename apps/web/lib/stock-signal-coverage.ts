@@ -56,15 +56,17 @@ function codeToCanonical(): Map<string, string> {
 }
 
 const NEWS_EVENT_NOISE =
-  /인기검색|검색\s?순위|주요\s?뉴스|오늘의\s?증시|마감\s?시황|장중\s?시황|특징주\s?모음|TOP\s?\d|상위\s?\d/i;
+  /인기검색|검색\s?순위|주요\s?뉴스|오늘의\s?증시|마감\s?시황|장중\s?시황|특징주\s?모음|주식\s?초고수|단타|ETF|ETN|상장지수|레버리지|인버스|TOP\s?\d|상위\s?\d/i;
 
 function cleanNewsEventTitle(title: string): string | undefined {
   const cleaned = title
     .replace(/^\s*(?:\[[^\]]+\]|【[^】]+】|\([^)]*\))\s*/g, "")
+    .replace(/[“”"]/g, "")
     .replace(/\s+/g, " ")
     .replace(/[.!?。]+$/g, "")
     .trim();
   if (!cleaned || cleaned.length < 6 || NEWS_EVENT_NOISE.test(cleaned)) return undefined;
+  if (/[\[\]{}<>]/.test(cleaned)) return undefined;
   const compact = cleaned.length > 44 ? `${cleaned.slice(0, 42).trim()}…` : cleaned;
   return isFrontHookSafe(`${compact} 소식이 나왔어요.`) ? compact : undefined;
 }
@@ -73,8 +75,7 @@ function buildNewsEventMap(newsItems: readonly KeywordSourceItem[], canonicals: 
   const out = new Map<string, { label: string; source?: string }>();
   for (const canonical of canonicals) {
     for (const item of newsItems) {
-      const blob = `${item.title} ${item.summary ?? ""}`;
-      if (!stockMatchesText(canonical, blob)) continue;
+      if (!stockMatchesText(canonical, item.title)) continue;
       const label = cleanNewsEventTitle(item.title);
       if (!label) continue;
       out.set(canonical, {
