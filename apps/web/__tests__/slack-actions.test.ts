@@ -113,7 +113,7 @@ describe("log_feedback 액션", () => {
 
 describe("액션 집합", () => {
   it("KNOWN_ACTIONS 에 7개 포함", () => {
-    for (const a of ["run_council", "implement", "merge", "approve", "comment", "add_constraint", "log_feedback"]) {
+    for (const a of ["run_council", "implement", "merge", "approve", "comment", "add_constraint", "log_feedback", "pipeline_check", "source_discovery", "integrity_check"]) {
       expect(KNOWN_ACTIONS.has(a)).toBe(true);
     }
   });
