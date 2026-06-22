@@ -153,24 +153,25 @@ describe("signalsFromBasics — baseline(stock-basics) → 신호 도출", () =>
 });
 
 describe("selectFomoHook — 상태 배지와 분리된 종목별 헤드라인", () => {
-  const forbidden = /차트\s?사실|낙폭|과매도|과매수|정배열|RSI|MACD|볼린저|이평선|추천|급등할|반등할|오를 것|내릴 것|매수\s?신호|매도\s?신호/;
+  const forbidden =
+    /차트\s?사실|낙폭|과매도|과매수|정배열|역배열|RSI|MACD|볼린저|이평선|가지런|가격만 먼저|가장 많이 오른 쪽|추천|급등할|반등할|오를 것|내릴 것|매수\s?신호|매도\s?신호/;
 
   it("가격 큼+주목 약은 긴장형 헤드라인을 고른다", () => {
     const fomo = computeFomoScore({ volumeRatio: 1, changePct: 10.58 });
     const hook = selectFomoHook({ fomo, signals: { changePct: 10.58, volumeRatio: 1 } });
     expect(fomo.label).toBe("lone");
     expect(hook.kind).toBe("axis_tension");
-    expect(hook.headline).toBe("가격은 +10.6% 올랐는데, 아직 거래·관심은 조용해요.");
+    expect(hook.headline).toBe("가격은 +10.6% 올랐는데, 거래량·뉴스는 아직 안 따라왔어요.");
   });
 
   it("빠지는 중인데 거래·관심이 늘면 하락 긴장형을 고른다", () => {
     const fomo = computeFomoScore({ volumeRatio: 2.8, changePct: -8.34 });
     const hook = selectFomoHook({ fomo, signals: { changePct: -8.34, volumeRatio: 2.8 } });
     expect(hook.kind).toBe("axis_tension");
-    expect(hook.headline).toBe("빠지는 중인데 거래·관심은 오히려 늘고 있어요.");
+    expect(hook.headline).toBe("가격은 빠졌는데, 거래량은 오히려 늘었어요.");
   });
 
-  it("같은 상태라도 데이터가 다르면 서로 다른 헤드라인이 나온다", () => {
+  it("모양형만 있으면 헤드라인을 차지하지 않고 보조문장으로 내려간다", () => {
     const volumeFomo = computeFomoScore({ volumeRatio: 2.2, changePct: 1 });
     const positionFomo = computeFomoScore({ changePct: 1, trendStrength: 0.42 });
     expect(volumeFomo.label).toBe("warming");
@@ -178,16 +179,19 @@ describe("selectFomoHook — 상태 배지와 분리된 종목별 헤드라인",
 
     const a = selectFomoHook({ fomo: volumeFomo, signals: { volumeRatio: 2.2, changePct: 1 } });
     const b = selectFomoHook({ fomo: positionFomo, signals: { near52WeekHigh: true, changePct: 1 } });
-    expect(a.headline).toBe("최근 거래가 평소 2.2배로 늘었어요.");
-    expect(b.headline).toBe("최근 1년 최고가 근처까지 왔어요.");
-    expect(a.headline).not.toBe(b.headline);
+    expect(a.kind).toBe("fallback");
+    expect(a.headline).toBe("아직 조용한 자리예요.");
+    expect(a.subLine).toBe("최근 거래가 평소 2.2배로 늘었어요.");
+    expect(b.kind).toBe("fallback");
+    expect(b.headline).toBe("아직 조용한 자리예요.");
+    expect(b.subLine).toBe("최근 1년 중 가장 높은 가격대까지 왔어요.");
   });
 
   it("데이터가 빈약하면 상태 헤드라인으로 폴백하고 디테일을 지어내지 않는다", () => {
     const fomo = computeFomoScore({});
     const hook = selectFomoHook({ fomo });
     expect(hook.kind).toBe("fallback");
-    expect(hook.headline).toBe(fomo.labelText);
+    expect(hook.headline).toBe("아직 조용한 자리예요.");
     expect(hook.subLine).toBeUndefined();
   });
 
@@ -218,7 +222,7 @@ describe("selectFomoHook — 상태 배지와 분리된 종목별 헤드라인",
       },
     });
     expect(lagging.kind).toBe("relative");
-    expect(lagging.headline).toBe("AI 테마 안에서 아직 덜 움직였어요.");
+    expect(lagging.headline).toBe("오늘 AI 테마 종목들은 평균 +5.2%인데, 이 종목은 +0.4%예요.");
 
     const moving = computeFomoScore({ changePct: 7, mentionScore: 80 });
     const leading = selectFomoHook({
@@ -233,13 +237,14 @@ describe("selectFomoHook — 상태 배지와 분리된 종목별 헤드라인",
       },
     });
     expect(leading.kind).toBe("relative");
-    expect(leading.headline).toBe("AI 테마에서 가장 많이 오른 쪽이에요.");
+    expect(leading.headline).toBe("오늘 AI 테마 종목 중 제일 많이 올랐어요(+7.0%).");
   });
 
-  it("D-day seam — 일정 데이터가 들어온 경우에만 일정 헤드라인을 고른다", () => {
+  it("뉴스 재료와 D-day seam — 데이터가 들어온 경우에만 재료 헤드라인을 고른다", () => {
     const fomo = computeFomoScore({ mentionScore: 30 });
     const withoutSchedule = selectFomoHook({ fomo, signals: { catalysts: [{ label: "공급계약 보도", kind: "news" }] } });
-    expect(withoutSchedule.kind).toBe("fallback");
+    expect(withoutSchedule.kind).toBe("news_event");
+    expect(withoutSchedule.headline).toBe("공급계약 보도 소식이 나왔어요.");
 
     const withSchedule = selectFomoHook({
       fomo,
@@ -261,6 +266,21 @@ describe("selectFomoHook — 상태 배지와 분리된 종목별 헤드라인",
     const hook = selectFomoHook({ fomo, signals: { mentionScore: 90, mentionCount: 4 } });
     expect(hook.kind).toBe("mention_event");
     expect(hook.headline).toBe("오늘 뉴스·커뮤니티에서 4번 언급됐어요.");
+  });
+
+  it("뉴스 이벤트는 모양형보다 먼저 헤드라인을 차지한다", () => {
+    const fomo = computeFomoScore({ volumeRatio: 2.5, changePct: 1 });
+    const hook = selectFomoHook({
+      fomo,
+      signals: {
+        newsEventLabel: "대규모 공급계약 공시",
+        volumeRatio: 2.5,
+        near52WeekHigh: true,
+      },
+    });
+    expect(hook.kind).toBe("news_event");
+    expect(hook.headline).toBe("대규모 공급계약 공시 소식이 나왔어요.");
+    expect(hook.subLine).toBe("최근 거래가 평소 2.5배로 늘었어요.");
   });
 
   it("헤드라인·보조문장은 안전하고 결정적이다", () => {

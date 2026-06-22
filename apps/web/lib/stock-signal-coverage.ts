@@ -2,7 +2,9 @@ import {
   STOCK_VOCAB,
   extractStocks,
   fetchCommunity,
+  isFrontHookSafe,
   signalsFromBasics,
+  stockMatchesText,
   stocksBySector,
   type StockSector,
   type KeywordSourceItem,
@@ -13,6 +15,8 @@ import { fetchStockBasics } from "./stock-basics";
 export interface StockAttentionSignal {
   mentionCount: number;
   mentionScore: number;
+  newsEventLabel?: string;
+  newsEventSource?: string;
 }
 
 export interface ThemeRelativeSignal {
@@ -51,6 +55,38 @@ function codeToCanonical(): Map<string, string> {
   return out;
 }
 
+const NEWS_EVENT_NOISE =
+  /인기검색|검색\s?순위|주요\s?뉴스|오늘의\s?증시|마감\s?시황|장중\s?시황|특징주\s?모음|TOP\s?\d|상위\s?\d/i;
+
+function cleanNewsEventTitle(title: string): string | undefined {
+  const cleaned = title
+    .replace(/^\s*(?:\[[^\]]+\]|【[^】]+】|\([^)]*\))\s*/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/[.!?。]+$/g, "")
+    .trim();
+  if (!cleaned || cleaned.length < 6 || NEWS_EVENT_NOISE.test(cleaned)) return undefined;
+  const compact = cleaned.length > 44 ? `${cleaned.slice(0, 42).trim()}…` : cleaned;
+  return isFrontHookSafe(`${compact} 소식이 나왔어요.`) ? compact : undefined;
+}
+
+function buildNewsEventMap(newsItems: readonly KeywordSourceItem[], canonicals: Iterable<string>): Map<string, { label: string; source?: string }> {
+  const out = new Map<string, { label: string; source?: string }>();
+  for (const canonical of canonicals) {
+    for (const item of newsItems) {
+      const blob = `${item.title} ${item.summary ?? ""}`;
+      if (!stockMatchesText(canonical, blob)) continue;
+      const label = cleanNewsEventTitle(item.title);
+      if (!label) continue;
+      out.set(canonical, {
+        label,
+        ...(item.source ? { source: item.source } : {}),
+      });
+      break;
+    }
+  }
+  return out;
+}
+
 /**
  * 오늘 원문 기반 종목 언급 지도.
  * 뉴스 제목/요약 + 커뮤니티 소스 글 수만 사용하며, 결과는 FOMO 주목축(attention)에만 들어간다.
@@ -58,9 +94,11 @@ function codeToCanonical(): Map<string, string> {
 export async function computeStockAttentionSignals(): Promise<Record<string, StockAttentionSignal>> {
   const [newsResult, communityResult] = await Promise.allSettled([fetchAllNews(), fetchCommunity()]);
   const counts = new Map<string, number>();
+  let newsItems: KeywordSourceItem[] = [];
 
   if (newsResult.status === "fulfilled") {
-    for (const s of extractStocks(newsToItems(newsResult.value), { minMentions: 1 })) {
+    newsItems = newsToItems(newsResult.value);
+    for (const s of extractStocks(newsItems, { minMentions: 1 })) {
       counts.set(s.canonical, (counts.get(s.canonical) ?? 0) + s.mentions);
     }
   } else {
@@ -83,10 +121,13 @@ export async function computeStockAttentionSignals(): Promise<Record<string, Sto
   if (max <= 0) return {};
 
   const out: Record<string, StockAttentionSignal> = {};
+  const newsEvents = buildNewsEventMap(newsItems, counts.keys());
   for (const [canonical, mentionCount] of counts) {
+    const event = newsEvents.get(canonical);
     out[canonical] = {
       mentionCount,
       mentionScore: clamp100((mentionCount / max) * 100),
+      ...(event ? { newsEventLabel: event.label, ...(event.source ? { newsEventSource: event.source } : {}) } : {}),
     };
   }
   return out;

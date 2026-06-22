@@ -128,10 +128,10 @@ const STATE_MESSAGE: Record<FomoLabel, { headline: string; badge: string; watchP
     summary: "가격과 주목이 같이 강한 자리예요.",
   },
   lone: {
-    headline: "가격은 크게 올랐는데, 거래량·주목은 아직 안 붙었어요.",
-    badge: "가격만 먼저",
-    watchPoint: "거래량·주목이 따라붙는지가 관전 포인트예요.",
-    summary: "가격·차트는 강한데 주목이 안 따라온 자리예요.",
+    headline: "가격은 올랐는데, 거래량·뉴스는 아직 안 따라왔어요.",
+    badge: "가격 먼저 움직임",
+    watchPoint: "거래량·뉴스가 따라오는지가 관전 포인트예요.",
+    summary: "가격은 움직였지만 거래량·뉴스는 아직 차분한 자리예요.",
   },
   warming: {
     headline: "관심이 조금씩 데워지는 중이에요.",

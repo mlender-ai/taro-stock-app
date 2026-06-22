@@ -154,13 +154,13 @@ describe("computeFomoScore — 포모 점수 엔진(§2)", () => {
     expect(computeFomoScore({ mentionScore: 10 }).label).toBe("silent"); // C=10
   });
 
-  it("2축 핵심 — 가격 큼+주목 약은 lone(가격만 먼저)", () => {
+  it("2축 핵심 — 가격 큼+주목 약은 lone(가격 먼저 움직임)", () => {
     const s = computeFomoScore({ volumeRatio: 1.1, changePct: 10.58, mentionScore: 10 });
     expect(s.label).toBe("lone");
     expect(s.priceMove).toBe("up");
     expect(s.attentionAxis).toBeLessThan(60);
-    expect(fomoCardView(s).badge).toBe("가격만 먼저");
-    expect(fomoCardView(s).headline).toBe("가격은 크게 올랐는데, 거래량·주목은 아직 안 붙었어요.");
+    expect(fomoCardView(s).badge).toBe("가격 먼저 움직임");
+    expect(fomoCardView(s).headline).toBe("가격은 올랐는데, 거래량·뉴스는 아직 안 따라왔어요.");
   });
 
   it("2축 핵심 — 가격 평탄+L강은 incoming, 가격 큼+A강은 hot", () => {
@@ -271,7 +271,7 @@ describe("fomoCardView — 엔진 출력 → 카드(척추 ②, 단일 출처)",
   it("카드·상세 히어로 문장은 같은 상태에서 같은 단일 문장", () => {
     const s = computeFomoScore({ volumeRatio: 1.1, changePct: 10.58, mentionScore: 10 });
     expect(fomoCardView(s).headline).toBe(fomoWhy(s));
-    expect(fomoWatchPoint(s)).toBe("거래량·주목이 따라붙는지가 관전 포인트예요.");
+    expect(fomoWatchPoint(s)).toBe("거래량·뉴스가 따라오는지가 관전 포인트예요.");
   });
 
   it("모순 회귀 — 조용 계열과 '관심이 모였어요'류 why가 동시에 나오지 않음", () => {

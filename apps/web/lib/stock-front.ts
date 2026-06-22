@@ -170,6 +170,8 @@ export async function assembleStockFront(
   if (coverage.attention) {
     signals.mentionCount = coverage.attention.mentionCount;
     signals.mentionScore = coverage.attention.mentionScore;
+    if (coverage.attention.newsEventLabel) signals.newsEventLabel = coverage.attention.newsEventLabel;
+    if (coverage.attention.newsEventSource) signals.newsEventSource = coverage.attention.newsEventSource;
   }
   if (coverage.themeRelative) {
     signals.themeLabel = coverage.themeRelative.themeLabel;

@@ -40,6 +40,10 @@ export interface CardFrontSignals {
   mentionScore?: number;
   /** 뉴스·커뮤니티 원문에서 감지된 글 수. 디버그·커버리지용. */
   mentionCount?: number;
+  /** 오늘 이 종목을 직접 언급한 뉴스/공시형 재료 한 줄. */
+  newsEventLabel?: string;
+  /** 뉴스 이벤트 출처명. */
+  newsEventSource?: string;
   /** 등락률 %(부호 포함). 사회적 증거의 결과(보강). */
   changePct?: number;
   /** 52주 신고가 부근/돌파. */
@@ -295,6 +299,7 @@ export function buildCardFrontHook(sig: CardFrontSignals = {}): CardFrontHook {
 
 // ── FOMO_HOOK_SELECTOR — 상태 배지와 분리된 "지금 후킹되는 사실 1개" ─────────────
 export type FomoHookSignalKind =
+  | "news_event"
   | "axis_tension"
   | "dday"
   | "supply_streak"
@@ -317,6 +322,7 @@ export interface FomoHookSelection {
 
 interface HookCandidate {
   kind: FomoHookSignalKind;
+  tier: "material" | "tension" | "shape";
   score: number;
   headline: string;
   subLine?: string;
@@ -324,19 +330,21 @@ interface HookCandidate {
 
 const HOOK_FLOOR = 0.42;
 const HOOK_KIND_RANK: Record<FomoHookSignalKind, number> = {
-  axis_tension: 0,
+  news_event: 0,
   dday: 1,
   supply_streak: 2,
-  volume_event: 3,
-  mention_event: 4,
-  relative: 5,
-  position: 6,
-  accumulation: 7,
-  ta_fact: 8,
-  fallback: 9,
+  mention_event: 3,
+  relative: 4,
+  axis_tension: 5,
+  volume_event: 6,
+  position: 7,
+  accumulation: 8,
+  ta_fact: 9,
+  fallback: 10,
 };
 
-const EVERYDAY_FORBIDDEN = /차트\s?사실|낙폭|과매도|과매수|정배열|역배열|RSI|MACD|볼린저|이평선|신호선|골든크로스|데드크로스/;
+const EVERYDAY_FORBIDDEN =
+  /차트\s?사실|낙폭|과매도|과매수|정배열|역배열|RSI|MACD|볼린저|이평선|신호선|골든크로스|데드크로스|가지런|가격만 먼저|가장 많이 오른 쪽/;
 
 export function isEverydayHookText(text: string): boolean {
   return !EVERYDAY_FORBIDDEN.test(text);
@@ -354,14 +362,14 @@ function ratioText(ratio: number): string {
 
 const TA_EVERYDAY: Record<TaFactKind, string> = {
   accumulation_divergence: "거래는 느는데 가격은 잠잠해요.",
-  bollinger_squeeze: "요즘 가격이 좁게 움직여요.",
+  bollinger_squeeze: "며칠째 가격이 좁은 폭에서만 움직이고 있어요.",
   rsi_overbought: "단기엔 너무 많이 오른 편이에요.",
   rsi_oversold: "며칠 새 빠르게 빠졌고, 단기엔 너무 많이 떨어졌단 신호도 같이 나와요.",
-  ma_bullish: "최근 흐름이 위로 가지런해요.",
-  ma_bearish: "최근 흐름이 아래로 가지런해요.",
+  ma_bullish: "최근 3개월 흐름이 위쪽으로 이어지고 있어요.",
+  ma_bearish: "최근 3개월 흐름이 아래쪽으로 이어지고 있어요.",
   macd_bullish: "최근 흐름이 위쪽으로 바뀐 상태예요.",
   macd_bearish: "최근 흐름이 아래쪽으로 바뀐 상태예요.",
-  near_52w_high: "최근 1년 최고가 근처까지 왔어요.",
+  near_52w_high: "최근 1년 중 가장 높은 가격대까지 왔어요.",
   near_52w_low: "최근 1년 낮은 구간에 가까워요.",
   atr_expanded: "하루 가격 움직임이 최근보다 커졌어요.",
 };
@@ -372,8 +380,8 @@ export function translateTaFact(fact: TaFact | undefined): string | undefined {
   return isFrontHookSafe(text) && isEverydayHookText(text) ? text : undefined;
 }
 
-function fallbackHeadline(fomo: FomoScoreResult): string {
-  return fomo.labelText || "지금은 조용한 자리예요.";
+function fallbackHeadline(_fomo: FomoScoreResult): string {
+  return "아직 조용한 자리예요.";
 }
 
 function pushCandidate(candidates: HookCandidate[], candidate: HookCandidate | null): void {
@@ -391,10 +399,15 @@ function axisTensionCandidate(fomo: FomoScoreResult, signals: CardFrontSignals):
 
   if (fomo.priceMove === "down" && attentionRising) {
     const strength = Math.min(1, Math.max(fomo.attentionAxis / 100, volumeStrong ? 0.62 : 0));
+    const headline =
+      typeof signals.mentionScore === "number" && signals.mentionScore >= 60
+        ? "가격은 빠졌는데, 뉴스·커뮤니티 언급은 늘었어요."
+        : "가격은 빠졌는데, 거래량은 오히려 늘었어요.";
     return {
       kind: "axis_tension",
+      tier: "tension",
       score: 0.92 + strength * 0.18,
-      headline: "빠지는 중인데 거래·관심은 오히려 늘고 있어요.",
+      headline,
     };
   }
 
@@ -402,8 +415,9 @@ function axisTensionCandidate(fomo: FomoScoreResult, signals: CardFrontSignals):
     const gap = Math.min(1, Math.max(0, pct / 12) + Math.max(0, 60 - fomo.attentionAxis) / 120);
     return {
       kind: "axis_tension",
+      tier: "tension",
       score: 0.9 + gap * 0.2,
-      headline: `가격은 ${pctText(pct)} 올랐는데, 아직 거래·관심은 조용해요.`,
+      headline: `가격은 ${pctText(pct)} 올랐는데, 거래량·뉴스는 아직 안 따라왔어요.`,
     };
   }
 
@@ -421,8 +435,24 @@ function supplyCandidate(signals: CardFrontSignals): HookCandidate | null {
   const actor = foreignStrong && instStrong ? "외국인·기관이" : foreignStrong ? "외국인이" : "기관이";
   return {
     kind: "supply_streak",
+    tier: "material",
     score: Math.min(1, 0.5 + n / 10),
     headline: `${actor} ${n}일째 사는 중이에요.`,
+  };
+}
+
+function newsEventCandidate(signals: CardFrontSignals): HookCandidate | null {
+  const label =
+    signals.newsEventLabel?.trim() ??
+    (signals.catalysts ?? []).find((c) => c.kind === "news" && c.label.trim())?.label.trim();
+  if (!label || label === "재료") return null;
+  const event = label.replace(/[.!?。]+$/, "").replace(/\s+소식$/, "");
+  const headline = `${event} 소식이 나왔어요.`;
+  return {
+    kind: "news_event",
+    tier: "material",
+    score: 0.94,
+    headline,
   };
 }
 
@@ -433,6 +463,7 @@ function ddayCandidate(signals: CardFrontSignals): HookCandidate | null {
   const label = schedule.label.trim();
   return {
     kind: "dday",
+    tier: "material",
     score: 0.88,
     headline: when ? `${when} ${label}가 있어요.` : `${label} 일정이 있어요.`,
   };
@@ -443,6 +474,7 @@ function volumeCandidate(signals: CardFrontSignals): HookCandidate | null {
   if (typeof vr !== "number" || vr < FRONT_VOLUME_RATIO_MIN) return null;
   return {
     kind: "volume_event",
+    tier: "shape",
     score: Math.min(1, 0.42 + vr / 5),
     headline: `최근 거래가 평소 ${ratioText(vr)}배로 늘었어요.`,
   };
@@ -455,6 +487,7 @@ function mentionCandidate(signals: CardFrontSignals): HookCandidate | null {
   if (score < 60 || count < 2) return null;
   return {
     kind: "mention_event",
+    tier: "material",
     score: Math.min(0.78, 0.48 + score / 250),
     headline: `오늘 뉴스·커뮤니티에서 ${count}번 언급됐어요.`,
   };
@@ -475,16 +508,18 @@ function relativeCandidate(signals: CardFrontSignals): HookCandidate | null {
   if (rank === 1 && pct > 0 && delta >= 2) {
     return {
       kind: "relative",
+      tier: "material",
       score: Math.min(0.86, 0.56 + Math.abs(delta) / 20),
-      headline: `${label}에서 가장 많이 오른 쪽이에요.`,
+      headline: `오늘 ${label} 종목 중 제일 많이 올랐어요(${pctText(pct)}).`,
     };
   }
 
   if (typeof avg === "number" && avg >= 2 && pct <= 1.5 && delta <= -3 && rank >= Math.max(2, peerCount - 1)) {
     return {
       kind: "relative",
+      tier: "material",
       score: Math.min(0.82, 0.54 + Math.abs(delta) / 22),
-      headline: `${label} 안에서 아직 덜 움직였어요.`,
+      headline: `오늘 ${label} 종목들은 평균 ${pctText(avg)}인데, 이 종목은 ${pctText(pct)}예요.`,
     };
   }
 
@@ -495,6 +530,7 @@ function positionCandidate(signals: CardFrontSignals): HookCandidate | null {
   if (signals.near52WeekLow) {
     return {
       kind: "position",
+      tier: "shape",
       score: 0.56,
       headline: "최근 1년 낮은 구간에 가까워요.",
     };
@@ -502,8 +538,9 @@ function positionCandidate(signals: CardFrontSignals): HookCandidate | null {
   if (!signals.near52WeekHigh) return null;
   return {
     kind: "position",
+    tier: "shape",
     score: 0.58,
-    headline: "최근 1년 최고가 근처까지 왔어요.",
+    headline: "최근 1년 중 가장 높은 가격대까지 왔어요.",
   };
 }
 
@@ -511,6 +548,7 @@ function accumulationCandidate(fomo: FomoScoreResult, taFact?: TaFact): HookCand
   if (fomo.inputs.accumulationDivergence !== true && taFact?.kind !== "accumulation_divergence") return null;
   return {
     kind: "accumulation",
+    tier: "shape",
     score: 0.7,
     headline: "거래는 느는데 가격은 잠잠해요.",
   };
@@ -532,11 +570,13 @@ function taCandidate(taFact?: TaFact): HookCandidate | null {
     macd_bullish: 0.46,
     macd_bearish: 0.46,
   };
-  return { kind: "ta_fact", score: strength[taFact!.kind], headline: text };
+  return { kind: "ta_fact", tier: "shape", score: strength[taFact!.kind], headline: text };
 }
 
-function secondaryLine(candidates: readonly HookCandidate[], top: HookCandidate): string | undefined {
-  const next = candidates.find((c) => c.kind !== top.kind && c.headline !== top.headline);
+function secondaryLine(candidates: readonly HookCandidate[], top?: HookCandidate): string | undefined {
+  const shape = candidates.find((c) => c.tier === "shape" && c.kind !== top?.kind && c.headline !== top?.headline);
+  if (shape) return shape.subLine ?? shape.headline;
+  const next = candidates.find((c) => c.kind !== top?.kind && c.headline !== top?.headline);
   return next?.subLine ?? next?.headline;
 }
 
@@ -554,6 +594,7 @@ export function selectFomoHook({
   taFact?: TaFact;
 }): FomoHookSelection {
   const candidates: HookCandidate[] = [];
+  pushCandidate(candidates, newsEventCandidate(signals));
   pushCandidate(candidates, axisTensionCandidate(fomo, signals));
   pushCandidate(candidates, ddayCandidate(signals));
   pushCandidate(candidates, supplyCandidate(signals));
@@ -565,9 +606,12 @@ export function selectFomoHook({
   pushCandidate(candidates, taCandidate(taFact));
 
   candidates.sort((a, b) => b.score - a.score || HOOK_KIND_RANK[a.kind] - HOOK_KIND_RANK[b.kind]);
-  const top = candidates[0];
+  const top =
+    candidates.find((c) => c.tier === "material") ??
+    candidates.find((c) => c.tier === "tension");
   if (!top) {
-    return { kind: "fallback", headline: fallbackHeadline(fomo) };
+    const subLine = secondaryLine(candidates);
+    return { kind: "fallback", headline: fallbackHeadline(fomo), ...(subLine ? { subLine } : {}) };
   }
   const subLine = secondaryLine(candidates, top);
   return {
