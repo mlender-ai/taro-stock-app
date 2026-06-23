@@ -167,6 +167,8 @@ jobs:
         timeout-minutes: ${{ fromJSON(steps.model.outputs.timeout_minutes) }}
         uses: anthropics/claude-code-action@v1
         with:
+          github_token: ${{ secrets.GH_PAT || github.token }}
+          allowed_bots: "github-actions,github-actions[bot]"
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: '--max-turns ${{ steps.model.outputs.max_turns }} --model ${{ steps.model.outputs.model }} --effort ${{ steps.model.outputs.effort }} --allowedTools "Read,Edit,Write,Glob,Grep,Bash"'
           prompt: |
@@ -305,6 +307,8 @@ jobs:
         timeout-minutes: 15
         uses: anthropics/claude-code-action@v1
         with:
+          github_token: ${{ secrets.GH_PAT || github.token }}
+          allowed_bots: "github-actions,github-actions[bot]"
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: '--max-turns 20 --model ${{ steps.model.outputs.model }} --effort ${{ steps.model.outputs.effort }} --allowedTools "Read,Edit,Write,Glob,Grep,Bash"'
           prompt: |
@@ -329,7 +333,7 @@ jobs:
       - name: Create Branch and PR
         if: steps.task.outputs.found == 'true' && steps.task.outputs.dup == '0' && steps.gate.outputs.passed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
           NUM: ${{ github.event.inputs.issue }}
           ITITLE: ${{ steps.task.outputs.title }}
           VERIFY1: ${{ steps.verify.outputs.ok }}
