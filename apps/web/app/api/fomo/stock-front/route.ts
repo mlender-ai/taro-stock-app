@@ -59,7 +59,7 @@ async function getFront(stock: string, lite = false): Promise<StockFrontData> {
       const sector = def ? sectorOf(def.canonical) : undefined;
       const [rankMap, attentionMap, themeRelativeMap] = await Promise.all([
         lite ? Promise.resolve({}) : getRankMap().catch(() => ({})),
-        lite ? Promise.resolve({} as Record<string, StockAttentionSignal>) : getAttentionMap().catch((): Record<string, StockAttentionSignal> => ({})),
+        getAttentionMap().catch((): Record<string, StockAttentionSignal> => ({})),
         !lite && sector
           ? getThemeRelativeMap(sector).catch((): Record<string, ThemeRelativeSignal> => ({}))
           : Promise.resolve({} as Record<string, ThemeRelativeSignal>),

@@ -55,7 +55,7 @@ async function main() {
   const stockList = [...stocks];
   console.log(`[warm-insights] 종목 ${stockList.length}개: ${stockList.join(", ")}`);
   for (const stock of stockList) {
-    await warm(`/api/fomo/stock-insight?stock=${encodeURIComponent(stock)}`);
+    await warm(`/api/fomo/stock-insight?stock=${encodeURIComponent(stock)}&blocking=1`);
   }
 
   console.log(`[warm-insights] 완료 — 테마 ${themes.length} + 종목 ${stockList.length} 워밍`);

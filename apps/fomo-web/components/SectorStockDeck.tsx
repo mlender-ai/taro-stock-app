@@ -154,6 +154,17 @@ function Sparkline({ series }: { series: number[] }) {
   );
 }
 
+function ChartSlot({ series, supported }: { series?: number[] | undefined; supported: boolean }) {
+  if (series && series.length >= 2) return <Sparkline series={series} />;
+  return (
+    <div className="mt-4 flex h-11 w-full items-center justify-center rounded-lg border border-hairline bg-white/[0.03]">
+      <span className="font-pixel text-[10px] text-muted">
+        {supported ? "차트 불러오는 중" : "차트 데이터 없음"}
+      </span>
+    </div>
+  );
+}
+
 /** 포모 강도 미터(DESIGN.md §8 모티프) — 10 도트 세그먼트, 점수만큼 오렌지 fill·나머지 dim. */
 function FomoMeter({ score, color }: { score: number; color: string }) {
   const normalized = Math.max(0, Math.min(100, score));
@@ -188,6 +199,7 @@ function StockCardFace({
   changeDir,
   rankLabel,
   sparkline,
+  chartSupported,
   subLine,
   progress,
 }: {
@@ -200,6 +212,7 @@ function StockCardFace({
   changeDir?: "up" | "down" | "flat" | undefined;
   rankLabel?: string | undefined;
   sparkline?: number[] | undefined;
+  chartSupported: boolean;
   subLine?: string | undefined;
   progress?: string | undefined;
 }) {
@@ -271,8 +284,8 @@ function StockCardFace({
         </p>
       )}
 
-      {/* 미니 스파크라인(최근 3개월) */}
-      {sparkline && sparkline.length >= 2 && <Sparkline series={sparkline} />}
+      {/* 미니 스파크라인(최근 흐름) — lite 응답도 짧은 라인차트를 싣는다. */}
+      <ChartSlot series={sparkline} supported={chartSupported} />
 
       {/* 다가오는 재료(있으면) */}
       {catalysts && catalysts.length > 0 && (
@@ -378,7 +391,14 @@ function SectorDeckInner({
   const ensureFront = useCallback(
     (stock: DeckStock) => {
       const key = stock.canonical;
-      if (!stock.naverCode || front[key] || inflight.current.has(key)) return;
+      if (front[key] || inflight.current.has(key)) return;
+      if (!stock.naverCode) {
+        setFront((prev) => ({
+          ...prev,
+          [key]: { signals: {}, fomo: EMPTY_FOMO, sparkline: [] },
+        }));
+        return;
+      }
       inflight.current.add(key);
       fetchStockFront(key, { lite: true })
         .then((d) =>
@@ -445,6 +465,7 @@ function SectorDeckInner({
         changeDir={e?.changeDir}
         rankLabel={rankLabelFor(stock)}
         sparkline={e?.sparkline}
+        chartSupported={!!stock.naverCode}
         subLine={subLine}
         progress={progress}
       />

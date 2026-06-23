@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { condenseThemeInsight, stockDef, supplyDemandFact, type CondensedInsight } from "@fomo/core";
+import { condenseThemeInsight, emptyThemeInsight, stockDef, supplyDemandFact, type CondensedInsight } from "@fomo/core";
 import { withCors, kstDate, cacheVersion } from "../../../../lib/fomo";
 import { understandStock } from "../../../../lib/theme-understanding";
 import { readLatestSupplyDemand } from "../../../../lib/supply-demand-store";
@@ -21,6 +21,7 @@ export function OPTIONS() {
 
 // theme-insight 와 동일 정책 — (KST날짜, 종목) 키로 cold 를 하루 1회로. revalidate 6h(SWR — 대기 없이 갱신).
 const REVALIDATE_S = 21_600; // 6h
+const USER_WAIT_MS = 8_500;
 const inflight = new Map<string, Promise<CondensedInsight>>();
 
 async function getInsight(stock: string): Promise<CondensedInsight> {
@@ -40,12 +41,42 @@ async function getInsight(stock: string): Promise<CondensedInsight> {
   return p;
 }
 
+function timeoutFallback(stock: string): CondensedInsight {
+  return condenseThemeInsight(emptyThemeInsight(stock, "인사이트 캐시 준비 중 — 원문 근거가 아직 충분히 모이지 않았어요."));
+}
+
+async function getInsightForRequest(stock: string, blocking: boolean): Promise<{ payload: CondensedInsight; coldFallback: boolean }> {
+  if (blocking) return { payload: await getInsight(stock), coldFallback: false };
+
+  let timedOut = false;
+  const timeout = new Promise<CondensedInsight>((resolve) => {
+    windowlessSetTimeout(() => {
+      timedOut = true;
+      resolve(timeoutFallback(stock));
+    }, USER_WAIT_MS);
+  });
+  const payload = await Promise.race([
+    getInsight(stock).catch((err) => {
+      console.warn("[stock-insight] getInsight failed", stock, (err as Error)?.message);
+      return timeoutFallback(stock);
+    }),
+    timeout,
+  ]);
+  return { payload, coldFallback: timedOut || payload.confidence === "insufficient" };
+}
+
+function windowlessSetTimeout(fn: () => void, ms: number): void {
+  setTimeout(fn, ms);
+}
+
 export async function GET(req: Request) {
-  const stock = new URL(req.url).searchParams.get("stock")?.trim();
+  const url = new URL(req.url);
+  const stock = url.searchParams.get("stock")?.trim();
   if (!stock) {
     return withCors(NextResponse.json({ error: "stock required" }, { status: 400 }));
   }
-  const payload = await getInsight(stock);
+  const blocking = url.searchParams.get("blocking") === "1" || req.headers.get("x-warm") === "1";
+  const { payload, coldFallback } = await getInsightForRequest(stock, blocking);
 
   // 수급(외인·기관 장마감 확정) — 공식 지표 섹션에 객관 사실로 동봉(§4). 데이터 없으면 미표시(정직).
   // 캐시 밖에서 1회 조회(일별이라 가벼움). 테이블 전/미수집이면 null → 기존 응답 그대로.
@@ -57,7 +88,11 @@ export async function GET(req: Request) {
 
   return withCors(
     NextResponse.json(out, {
-      headers: { "Cache-Control": "public, s-maxage=900, stale-while-revalidate=1800" },
+      headers: {
+        "Cache-Control": coldFallback
+          ? "public, s-maxage=30, stale-while-revalidate=120"
+          : "public, s-maxage=900, stale-while-revalidate=1800",
+      },
     })
   );
 }
