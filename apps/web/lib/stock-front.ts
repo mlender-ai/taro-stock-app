@@ -147,7 +147,7 @@ export interface StockFrontData {
 }
 
 export interface StockFrontOptions {
-  /** 카드 앞면용 경량 경로. 시총순위·TA·스파크라인·상세 지표를 빼고 가격/수급/언급만 쓴다. */
+  /** 카드 앞면용 경량 경로. 시총순위·TA·상세 지표를 빼고 가격/수급/언급/짧은 차트만 쓴다. */
   lite?: boolean;
 }
 
@@ -170,7 +170,7 @@ export async function assembleStockFront(
   const [basics, history, daily] = await Promise.all([
     (lite ? fetchStockBasicsLite(stock) : fetchStockBasics(stock)).catch(() => null),
     readSupplyDemandHistory(code).catch(() => []),
-    lite ? Promise.resolve({ candles: [], closes: [], volumes: [] }) : fetchStockDaily(code),
+    fetchStockDaily(code, lite ? 110 : 420),
   ]);
 
   const signals: CardFrontSignals = basics ? signalsFromBasics(basics) : {};
@@ -198,10 +198,10 @@ export async function assembleStockFront(
   if (rank) signals.marketCapRank = { scope: "market", market: rank.market, rank: rank.rank };
 
   // ── 포모 점수(척추) — 거래량 회전·가격(등락·추세)·수급. 언급량·prevScore 는 후속(없으면 제외). ──
-  const volRatio = lite ? undefined : volumeTurnover(daily.volumes);
+  const volRatio = volumeTurnover(daily.volumes);
   if (typeof volRatio === "number") signals.volumeRatio = volRatio;
   const ta = lite ? null : computeTechnicalAnalysis(daily.candles);
-  const trend = ta?.inputs.trendStrength ?? (lite ? undefined : trendStrength(daily.closes));
+  const trend = ta?.inputs.trendStrength ?? trendStrength(daily.closes);
   const fomo = computeFomoScore({
     ...(typeof volRatio === "number" ? { volumeRatio: volRatio } : {}),
     ...(typeof signals.changePct === "number" ? { changePct: signals.changePct } : {}),
@@ -218,7 +218,7 @@ export async function assembleStockFront(
     signals,
     fomo,
     ...(taFact ? { taFact } : {}),
-    sparkline: lite ? [] : daily.closes.slice(-66),
+    sparkline: daily.closes.slice(lite ? -42 : -66),
     ...(basics?.priceText ? { priceText: basics.priceText } : {}),
     ...(basics?.changeText ? { changeText: basics.changeText } : {}),
     ...(basics?.changeDir ? { changeDir: basics.changeDir } : {}),
