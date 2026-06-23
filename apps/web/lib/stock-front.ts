@@ -144,11 +144,93 @@ export interface StockFrontData {
   changeText?: string;
   /** 등락 방향(색). */
   changeDir?: "up" | "down" | "flat";
+  /** 피드 카드용 강세 쪽 균형 사실 1줄. 원문/숫자가 있을 때만 채운다. */
+  feedBull?: FeedSignalPoint;
+  /** 피드 카드용 약세·주의 쪽 균형 사실 1줄. 원문/숫자가 있을 때만 채운다. */
+  feedBear?: FeedSignalPoint;
 }
 
 export interface StockFrontOptions {
   /** 카드 앞면용 경량 경로. 시총순위·TA·상세 지표를 빼고 가격/수급/언급/짧은 차트만 쓴다. */
   lite?: boolean;
+}
+
+export interface FeedSignalPoint {
+  text: string;
+  source: "뉴스" | "수급" | "테마" | "가격" | "주목" | "위치" | "거래";
+}
+
+function pushUnique(out: FeedSignalPoint[], point: FeedSignalPoint): void {
+  if (out.some((p) => p.text.replace(/\s+/g, "") === point.text.replace(/\s+/g, ""))) return;
+  out.push(point);
+}
+
+function buildFeedPoints(
+  signals: CardFrontSignals,
+  changeDir: "up" | "down" | "flat" | undefined,
+  changeText: string | undefined
+): { bull?: FeedSignalPoint; bear?: FeedSignalPoint } {
+  const bull: FeedSignalPoint[] = [];
+  const bear: FeedSignalPoint[] = [];
+  const { foreignNetStreak, institutionNetStreak } = signals;
+
+  if (signals.newsEventLabel) {
+    pushUnique(bull, { text: `오늘 이 종목을 직접 언급한 뉴스가 있어요.`, source: "뉴스" });
+  }
+  if (typeof foreignNetStreak === "number" && foreignNetStreak >= 3) {
+    pushUnique(bull, { text: `외국인이 ${foreignNetStreak}일째 사는 중이에요.`, source: "수급" });
+  }
+  if (typeof institutionNetStreak === "number" && institutionNetStreak >= 3) {
+    pushUnique(bull, { text: `기관이 ${institutionNetStreak}일째 사는 중이에요.`, source: "수급" });
+  }
+  if (typeof signals.themeRelativeRank === "number" && signals.themeRelativeRank === 1 && typeof signals.changePct === "number" && signals.changePct > 0) {
+    pushUnique(bull, {
+      text: `${signals.themeLabel ?? "같은 테마"} 안에서 오늘 가장 많이 오른 쪽이에요.`,
+      source: "테마",
+    });
+  }
+  if (typeof signals.mentionScore === "number" && signals.mentionScore >= 60) {
+    pushUnique(bull, { text: "뉴스·커뮤니티 언급이 늘어난 상태예요.", source: "주목" });
+  }
+  if (signals.near52WeekHigh) {
+    pushUnique(bull, { text: "최근 1년 중 높은 가격대에 가까워요.", source: "위치" });
+  }
+  if (changeDir === "up" && changeText) {
+    pushUnique(bull, { text: `오늘 가격은 ${changeText} 상승으로 움직였어요.`, source: "가격" });
+  }
+
+  if (typeof foreignNetStreak === "number" && foreignNetStreak <= -3) {
+    pushUnique(bear, { text: `외국인이 ${Math.abs(foreignNetStreak)}일째 파는 중이에요.`, source: "수급" });
+  }
+  if (typeof institutionNetStreak === "number" && institutionNetStreak <= -3) {
+    pushUnique(bear, { text: `기관이 ${Math.abs(institutionNetStreak)}일째 파는 중이에요.`, source: "수급" });
+  }
+  if (
+    typeof signals.themeAverageChangePct === "number" &&
+    typeof signals.themeRelativeChangePct === "number" &&
+    typeof signals.changePct === "number" &&
+    signals.themeAverageChangePct >= 2 &&
+    signals.themeRelativeChangePct <= -3
+  ) {
+    pushUnique(bear, {
+      text: `${signals.themeLabel ?? "같은 테마"} 평균보다 덜 움직였어요.`,
+      source: "테마",
+    });
+  }
+  if (typeof signals.volumeRatio === "number" && signals.volumeRatio >= 1.8 && changeDir === "down") {
+    pushUnique(bear, { text: "빠지는 중인데 거래량은 늘었어요.", source: "거래" });
+  }
+  if (signals.near52WeekLow) {
+    pushUnique(bear, { text: "최근 1년 낮은 가격대에 가까워요.", source: "위치" });
+  }
+  if (changeDir === "down" && changeText) {
+    pushUnique(bear, { text: `오늘 가격은 ${changeText} 하락으로 움직였어요.`, source: "가격" });
+  }
+
+  return {
+    ...(bull[0] ? { bull: bull[0] } : {}),
+    ...(bear[0] ? { bear: bear[0] } : {}),
+  };
 }
 
 /**
@@ -213,6 +295,7 @@ export async function assembleStockFront(
     ...(typeof signals.institutionNetStreak === "number" ? { institutionNetStreak: signals.institutionNetStreak } : {}),
   });
   const taFact = ta ? selectTaFact(fomo, ta) : undefined;
+  const feedPoints = buildFeedPoints(signals, basics?.changeDir, basics?.changeText);
 
   return {
     signals,
@@ -222,5 +305,7 @@ export async function assembleStockFront(
     ...(basics?.priceText ? { priceText: basics.priceText } : {}),
     ...(basics?.changeText ? { changeText: basics.changeText } : {}),
     ...(basics?.changeDir ? { changeDir: basics.changeDir } : {}),
+    ...(feedPoints.bull ? { feedBull: feedPoints.bull } : {}),
+    ...(feedPoints.bear ? { feedBear: feedPoints.bear } : {}),
   };
 }

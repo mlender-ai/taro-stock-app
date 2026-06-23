@@ -61,6 +61,8 @@ interface StockFrontLike {
   sparkline?: unknown[];
   priceText?: string;
   changeText?: string;
+  feedBull?: unknown;
+  feedBear?: unknown;
 }
 
 interface InsightLike {
@@ -163,6 +165,10 @@ function duplicateCount(values: readonly string[]): number {
   return [...counts.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0);
 }
 
+function rate(count: number, total: number): number {
+  return total > 0 ? count / total : 0;
+}
+
 async function main() {
   const date = kstDate();
   const samples: LatencySample[] = [];
@@ -231,6 +237,14 @@ async function main() {
   const liteTierDist = distribution(liteHooks.map((hook) => hookTier(hook.kind)));
   const liteKindDist = distribution(liteHooks.map((hook) => hook.kind));
   const fullTierDist = distribution(fullHooks.map((hook) => hookTier(hook.kind)));
+  const liteOk = liteResults.map((row) => row.res.data).filter((data): data is StockFrontLike => !!data);
+  const liteCoverage = {
+    sample: liteOk.length,
+    mention: rate(liteOk.filter((row) => typeof row.signals?.mentionScore === "number").length, liteOk.length),
+    themeRelative: rate(liteOk.filter((row) => typeof row.signals?.themeRelativeRank === "number").length, liteOk.length),
+    feedBull: rate(liteOk.filter((row) => !!row.feedBull).length, liteOk.length),
+    feedBear: rate(liteOk.filter((row) => !!row.feedBear).length, liteOk.length),
+  };
 
   const json = {
     date,
@@ -245,6 +259,7 @@ async function main() {
       liteKind: liteKindDist,
       fullTier: fullTierDist,
     },
+    liteCoverage,
     findings,
     rawErrors: rawResults
       .filter((row) => !row.ok)
@@ -268,6 +283,9 @@ async function main() {
         ["Sample stocks", stocks.join(", ") || "none"],
         ["Lite material hooks", formatPercent(liteTierDist.find((row) => row.key === "material")?.rate ?? 0)],
         ["Lite fallback hooks", formatPercent(liteTierDist.find((row) => row.key === "fallback")?.rate ?? 0)],
+        ["Lite mention coverage", formatPercent(liteCoverage.mention)],
+        ["Lite theme-relative coverage", formatPercent(liteCoverage.themeRelative)],
+        ["Lite feed bull/bear", `${formatPercent(liteCoverage.feedBull)} / ${formatPercent(liteCoverage.feedBear)}`],
         [
           "Depth insufficient",
           stockInput.insightCount > 0 ? `${stockInput.insufficientInsightCount}/${stockInput.insightCount}` : "N/A",

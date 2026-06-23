@@ -5,6 +5,7 @@ import { fomoCardView, computeFomoScore, selectFomoHook, sparklinePath } from "@
 import type { CardFrontSignals, FomoScoreResult, FomoCardView, TaFact } from "@fomo/core";
 import { StockInsightView } from "@/components/KeywordDepthPage";
 import { fetchStockFront, recordTaste } from "@/lib/fomoApi";
+import type { FeedSignalPoint } from "@/lib/fomoApi";
 import { recordStockInterest } from "@/lib/stockInterest";
 import { upsertWatch } from "@/lib/watchlist";
 import type { DeckStock } from "@/lib/discoveryDeck";
@@ -35,6 +36,8 @@ export type FrontEntry = {
   priceText?: string;
   changeText?: string;
   changeDir?: "up" | "down" | "flat";
+  feedBull?: FeedSignalPoint;
+  feedBear?: FeedSignalPoint;
 };
 
 function prefersReducedMotion(): boolean {
@@ -87,7 +90,7 @@ function Sparkline({ series }: { series: number[] }) {
   const paths = sparklinePath(pts, W, H);
   if (!paths) return null;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="mt-3 h-9 w-full shrink-0" aria-hidden>
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="mt-2 h-8 w-full shrink-0" aria-hidden>
       <path d={paths.line} fill="none" stroke="rgba(250,250,250,0.52)" strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
@@ -96,7 +99,7 @@ function Sparkline({ series }: { series: number[] }) {
 function ChartSlot({ series, supported }: { series?: number[] | undefined; supported: boolean }) {
   if (series && series.length >= 2) return <Sparkline series={series} />;
   return (
-    <div className="mt-3 flex h-9 w-full shrink-0 items-center justify-center rounded-lg border border-hairline bg-white/[0.03]">
+    <div className="mt-2 flex h-8 w-full shrink-0 items-center justify-center rounded-lg border border-hairline bg-white/[0.03]">
       <span className="font-pixel text-[10px] text-muted">
         {supported ? "차트 불러오는 중" : "차트 데이터 없음"}
       </span>
@@ -139,6 +142,35 @@ function compactEvidenceLine(text: string | undefined): string | undefined {
   return clean.length > 58 ? `${clean.slice(0, 57)}…` : clean;
 }
 
+function FeedSignalStrip({
+  bull,
+  bear,
+}: {
+  bull?: FeedSignalPoint | undefined;
+  bear?: FeedSignalPoint | undefined;
+}) {
+  if (!bull && !bear) return null;
+  const rows = [
+    bull ? { label: "강세", tone: "#FF4D4D", point: bull } : undefined,
+    bear ? { label: "약세", tone: "#3B82F6", point: bear } : undefined,
+  ].filter((row): row is { label: string; tone: string; point: FeedSignalPoint } => !!row);
+  return (
+    <div className="mt-2 grid shrink-0 gap-1 rounded-lg border border-hairline bg-black/10 px-3 py-1.5">
+      {rows.map((row) => (
+        <div key={row.label} className="flex min-w-0 items-center gap-2 text-xs leading-4">
+          <span className="shrink-0 font-pixel" style={{ color: row.tone }}>
+            {row.label}
+          </span>
+          <span className="min-w-0 flex-1 text-muted" style={clampStyle(1)}>
+            {row.point.text}
+          </span>
+          <span className="shrink-0 text-[10px] text-muted/80">{row.point.source}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
  * 종목 카드 앞면 — 포모 점수(척추 ②, 단일 출처)로 점수·라벨·헤드라인·톤. 휴리스틱 대체.
  * 정체성 / 현재가 / 포모점수+라벨 / 테마태그 / 헤드라인 / 스파크라인 / 재료. 점수=주목도(품질 아님), 예측 0.
@@ -154,6 +186,8 @@ function StockCardFace({
   sparkline,
   chartSupported,
   subLine,
+  feedBull,
+  feedBear,
   why,
   progress,
 }: {
@@ -167,6 +201,8 @@ function StockCardFace({
   sparkline?: number[] | undefined;
   chartSupported: boolean;
   subLine?: string | undefined;
+  feedBull?: FeedSignalPoint | undefined;
+  feedBear?: FeedSignalPoint | undefined;
   why: string;
   progress?: string | undefined;
 }) {
@@ -232,16 +268,18 @@ function StockCardFace({
         {view.headline}
       </p>
 
-      <div className="mt-2.5 shrink-0 rounded-lg border border-hairline bg-white/[0.035] px-3 py-2">
-        <span className="block text-[10px] text-muted">보여주는 이유</span>
-        <span className="mt-1 text-sm leading-6 text-whiteout" style={clampStyle(2)}>
+      <div className="mt-2.5 flex shrink-0 items-start gap-2 rounded-lg border border-hairline bg-white/[0.035] px-3 py-1.5">
+        <span className="shrink-0 text-[10px] leading-5 text-muted">이유</span>
+        <span className="min-w-0 flex-1 text-sm leading-5 text-whiteout" style={clampStyle(1)}>
           {why}
         </span>
       </div>
 
-      {subLine && (
-        <div className="mt-2 shrink-0 rounded-lg border border-hairline bg-black/10 px-3 py-2">
-          <span className="text-sm leading-6 text-muted" style={clampStyle(1)}>
+      <FeedSignalStrip bull={feedBull} bear={feedBear} />
+
+      {subLine && !feedBull && !feedBear && (
+        <div className="mt-2 shrink-0 rounded-lg border border-hairline bg-black/10 px-3 py-1.5">
+          <span className="text-sm leading-5 text-muted" style={clampStyle(1)}>
             {subLine}
           </span>
         </div>
@@ -250,7 +288,7 @@ function StockCardFace({
       {/* 미니 스파크라인(최근 흐름) — lite 응답도 짧은 라인차트를 싣는다. */}
       <ChartSlot series={sparkline} supported={chartSupported} />
 
-      <div className="mt-auto flex shrink-0 items-center justify-between pt-4">
+      <div className="mt-auto flex shrink-0 items-center justify-between pt-2">
         <span className="font-pixel text-[11px] text-muted">더보기 →</span>
         {progress && <span className="font-pixel text-[11px] text-muted">{progress}</span>}
       </div>
@@ -364,6 +402,8 @@ export function StockSwipeDeck({
               ...(d.priceText ? { priceText: d.priceText } : {}),
               ...(d.changeText ? { changeText: d.changeText } : {}),
               ...(d.changeDir ? { changeDir: d.changeDir } : {}),
+              ...(d.feedBull ? { feedBull: d.feedBull } : {}),
+              ...(d.feedBear ? { feedBear: d.feedBear } : {}),
             },
           }))
         )
@@ -432,6 +472,8 @@ export function StockSwipeDeck({
         sparkline={e?.sparkline}
         chartSupported={!!stock.naverCode}
         subLine={subLine}
+        feedBull={e?.feedBull}
+        feedBear={e?.feedBear}
         why={whyFor(stock)}
         progress={progress}
       />

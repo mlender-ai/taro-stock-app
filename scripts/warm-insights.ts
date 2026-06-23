@@ -5,6 +5,7 @@
  *   즉시지만, 그날·그 슬롯의 *첫* 사용자는 cold 를 맞는다.
  * 해결: cron 이 슬롯 시작마다 그날 테마+등장 종목의 endpoint 를 HTTP 로 미리 호출 → Data Cache 를
  *   현재 슬롯 키로 채운다. 사용자는 항상 warm(즉시). 테이블 신설 없음(기존 Data Cache 재사용).
+ *   스와이프 피드용 stock-front lite 도 함께 데워 attention/theme-relative 캐시를 피드까지 전달한다.
  *
  * Data Cache 는 Vercel 런타임 안에서만 채워지므로, 로컬 함수 호출이 아니라 *배포 endpoint HTTP 호출*이어야 한다.
  * (종목 목록만 collectThemeStocks 로 추출 — 이건 LLM 없는 룰 기반 수집이라 가볍다.)
@@ -51,9 +52,14 @@ async function main() {
     }
   }
 
-  // 3) 그날 등장 종목 뎁스 워밍(가장 느렸던 경로 — cold 33초의 주범).
+  // 3) 피드 카드용 stock-front lite 워밍 — 신호 캐시(attention/theme-relative)를 먼저 채운다.
   const stockList = [...stocks];
   console.log(`[warm-insights] 종목 ${stockList.length}개: ${stockList.join(", ")}`);
+  for (const stock of stockList) {
+    await warm(`/api/fomo/stock-front?stock=${encodeURIComponent(stock)}&lite=1`);
+  }
+
+  // 4) 그날 등장 종목 뎁스 워밍(가장 느렸던 경로 — cold 33초의 주범).
   for (const stock of stockList) {
     await warm(`/api/fomo/stock-insight?stock=${encodeURIComponent(stock)}&blocking=1`);
   }
