@@ -61,8 +61,27 @@ jobs:
           gh label create "data-quality" --repo "$REPO" --force --color "c2e0c6" --description "Data quality, confidence, fallback, grounding" >/dev/null 2>&1 || true
           gh label create "task" --repo "$REPO" --force --color "bfd4f2" --description "Implementable task issue" >/dev/null 2>&1 || true
 
-          gh run list --repo "$REPO" --branch main --limit 50 \
+          gh run list --repo "$REPO" --branch main --limit 200 \
             --json databaseId,workflowName,displayTitle,conclusion,status,createdAt,url \
+            > /tmp/runs-global.json
+
+          # 제품 파이프라인은 전체 최근 run 목록에서 밀려 오탐이 날 수 있으므로
+          # workflow별로 직접 조회해 stale 판정의 기준 풀에 합친다.
+          gh run list --repo "$REPO" --workflow fomo-index-pipeline.yml --branch main --limit 30 \
+            --json databaseId,workflowName,displayTitle,conclusion,status,createdAt,url \
+            > /tmp/runs-fomo-index.json
+          gh run list --repo "$REPO" --workflow keyword-cards-pipeline.yml --branch main --limit 30 \
+            --json databaseId,workflowName,displayTitle,conclusion,status,createdAt,url \
+            > /tmp/runs-keyword-cards.json
+          gh run list --repo "$REPO" --workflow supply-demand-pipeline.yml --branch main --limit 30 \
+            --json databaseId,workflowName,displayTitle,conclusion,status,createdAt,url \
+            > /tmp/runs-supply-demand.json
+
+          jq -s 'add | unique_by(.databaseId)' \
+            /tmp/runs-global.json \
+            /tmp/runs-fomo-index.json \
+            /tmp/runs-keyword-cards.json \
+            /tmp/runs-supply-demand.json \
             > /tmp/runs.json
 
           jq --arg since "$SINCE" '
