@@ -1,9 +1,17 @@
-import type { KeywordCard, SectorStock, StockSector } from "@fomo/core";
-import { getWatchlist } from "@/lib/watchlist";
-import { stockInterestScore } from "@/lib/stockInterest";
+import { stocksBySector, type KeywordCard, type SectorStock, type StockSector } from "@fomo/core";
+import { getWatchlist } from "./watchlist";
+import { recentSeenStocks, stockInteractionSummary, stockInterestScore } from "./stockInterest";
 
 export const MAX_DISCOVERY_STOCKS = 60;
 export const MIN_DISCOVERY_STOCKS = 30;
+export const RECENT_SEEN_LIMIT = 20;
+
+export const DISCOVERY_MIX = {
+  marquee: 0.4,
+  discovered: 0.3,
+  tasteSimilar: 0.2,
+  quietLead: 0.1,
+} as const;
 
 /** 덱 카드 — 섹터 풀 종목 + 발굴 근거(있으면 "주목 종목"으로 노출). */
 export type DeckStock = SectorStock & { reason?: string; whyShown?: string };
@@ -99,5 +107,87 @@ export function buildTodayDiscoveryStocks(
     }
   }
 
-  return rankInstantStocks([...byCanonical.values()]).slice(0, MAX_DISCOVERY_STOCKS);
+  const all = rankTodayDiscoveryStocks([...byCanonical.values()]);
+  if (all.length <= MIN_DISCOVERY_STOCKS) return all;
+
+  const picked = new Map<string, DeckStock>();
+  const add = (stock: DeckStock) => {
+    if (!picked.has(stock.canonical)) picked.set(stock.canonical, stock);
+  };
+  const take = (group: readonly DeckStock[], count: number) => {
+    for (const stock of group) {
+      if (picked.size >= MAX_DISCOVERY_STOCKS || count <= 0) break;
+      if (picked.has(stock.canonical)) continue;
+      add(stock);
+      count -= 1;
+    }
+  };
+
+  const target = Math.min(MAX_DISCOVERY_STOCKS, all.length);
+  const discoveredTarget = Math.round(target * DISCOVERY_MIX.discovered);
+  const tasteTarget = Math.round(target * DISCOVERY_MIX.tasteSimilar);
+  const marqueeTarget = Math.round(target * DISCOVERY_MIX.marquee);
+  const quietLeadTarget = Math.round(target * DISCOVERY_MIX.quietLead);
+
+  const early = all.filter((s) => !isSuppressedForEarlyDiscovery(s));
+  const late = all.filter((s) => isSuppressedForEarlyDiscovery(s));
+  const discovered = early.filter((s) => !!s.reason);
+  const tasteSimilar = early.filter((s) => !s.reason && isTasteSimilarStock(s));
+  const marquee = early.filter((s) => !s.reason && s.marquee);
+  const quietLead: DeckStock[] = []; // 수급/💎 후보 데이터가 빌더 입력에 없으면 만들지 않는다.
+  const rest = early.filter((s) => !s.reason && !s.marquee && !isTasteSimilarStock(s));
+
+  take(discovered, discoveredTarget);
+  take(tasteSimilar, tasteTarget);
+  take(marquee, marqueeTarget);
+  take(quietLead, quietLeadTarget);
+  take(rest, target - picked.size);
+  take(early, target - picked.size);
+  take(late, target - picked.size);
+
+  return [...picked.values()].slice(0, MAX_DISCOVERY_STOCKS);
+}
+
+function isSuppressedForEarlyDiscovery(stock: DeckStock, nowMs = Date.now()): boolean {
+  if (recentSeenStocks(RECENT_SEEN_LIMIT).includes(stock.canonical)) return true;
+  const summary = stockInteractionSummary(stock.canonical);
+  const dayMs = 86_400_000;
+  const isFreshInteraction = typeof summary.lastTs === "number" && nowMs - summary.lastTs < dayMs;
+  return isFreshInteraction && (summary.lastSignal === "less" || summary.lastSignal === "more" || summary.lastSignal === "view_depth");
+}
+
+function rankTodayDiscoveryStocks(stocks: readonly DeckStock[], nowMs = Date.now()): DeckStock[] {
+  const recent = recentSeenStocks(RECENT_SEEN_LIMIT);
+  const recentRank = new Map(recent.map((stock, index) => [stock, RECENT_SEEN_LIMIT - index]));
+  return stocks
+    .map((stock, index) => ({ stock, index, rank: todayDiscoveryRank(stock, recentRank, nowMs) }))
+    .sort((a, b) => b.rank - a.rank || a.index - b.index)
+    .map((row) => row.stock);
+}
+
+function todayDiscoveryRank(stock: DeckStock, recentRank: ReadonlyMap<string, number>, nowMs: number): number {
+  const summary = stockInteractionSummary(stock.canonical);
+  const dayMs = 86_400_000;
+  const isFreshInteraction = typeof summary.lastTs === "number" && nowMs - summary.lastTs < dayMs;
+  const interest = stockInterestScore(stock.canonical, nowMs);
+  const recentPenalty = recentRank.get(stock.canonical) ?? 0;
+  const lessPenalty = isFreshInteraction && summary.lastSignal === "less" ? 220 : summary.lessCount > summary.moreCount + summary.depthCount ? 80 : 0;
+  const positiveRevisitPenalty =
+    isFreshInteraction && (summary.lastSignal === "more" || summary.lastSignal === "view_depth") ? 70 : 0;
+  return (
+    (stock.reason ? 90 : 0) +
+    (stock.marquee ? 35 : 0) +
+    (isTasteSimilarStock(stock) ? 40 : 0) +
+    interest * 0.25 -
+    recentPenalty * 10 -
+    lessPenalty -
+    positiveRevisitPenalty
+  );
+}
+
+function isTasteSimilarStock(stock: DeckStock): boolean {
+  const watch = getWatchlist();
+  if (watch.length === 0) return false;
+  const peers = new Set(stocksBySector(stock.sector).map((s) => s.canonical));
+  return watch.some((w) => w.stock !== stock.canonical && peers.has(w.stock));
 }

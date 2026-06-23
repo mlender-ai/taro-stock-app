@@ -5,7 +5,7 @@
 const KEY = "fomo_stock_interest";
 const CAP = 300;
 
-export type StockInterest = "more" | "less" | "view_depth";
+export type StockInterest = "more" | "less" | "view_depth" | "seen";
 
 interface StockInterestRecord {
   stock: string;
@@ -21,6 +21,16 @@ function read(): StockInterestRecord[] {
   } catch {
     return [];
   }
+}
+
+export interface StockInteractionSummary {
+  stock: string;
+  lastSignal?: StockInterest | undefined;
+  lastTs?: number | undefined;
+  moreCount: number;
+  lessCount: number;
+  depthCount: number;
+  seenCount: number;
 }
 
 export function recordStockInterest(stock: string, signal: StockInterest, nowMs: number): void {
@@ -41,7 +51,36 @@ export function stockInterestScore(stock: string, nowMs = Date.now()): number {
     .reduce((sum, r) => {
       const ageDays = Math.max(0, (nowMs - r.ts) / dayMs);
       const decay = Math.max(0.25, 1 - ageDays / 21);
-      const weight = r.signal === "view_depth" ? 14 : r.signal === "more" ? 10 : -12;
+      const weight = r.signal === "view_depth" ? 14 : r.signal === "more" ? 10 : r.signal === "less" ? -12 : 0;
       return sum + weight * decay;
     }, 0);
+}
+
+export function recentSeenStocks(limit = 20): string[] {
+  const seen: string[] = [];
+  const used = new Set<string>();
+  for (const record of [...read()].reverse()) {
+    if (record.signal !== "seen" && record.signal !== "more" && record.signal !== "less" && record.signal !== "view_depth") {
+      continue;
+    }
+    if (used.has(record.stock)) continue;
+    used.add(record.stock);
+    seen.push(record.stock);
+    if (seen.length >= limit) break;
+  }
+  return seen;
+}
+
+export function stockInteractionSummary(stock: string): StockInteractionSummary {
+  const rows = read().filter((r) => r.stock === stock);
+  const last = rows.at(-1);
+  return {
+    stock,
+    lastSignal: last?.signal,
+    lastTs: last?.ts,
+    moreCount: rows.filter((r) => r.signal === "more").length,
+    lessCount: rows.filter((r) => r.signal === "less").length,
+    depthCount: rows.filter((r) => r.signal === "view_depth").length,
+    seenCount: rows.filter((r) => r.signal === "seen").length,
+  };
 }

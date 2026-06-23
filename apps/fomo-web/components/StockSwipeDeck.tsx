@@ -273,6 +273,7 @@ export function StockSwipeDeck({
   const dragging = useRef(false);
   const startX = useRef(0);
   const moved = useRef(false);
+  const lastSeenStock = useRef<string | null>(null);
 
   // 앞면 FOMO 신호 — ④ 정렬 때 풀 전체를 이미 받아 seed(initialFronts). 빠진 종목만 도달 시 lazy 보강.
   const [front, setFront] = useState<Record<string, FrontEntry>>(initialFronts ?? {});
@@ -437,6 +438,13 @@ export function StockSwipeDeck({
     ensureFront(at(idx));
     ensureFront(at(idx + 1));
   }, [idx, ensureFront]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const stock = at(idx).canonical;
+    if (lastSeenStock.current === stock) return;
+    lastSeenStock.current = stock;
+    recordStockInterest(stock, "seen", Date.now());
+  }, [idx, stocks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const top = at(idx);
   const topTransform = exiting
