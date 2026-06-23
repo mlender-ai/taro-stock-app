@@ -206,6 +206,13 @@ export interface StockFrontResponse {
   priceText?: string;
   changeText?: string;
   changeDir?: "up" | "down" | "flat";
+  feedBull?: FeedSignalPoint;
+  feedBear?: FeedSignalPoint;
+}
+
+export interface FeedSignalPoint {
+  text: string;
+  source: "뉴스" | "수급" | "테마" | "가격" | "주목" | "위치" | "거래";
 }
 export const fetchStockFront = (stock: string, opts: { lite?: boolean } = {}) =>
   cachedGet(

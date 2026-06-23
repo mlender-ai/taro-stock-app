@@ -56,6 +56,23 @@ export function whyShown({ stock, fomoLabel, signals, nowMs = Date.now() }: WhyS
     const actor = foreign >= 3 && institution >= 3 ? "외국인·기관" : foreign >= 3 ? "외국인" : "기관";
     return `가격은 빠졌지만 ${actor} 수급이 이어져서 확인 대상으로 보여줘요.`;
   }
+  if (
+    typeof signals?.themeAverageChangePct === "number" &&
+    typeof signals?.themeRelativeChangePct === "number" &&
+    typeof signals?.changePct === "number" &&
+    signals.themeAverageChangePct >= 2 &&
+    signals.themeRelativeChangePct <= -3
+  ) {
+    return `같은 ${signals.themeLabel ?? stock.sector} 흐름은 평균적으로 움직였는데, 이 종목은 아직 덜 움직여서 보여줘요.`;
+  }
+  if (
+    typeof signals?.themeRelativeRank === "number" &&
+    signals.themeRelativeRank === 1 &&
+    typeof signals.changePct === "number" &&
+    signals.changePct > 0
+  ) {
+    return `${signals.themeLabel ?? stock.sector} 흐름 안에서 오늘 가장 앞에서 움직여서 보여줘요.`;
+  }
   if (isDown && (mentionStrong || volumeStrong)) {
     return "강세 카드가 아니라, 하락 중에도 거래·언급이 몰린 이유를 확인하는 카드예요.";
   }

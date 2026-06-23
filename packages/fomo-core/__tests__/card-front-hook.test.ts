@@ -171,7 +171,7 @@ describe("selectFomoHook — 상태 배지와 분리된 종목별 헤드라인",
     expect(hook.headline).toBe("가격은 빠졌는데, 거래량은 오히려 늘었어요.");
   });
 
-  it("모양형만 있으면 헤드라인을 차지하지 않고 보조문장으로 내려간다", () => {
+  it("거래량·52주 위치는 피드에서 확인할 재료로 헤드라인 자격을 가진다", () => {
     const volumeFomo = computeFomoScore({ volumeRatio: 2.2, changePct: 1 });
     const positionFomo = computeFomoScore({ changePct: 1, trendStrength: 0.42 });
     expect(volumeFomo.label).toBe("warming");
@@ -179,12 +179,24 @@ describe("selectFomoHook — 상태 배지와 분리된 종목별 헤드라인",
 
     const a = selectFomoHook({ fomo: volumeFomo, signals: { volumeRatio: 2.2, changePct: 1 } });
     const b = selectFomoHook({ fomo: positionFomo, signals: { near52WeekHigh: true, changePct: 1 } });
-    expect(a.kind).toBe("fallback");
-    expect(a.headline).toBe("아직 조용한 자리예요.");
-    expect(a.subLine).toBe("최근 거래가 평소 2.2배로 늘었어요.");
-    expect(b.kind).toBe("fallback");
-    expect(b.headline).toBe("아직 조용한 자리예요.");
-    expect(b.subLine).toBe("최근 1년 중 가장 높은 가격대까지 왔어요.");
+    expect(a.kind).toBe("volume_event");
+    expect(a.headline).toBe("최근 거래가 평소 2.2배로 늘었어요.");
+    expect(b.kind).toBe("position");
+    expect(b.headline).toBe("최근 1년 중 가장 높은 가격대까지 왔어요.");
+  });
+
+  it("순수 TA 모양형만 있으면 헤드라인을 차지하지 않고 보조문장으로 내려간다", () => {
+    const fomo = computeFomoScore({ changePct: 1, trendStrength: 0.42 });
+    const fact: TaFact = {
+      kind: "ma_bullish",
+      role: "event",
+      confidence: "high",
+      text: "20·60·120일선이 위쪽으로 정렬된 상태예요.",
+    };
+    const hook = selectFomoHook({ fomo, taFact: fact });
+    expect(hook.kind).toBe("fallback");
+    expect(hook.headline).toBe("아직 조용한 자리예요.");
+    expect(hook.subLine).toBe("최근 3개월 흐름이 위쪽으로 이어지고 있어요.");
   });
 
   it("데이터가 빈약하면 상태 헤드라인으로 폴백하고 디테일을 지어내지 않는다", () => {

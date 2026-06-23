@@ -405,7 +405,7 @@ function axisTensionCandidate(fomo: FomoScoreResult, signals: CardFrontSignals):
         : "가격은 빠졌는데, 거래량은 오히려 늘었어요.";
     return {
       kind: "axis_tension",
-      tier: "tension",
+      tier: "material",
       score: 0.92 + strength * 0.18,
       headline,
     };
@@ -415,7 +415,7 @@ function axisTensionCandidate(fomo: FomoScoreResult, signals: CardFrontSignals):
     const gap = Math.min(1, Math.max(0, pct / 12) + Math.max(0, 60 - fomo.attentionAxis) / 120);
     return {
       kind: "axis_tension",
-      tier: "tension",
+      tier: "material",
       score: 0.9 + gap * 0.2,
       headline: `가격은 ${pctText(pct)} 올랐는데, 거래량·뉴스는 아직 안 따라왔어요.`,
     };
@@ -474,7 +474,7 @@ function volumeCandidate(signals: CardFrontSignals): HookCandidate | null {
   if (typeof vr !== "number" || vr < FRONT_VOLUME_RATIO_MIN) return null;
   return {
     kind: "volume_event",
-    tier: "shape",
+    tier: "material",
     score: Math.min(1, 0.42 + vr / 5),
     headline: `최근 거래가 평소 ${ratioText(vr)}배로 늘었어요.`,
   };
@@ -530,7 +530,7 @@ function positionCandidate(signals: CardFrontSignals): HookCandidate | null {
   if (signals.near52WeekLow) {
     return {
       kind: "position",
-      tier: "shape",
+      tier: "material",
       score: 0.56,
       headline: "최근 1년 낮은 구간에 가까워요.",
     };
@@ -538,7 +538,7 @@ function positionCandidate(signals: CardFrontSignals): HookCandidate | null {
   if (!signals.near52WeekHigh) return null;
   return {
     kind: "position",
-    tier: "shape",
+    tier: "material",
     score: 0.58,
     headline: "최근 1년 중 가장 높은 가격대까지 왔어요.",
   };
@@ -548,7 +548,7 @@ function accumulationCandidate(fomo: FomoScoreResult, taFact?: TaFact): HookCand
   if (fomo.inputs.accumulationDivergence !== true && taFact?.kind !== "accumulation_divergence") return null;
   return {
     kind: "accumulation",
-    tier: "shape",
+    tier: "material",
     score: 0.7,
     headline: "거래는 느는데 가격은 잠잠해요.",
   };
