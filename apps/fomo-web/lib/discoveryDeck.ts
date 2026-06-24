@@ -6,6 +6,8 @@ import {
   type KeywordCard,
   type MultiAxisHookSelection,
   type SectorStock,
+  type StockCountry,
+  type StockMarket,
   type StockSector,
   resolveStock,
   stocksBySector,
@@ -25,11 +27,14 @@ export const DISCOVERY_MIX = {
 } as const;
 
 /** 덱 카드 — 섹터 풀 종목 + 발굴 근거(있으면 "주목 종목"으로 노출). */
-export type DeckStock = SectorStock & {
+export type DeckStock = Omit<SectorStock, "sector"> & {
   reason?: string;
   whyShown?: string;
   axisSignals?: AxisSignal[];
   axisHook?: MultiAxisHookSelection;
+  sector: string;
+  market: StockMarket;
+  country: StockCountry;
 };
 
 export interface AxisSnapshotLike {
@@ -219,13 +224,19 @@ function todayDiscoveryRank(stock: DeckStock, recentRank: ReadonlyMap<string, nu
 }
 
 function isTasteSimilarStock(stock: DeckStock): boolean {
+  if (!isKnownStockSector(stock.sector)) return false;
   const watch = getWatchlist();
   if (watch.length === 0) return false;
   const peers = new Set(stocksBySector(stock.sector).map((s) => s.canonical));
   return watch.some((w) => w.stock !== stock.canonical && peers.has(w.stock));
 }
 
+function isKnownStockSector(sector: string): sector is StockSector {
+  return ["반도체", "AI", "2차전지", "방산", "바이오", "원자력", "코인"].includes(sector);
+}
+
 function affinitySignalFor(stock: DeckStock): AxisSignal | undefined {
+  if (!isKnownStockSector(stock.sector)) return undefined;
   const watch = getWatchlist();
   if (watch.length === 0) return undefined;
   const peers = new Set(stocksBySector(stock.sector).map((s) => s.canonical));

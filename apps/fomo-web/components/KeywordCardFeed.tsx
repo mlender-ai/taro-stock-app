@@ -3,14 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   scoreToColor,
-  SECTORS,
   type KeywordCard,
   type KeywordConfidence,
-  type StockSector,
   type SurpriseStock,
 } from "@fomo/core";
 import { KeywordDepthPage, StockInsightView } from "@/components/KeywordDepthPage";
-import { SectorStockDeck } from "@/components/SectorStockDeck";
 import { TodayDiscoveryDeck } from "@/components/TodayDiscoveryDeck";
 import { KEYWORDS_UPDATED_EVENT, fetchKeywords, fetchThemeInsight, recordTaste, type KeywordsResponse } from "@/lib/fomoApi";
 import { keywordInterestScore, recordInterest } from "@/lib/keywordInterest";
@@ -148,57 +145,8 @@ interface FeedGate {
   onRequireLogin?: (() => void) | undefined;
 }
 
-/**
- * 섹터 카테고리 칩 네비(SECTOR_STRUCTURE §1) — "오늘"(쏠림 피드) + 섹터들.
- * 비주얼(칩 디자인·국기 등)은 광혁 — 여기선 구조/선택 동작만(§4).
- */
-function SectorChips({
-  active,
-  onSelect,
-}: {
-  active: StockSector | null;
-  onSelect: (s: StockSector | null) => void;
-}) {
-  const chip = (label: string, value: StockSector | null) => {
-    const on = active === value;
-    return (
-      <button
-        key={label}
-        onClick={() => onSelect(value)}
-        className={`shrink-0 rounded-full border px-3 py-1 font-pixel text-xs transition-colors ${
-          on ? "border-transparent bg-whiteout text-black" : "border-hairline text-muted hover:text-whiteout"
-        }`}
-      >
-        {label}
-      </button>
-    );
-  };
-  return (
-    <div className="mb-3 flex gap-2 overflow-x-auto px-1 pb-1">
-      {chip("오늘", null)}
-      {SECTORS.map((s) => chip(s, s))}
-    </div>
-  );
-}
-
 export function KeywordCardFeed({ loggedIn, onRequireLogin }: FeedGate = {}) {
-  // 섹터 네비: null = "오늘의 발견"(전체 종목 풀). 섹터 선택 시 그 섹터 종목 무한 스와이프.
-  const [activeSector, setActiveSector] = useState<StockSector | null>(null);
-  return (
-    <div className="w-full">
-      <SectorChips active={activeSector} onSelect={setActiveSector} />
-      {activeSector === null ? (
-        <TodayDiscoveryDeck loggedIn={loggedIn} onRequireLogin={onRequireLogin} />
-      ) : (
-        <SectorStockDeck
-          key={activeSector}
-          sector={activeSector}
-          loggedIn={loggedIn}
-          onRequireLogin={onRequireLogin}
-        />
-      )}
-    </div>
-  );
+  return <TodayDiscoveryDeck loggedIn={loggedIn} onRequireLogin={onRequireLogin} />;
 }
 
 /** "오늘" 탭 — 기존 쏠림(키워드) 피드(무변경). */
