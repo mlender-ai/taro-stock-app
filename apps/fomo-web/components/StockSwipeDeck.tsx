@@ -394,6 +394,8 @@ export function StockSwipeDeck({
   const [restorePrimed, setRestorePrimed] = useState(false);
   const [selected, setSelected] = useState<DeckStock | null>(null);
   const [undoEntry, setUndoEntry] = useState<UndoEntry | null>(null);
+  // 매칭 모먼트 — 관심(우)·슈퍼관심(위) 넘길 때 짧게 뜨는 담담한 확인 연출(표현 레이어).
+  const [matchMoment, setMatchMoment] = useState<null | { name: string; kind: "like" | "super" }>(null);
   const dragging = useRef(false);
   const startX = useRef(0);
   const startY = useRef(0);
@@ -401,6 +403,7 @@ export function StockSwipeDeck({
   const lastSeenStock = useRef<string | null>(null);
   const firstCardRecorded = useRef(false);
   const hydratedRecorded = useRef<Set<string>>(new Set());
+  const matchTimer = useRef<number | null>(null);
 
   // 앞면 FOMO 신호 — ④ 정렬 때 풀 전체를 이미 받아 seed(initialFronts). 빠진 종목만 도달 시 lazy 보강.
   const [front, setFront] = useState<Record<string, FrontEntry>>(initialFronts ?? {});
@@ -551,6 +554,14 @@ export function StockSwipeDeck({
     }, EXIT_MS);
   }, []);
 
+  // 매칭 모먼트 — 짧게 띄우고 자동 해제(애니메이션 끔 설정이면 더 짧게).
+  const fireMatch = useCallback((name: string, kind: "like" | "super") => {
+    if (matchTimer.current) window.clearTimeout(matchTimer.current);
+    setMatchMoment({ name, kind });
+    matchTimer.current = window.setTimeout(() => setMatchMoment(null), prefersReducedMotion() ? 650 : 1100);
+  }, []);
+
+  // 패스(좌) — 관심 없음, 다음 카드로. 저장 없음(로그인 불필요).
   const advance = useCallback(
     (dir: "left" | "right") => {
       const stock = at(idx);
@@ -586,16 +597,37 @@ export function StockSwipeDeck({
     window.setTimeout(() => setRestoring(false), EXIT_MS + 40);
   }, [undoEntry, exiting]);
 
-  // 슈퍼관심(위로) — 강한 관심. 기존 "more" 신호 재사용(새 데이터 없음), 위로 날리는 연출만 추가.
-  const superLike = useCallback(() => {
+  // 관심(우/관심버튼)·슈퍼관심(위/별버튼) 공통 — 매칭 모먼트 띄운 뒤 상세(뎁스) 페이지로 진입.
+  // 비로그인은 로그인 유도 후 스냅백(저장·매칭 없음). kind는 매칭 모먼트 표현만 다름(하트/별).
+  const interest = useCallback((kind: "like" | "super") => {
     const stock = at(idx);
-    setUndoEntry({ idx, dir: "right", stock }); // 되돌리기 가능(강한 관심=right 연출로 복구)
+    if (!loggedIn && onRequireLogin) {
+      onRequireLogin();
+      setDx(0);
+      setDy(0);
+      return;
+    }
     saveDiscovery(stock);
-    recordDiscoveryEvent("swipe", { direction: "right", hydrated: !!front[stock.canonical] }); // 메트릭상 강한 관심=right
+    recordDiscoveryEvent("swipe", { direction: "right", hydrated: !!front[stock.canonical] });
     recordStockInterest(stock.canonical, "more", Date.now());
     recordTaste("stock", stock.canonical, "more");
-    flingNext("up");
-  }, [idx, stocks, flingNext, front]);
+    fireMatch(stock.canonical, kind);
+    // 상세 진입 — source "card"(중복 저장 없음). 진입 직전 fling 상태 정리.
+    const openAfter = () => {
+      setExiting(null);
+      setDx(0);
+      setDy(0);
+      openDepth(stock, "card");
+    };
+    if (prefersReducedMotion()) {
+      openAfter();
+      return;
+    }
+    // 카드 날리는 연출(관심=우로, 슈퍼관심=위로) — 스와이프·버튼 완전 동일. 날아간 뒤 매칭 보고 상세로.
+    setExiting(kind === "super" ? "up" : "right");
+    window.setTimeout(openAfter, 760);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idx, stocks, front, fireMatch, loggedIn, onRequireLogin]);
 
   const openDepth = (stock: DeckStock, source: "card" | "interest_button" = "card") => {
     if (!loggedIn && onRequireLogin) {
@@ -637,9 +669,9 @@ export function StockSwipeDeck({
   const onPointerUp = () => {
     if (!dragging.current) return;
     dragging.current = false;
-    // 위로 크게 끌면 슈퍼관심(좌우보다 우선). 아니면 좌우 임계.
-    if (dy < -UP_THRESHOLD && Math.abs(dy) > Math.abs(dx)) superLike();
-    else if (dx > THRESHOLD) advance("right");
+    // 위로 크게 끌면 슈퍼관심(좌우보다 우선). 우=관심, 좌=패스.
+    if (dy < -UP_THRESHOLD && Math.abs(dy) > Math.abs(dx)) interest("super");
+    else if (dx > THRESHOLD) interest("like");
     else if (dx < -THRESHOLD) advance("left");
     else {
       setDx(0);
@@ -739,6 +771,19 @@ export function StockSwipeDeck({
           </span>
           {renderFace(top, `${(idx % stocks.length) + 1} / ${stocks.length}`)}
         </div>
+
+        {/* 매칭 모먼트 — 관심/슈퍼관심 확인 연출(담담·자동 해제). 투자 신호 아님. */}
+        {matchMoment && (
+          <div className="fomo-match-pop pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 rounded-2xl bg-canvas/70 backdrop-blur-sm">
+            <span style={{ color: NEON }}>
+              {matchMoment.kind === "super" ? <StarIcon size={64} /> : <HeartIcon size={64} />}
+            </span>
+            <span className="font-number text-lg font-bold text-whiteout">{matchMoment.name}</span>
+            <span className="text-sm text-muted">
+              {matchMoment.kind === "super" ? "슈퍼 관심으로 담았어요" : "관심에 담았어요"}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 flex items-center justify-center gap-4">
@@ -760,9 +805,19 @@ export function StockSwipeDeck({
           ✕
         </button>
         <button
-          onClick={() => openDepth(top, "interest_button")}
+          onClick={() => interest("super")}
           disabled={!!exiting || restoring || !topReady}
-          aria-label="관심 — 자세히 보기"
+          aria-label="슈퍼 관심"
+          title="슈퍼 관심"
+          className="flex h-14 w-14 items-center justify-center rounded-full border-2 bg-surface-raised transition-colors disabled:opacity-40"
+          style={{ borderColor: NEON, color: NEON }}
+        >
+          <StarIcon size={26} />
+        </button>
+        <button
+          onClick={() => interest("like")}
+          disabled={!!exiting || restoring || !topReady}
+          aria-label="관심"
           className="flex h-14 flex-1 items-center justify-center rounded-full text-sm font-bold text-canvas transition-opacity disabled:opacity-40"
           style={{ backgroundColor: NEON }}
         >
