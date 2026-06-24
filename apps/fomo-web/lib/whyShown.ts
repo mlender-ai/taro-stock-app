@@ -23,6 +23,10 @@ function hasWatchedPeer(sector: StockSector, stockName: string): boolean {
   return watch.some((w) => names.has(w.stock));
 }
 
+function isKnownStockSector(sector: string): sector is StockSector {
+  return ["반도체", "AI", "2차전지", "방산", "바이오", "원자력", "코인"].includes(sector);
+}
+
 function compactInline(text: string | undefined): string {
   const clean = (text ?? "").replace(/\s+/g, " ").trim();
   if (!clean) return "";
@@ -79,7 +83,7 @@ export function whyShown({ stock, fomoLabel, signals, nowMs = Date.now() }: WhyS
   if (hasSupplySell && (mentionStrong || volumeStrong)) {
     return "약세·주의 신호가 커져서 시장이 어디에 반응하는지 보여줘요.";
   }
-  if (hasWatchedPeer(stock.sector, stock.canonical)) {
+  if (isKnownStockSector(stock.sector) && hasWatchedPeer(stock.sector, stock.canonical)) {
     return "네가 관심 둔 종목들과 같은 섹터에 있어요.";
   }
   if (stockInterestScore(stock.canonical, nowMs) >= HIGH_INTEREST_SCORE) {

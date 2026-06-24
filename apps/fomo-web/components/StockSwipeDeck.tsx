@@ -525,7 +525,7 @@ export function StockSwipeDeck({
         changeDir={e?.changeDir}
         rankLabel={rankLabelFor(stock)}
         sparkline={e?.sparkline}
-        chartSupported={!!stock.naverCode}
+        chartSupported={!!stock.naverCode && (e?.sparkline?.length ?? 0) >= 2}
         subLine={subLine}
         feedBull={deduped.feedBull}
         feedBear={deduped.feedBear}

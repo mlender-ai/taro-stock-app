@@ -227,6 +227,28 @@ export const fetchStockFront = (stock: string, opts: { lite?: boolean } = {}) =>
     CACHE_TTL.stockFront
   );
 
+export interface DiscoveryStockResponse {
+  canonical: string;
+  market: import("@fomo/core").StockMarket;
+  country: import("@fomo/core").StockCountry;
+  naverCode?: string;
+  marquee: boolean;
+  sector: string;
+  whyShown?: string;
+  reason?: string;
+}
+
+export interface DiscoveryResponse {
+  asOf: string;
+  stocks: DiscoveryStockResponse[];
+  fronts: Record<string, StockFrontResponse>;
+  confidence: "L" | "M" | "H";
+  source: string;
+}
+
+export const fetchDiscovery = () =>
+  cachedGet("discovery:today", () => get<DiscoveryResponse>("/api/fomo/discovery"), CACHE_TTL.stockFront);
+
 export interface AxisSnapshotEntry {
   axisSignals: import("@fomo/core").AxisSignal[];
   axisHook: import("@fomo/core").MultiAxisHookSelection;
