@@ -32,6 +32,24 @@ export function StarIcon({ size = 14, className }: IconProps) {
   );
 }
 
+/** 관심(LIKE) 스탬프 — 채워진 하트(틴더식). */
+export function HeartIcon({ size = 48, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} fill="currentColor" aria-hidden>
+      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+    </svg>
+  );
+}
+
+/** 패스(NOPE) 스탬프 — 굵은 X(틴더식). */
+export function XMarkIcon({ size = 48, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" aria-hidden>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  );
+}
+
 /** ▲ 대체 — 상승(등락 데이터 전용, 봉인색). */
 export function CaretUpIcon({ size = 12, className }: IconProps) {
   return (

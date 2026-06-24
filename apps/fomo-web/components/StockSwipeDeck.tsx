@@ -12,7 +12,7 @@ import type { DeckStock } from "@/lib/discoveryDeck";
 import { whyShown } from "@/lib/whyShown";
 import { dedupeCardCopy } from "@/lib/cardCopyDedupe";
 import { recordDiscoveryEvent } from "@/lib/discoveryMetrics";
-import { FlameIcon, GemIcon, StarIcon, CaretUpIcon, CaretDownIcon, UndoIcon } from "@/components/icons";
+import { FlameIcon, GemIcon, StarIcon, CaretUpIcon, CaretDownIcon, UndoIcon, HeartIcon, XMarkIcon } from "@/components/icons";
 
 /**
  * 공통 종목 무한 스와이프 덱.
@@ -20,8 +20,8 @@ import { FlameIcon, GemIcon, StarIcon, CaretUpIcon, CaretDownIcon, UndoIcon } fr
  * stock-front 는 현재 카드와 다음 카드만 lazy hydrate 한다.
  */
 const THRESHOLD = 90;
+const UP_THRESHOLD = 90; // 위로 끌어 슈퍼관심(강한 관심)
 const EXIT_MS = 320;
-const DOWN = "#64748B"; // 덜관심(패스) 오버레이 — 중립 그레이
 // DESIGN.md §2 브랜드 액센트(역할 인코딩). 오렌지=주목 열기/강도, 네온=발견·💎·CTA. 등락엔 절대 금지.
 const NEON = "#D8FF3A";
 
@@ -378,7 +378,8 @@ export function StockSwipeDeck({
   // 무한: 풀을 순환(modulo)해 끝나지 않는다(§7 "무한히 풀만큼").
   const [idx, setIdx] = useState(0);
   const [dx, setDx] = useState(0);
-  const [exiting, setExiting] = useState<null | "left" | "right">(null);
+  const [dy, setDy] = useState(0);
+  const [exiting, setExiting] = useState<null | "left" | "right" | "up">(null);
   const [restoring, setRestoring] = useState(false);
   const [restoreStart, setRestoreStart] = useState<null | "left" | "right">(null);
   const [restorePrimed, setRestorePrimed] = useState(false);
@@ -386,6 +387,7 @@ export function StockSwipeDeck({
   const [undoEntry, setUndoEntry] = useState<UndoEntry | null>(null);
   const dragging = useRef(false);
   const startX = useRef(0);
+  const startY = useRef(0);
   const moved = useRef(false);
   const lastSeenStock = useRef<string | null>(null);
   const firstCardRecorded = useRef(false);
@@ -516,9 +518,10 @@ export function StockSwipeDeck({
     );
   };
 
-  const flingNext = useCallback((dir: "left" | "right") => {
+  const flingNext = useCallback((dir: "left" | "right" | "up") => {
     if (prefersReducedMotion()) {
       setDx(0);
+      setDy(0);
       setIdx((i) => i + 1);
       return;
     }
@@ -526,6 +529,7 @@ export function StockSwipeDeck({
     window.setTimeout(() => {
       setExiting(null);
       setDx(0);
+      setDy(0);
       setIdx((i) => i + 1);
     }, EXIT_MS);
   }, []);
@@ -565,6 +569,17 @@ export function StockSwipeDeck({
     window.setTimeout(() => setRestoring(false), EXIT_MS + 40);
   }, [undoEntry, exiting]);
 
+  // 슈퍼관심(위로) — 강한 관심. 기존 "more" 신호 재사용(새 데이터 없음), 위로 날리는 연출만 추가.
+  const superLike = useCallback(() => {
+    const stock = at(idx);
+    setUndoEntry({ idx, dir: "right", stock }); // 되돌리기 가능(강한 관심=right 연출로 복구)
+    saveDiscovery(stock);
+    recordDiscoveryEvent("swipe", { direction: "right", hydrated: !!front[stock.canonical] }); // 메트릭상 강한 관심=right
+    recordStockInterest(stock.canonical, "more", Date.now());
+    recordTaste("stock", stock.canonical, "more");
+    flingNext("up");
+  }, [idx, stocks, flingNext, front]);
+
   const openDepth = (stock: DeckStock, source: "card" | "interest_button" = "card") => {
     if (!loggedIn && onRequireLogin) {
       onRequireLogin();
@@ -591,20 +606,28 @@ export function StockSwipeDeck({
     dragging.current = true;
     moved.current = false;
     startX.current = e.clientX;
+    startY.current = e.clientY;
     (e.target as Element).setPointerCapture?.(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent) => {
     if (!dragging.current) return;
     const d = e.clientX - startX.current;
-    if (Math.abs(d) > 6) moved.current = true;
+    const v = e.clientY - startY.current;
+    if (Math.abs(d) > 6 || Math.abs(v) > 6) moved.current = true;
     setDx(d);
+    setDy(v);
   };
   const onPointerUp = () => {
     if (!dragging.current) return;
     dragging.current = false;
-    if (dx > THRESHOLD) advance("right");
+    // 위로 크게 끌면 슈퍼관심(좌우보다 우선). 아니면 좌우 임계.
+    if (dy < -UP_THRESHOLD && Math.abs(dy) > Math.abs(dx)) superLike();
+    else if (dx > THRESHOLD) advance("right");
     else if (dx < -THRESHOLD) advance("left");
-    else setDx(0);
+    else {
+      setDx(0);
+      setDy(0);
+    }
   };
 
   // 보이는 카드(+다음 1장)의 신호를 미리 채운다 — 도달 종목만(비용 방어).
@@ -645,15 +668,28 @@ export function StockSwipeDeck({
   const topTransform = restoreStart
     ? flingTransform(restoreStart)
     : exiting
-      ? flingTransform(exiting)
-      : `translateX(${dx}px) rotate(${dx * 0.04}deg)`;
+      ? exiting === "up"
+        ? "translateY(-140%) scale(0.96)"
+        : flingTransform(exiting)
+      : `translate(${dx}px, ${dy}px) rotate(${dx * 0.04}deg)`;
   const topTransition = dragging.current || restorePrimed ? "none" : `transform ${EXIT_MS}ms cubic-bezier(0.22,1,0.36,1)`;
   const topReady = !!front[top.canonical];
 
   return (
     <div className="w-full">
       <div className="relative mx-auto h-[60svh] min-h-[460px] max-h-[580px] w-full select-none sm:min-h-[500px]">
-        {/* 단일 카드만 렌더 — 글래스모피즘 카드 뒤로 비침 금지(스택 미리보기 제거). */}
+        {/* 다음 카드 — 뒤에 살짝 드러나는 스택(틴더식 peek). 위 카드가 불투명이라 body 통과 비침은 없음. */}
+        {stocks.length > 1 && (
+          <div
+            aria-hidden
+            className="absolute inset-0 overflow-hidden rounded-2xl border border-hairline-soft bg-surface-raised px-6 py-7"
+            style={{ transform: "translateY(14px) scale(0.95)", opacity: 0.6, zIndex: 0 }}
+          >
+            {renderFace(at(idx + 1))}
+          </div>
+        )}
+
+        {/* 위 카드 — 불투명(뒤 카드 body 비침 차단). 슬라이드하면 뒤 카드가 드러난다. */}
         <div
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -662,20 +698,27 @@ export function StockSwipeDeck({
           onClick={() => {
             if (topReady && !moved.current && !exiting && !restoring) openDepth(top, "card");
           }}
-          className="glass-card absolute inset-0 z-10 cursor-pointer overflow-hidden rounded-2xl px-6 py-7"
+          className="absolute inset-0 z-10 cursor-pointer overflow-hidden rounded-2xl border border-hairline-soft bg-surface-raised px-6 py-7"
           style={{ transform: topTransform, transition: topTransition }}
         >
+          {/* 드래그 스탬프(틴더식 아이콘) — 거리에 비례해 또렷·확대. 우=관심(하트)·좌=패스(X)·위=슈퍼관심(별). */}
           <span
-            className="pointer-events-none absolute right-4 top-4 z-20 rounded-lg border-2 px-2 py-0.5 text-sm font-bold"
-            style={{ color: NEON, borderColor: NEON, opacity: Math.max(0, Math.min(1, dx / THRESHOLD)) }}
+            className="pointer-events-none absolute right-6 top-7 z-20"
+            style={{ color: NEON, opacity: Math.max(0, Math.min(1, dx / THRESHOLD)), transform: `rotate(18deg) scale(${0.8 + 0.25 * Math.max(0, Math.min(1, dx / THRESHOLD))})` }}
           >
-            관심 →
+            <HeartIcon size={76} />
           </span>
           <span
-            className="pointer-events-none absolute left-4 top-4 z-20 rounded-lg border-2 px-2 py-0.5 text-sm font-bold"
-            style={{ color: DOWN, borderColor: DOWN, opacity: Math.max(0, Math.min(1, -dx / THRESHOLD)) }}
+            className="pointer-events-none absolute left-6 top-7 z-20"
+            style={{ color: "#E2E8F0", opacity: Math.max(0, Math.min(1, -dx / THRESHOLD)), transform: `rotate(-18deg) scale(${0.8 + 0.25 * Math.max(0, Math.min(1, -dx / THRESHOLD))})` }}
           >
-            ← 덜 관심
+            <XMarkIcon size={76} />
+          </span>
+          <span
+            className="pointer-events-none absolute bottom-10 left-1/2 z-20 -translate-x-1/2"
+            style={{ color: NEON, opacity: Math.max(0, Math.min(1, -dy / UP_THRESHOLD)), transform: `translateX(-50%) scale(${0.8 + 0.25 * Math.max(0, Math.min(1, -dy / UP_THRESHOLD))})` }}
+          >
+            <StarIcon size={72} />
           </span>
           {renderFace(top, `${(idx % stocks.length) + 1} / ${stocks.length}`)}
         </div>
