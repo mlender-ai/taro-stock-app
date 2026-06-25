@@ -28,6 +28,10 @@ export const FOMO_AXIS_THRESHOLDS = {
 } as const;
 /** 정규화 기준점 — 거래량 3.5배=만점, 등락 8%=만점, 수급 5일연속·시총대비 1%=만점. */
 export const FOMO_NORM = { volTopX: 3.5, priceTopPct: 8, streakTopDays: 5, ratioTopPct: 0.01 } as const;
+/** 낮은 근거/단일축 카드가 100점으로 포화되는 것을 막는 상한. */
+export const FOMO_SCORE_CAPS = { singleVolume: 75, singlePrice: 60, singleMention: 60 } as const;
+/** 큰 하락은 가격축 상태 신호이지만 heat 점수로는 낮게 반영한다. */
+export const FOMO_PRICE_DOWN_HEAT_RATIO = 0.35;
 /** 매집 다이버전스(§6.4 — 거래량↑·가격 평탄 = 조용히 담는 중). 광혁 튜닝 전 기본 off. */
 export const ACCUMULATION = { enabled: false, volMin: 1.8, priceFlatMax: 2, leadBonus: 8 } as const;
 /** 볼린저 스퀴즈(§6.4 — 변동성 압축). L 보조 입력. 광혁 튜닝 전 기본 off. */
@@ -107,10 +111,29 @@ const clamp100 = (x: number) => (x < 0 ? 0 : x > 100 ? 100 : x);
 function volTo100(ratio: number): number {
   return clamp01((ratio - 1) / (FOMO_NORM.volTopX - 1)) * 100;
 }
-function priceTo100(changePct?: number, trendStrength?: number): number {
+function priceAxisTo100(changePct?: number, trendStrength?: number): number {
   const fromPct = typeof changePct === "number" ? clamp01(Math.abs(changePct) / FOMO_NORM.priceTopPct) : 0;
   const fromTrend = typeof trendStrength === "number" ? clamp01(trendStrength) : 0;
   return Math.max(fromPct, fromTrend) * 100;
+}
+function priceHeatTo100(changePct?: number, trendStrength?: number): number {
+  if (typeof changePct === "number" && changePct < 0) {
+    return clamp01(Math.abs(changePct) / FOMO_NORM.priceTopPct) * FOMO_PRICE_DOWN_HEAT_RATIO * 100;
+  }
+  return priceAxisTo100(changePct, trendStrength);
+}
+function capLowEvidenceScore(score: number, inputs: FomoScoreResult["inputs"]): number {
+  const present = [
+    inputs.volume !== undefined ? "volume" : undefined,
+    inputs.price !== undefined ? "price" : undefined,
+    inputs.mention !== undefined ? "mention" : undefined,
+  ].filter(Boolean);
+  if (present.length !== 1) return score;
+  const only = present[0];
+  if (only === "volume") return Math.min(score, FOMO_SCORE_CAPS.singleVolume);
+  if (only === "price") return Math.min(score, FOMO_SCORE_CAPS.singlePrice);
+  if (only === "mention") return Math.min(score, FOMO_SCORE_CAPS.singleMention);
+  return score;
 }
 /** 순매수(양의 streak)만 선행 신호에 기여 — 순매도는 L=0(식는 신호는 방향이 담당). */
 function supplyTo100(streak?: number, ratio?: number): number | undefined {
@@ -187,7 +210,7 @@ export function computeFomoScore(input: FomoScoreInputs = {}, tuning: FomoScoreT
     cDen += C_WEIGHTS.volume;
   }
   if (typeof input.changePct === "number" || typeof input.trendStrength === "number") {
-    inputs.price = priceTo100(input.changePct, input.trendStrength);
+    inputs.price = priceHeatTo100(input.changePct, input.trendStrength);
     cNum += inputs.price * C_WEIGHTS.price;
     cDen += C_WEIGHTS.price;
   }
@@ -196,9 +219,13 @@ export function computeFomoScore(input: FomoScoreInputs = {}, tuning: FomoScoreT
     cNum += inputs.mention * C_WEIGHTS.mention;
     cDen += C_WEIGHTS.mention;
   }
-  const C = cDen > 0 ? Math.round(cNum / cDen) : 0;
+  const rawC = cDen > 0 ? Math.round(cNum / cDen) : 0;
+  const C = capLowEvidenceScore(rawC, inputs);
   const confidence = clamp01(cDen / (C_WEIGHTS.volume + C_WEIGHTS.price + C_WEIGHTS.mention));
-  const priceAxis = Math.round(inputs.price ?? 0);
+  const priceAxis =
+    typeof input.changePct === "number" || typeof input.trendStrength === "number"
+      ? Math.round(priceAxisTo100(input.changePct, input.trendStrength))
+      : 0;
   const aDen =
     (inputs.volume !== undefined ? C_WEIGHTS.volume : 0) + (inputs.mention !== undefined ? C_WEIGHTS.mention : 0);
   const attentionAxis =
@@ -264,7 +291,7 @@ export function computeFomoScore(input: FomoScoreInputs = {}, tuning: FomoScoreT
 
   // ── 상태 라벨(임계값 §2, 빈틈 없이) ──
   let label: FomoLabel;
-  if ((strongDown || priceMove === "down") && C >= FOMO_THRESHOLDS.warm) label = "cooling";
+  if (strongDown || priceMove === "down") label = "cooling";
   else if (priceMove === "flat" && (attentionStrong || leadStrong)) label = "incoming";
   else if (priceMove === "up" && attentionStrong) label = "hot";
   else if (priceMove === "up" && !attentionStrong) label = "lone";
