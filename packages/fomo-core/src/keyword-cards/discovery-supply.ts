@@ -110,7 +110,10 @@ export function hasThemeLinkEvent(candidate: DiscoveryCandidate): boolean {
 }
 
 export function hasDisplayWhyEvent(candidate: DiscoveryCandidate): boolean {
-  return hasPublicMaterialEvent(candidate) || candidate.events.some((event) => event.kind === "theme_link");
+  return (
+    hasPublicMaterialEvent(candidate) ||
+    candidate.events.some((event) => event.kind === "theme_link" || (event.kind === "volume_spike" && event.firstSeen))
+  );
 }
 
 export function isWeakDiscoveryCandidate(candidate: DiscoveryCandidate): boolean {
@@ -233,6 +236,7 @@ export function rankDiscoveryCandidates(
     }))
     .sort(
       (a, b) =>
+        Number(hasDisplayWhyEvent(b.candidate)) - Number(hasDisplayWhyEvent(a.candidate)) ||
         b.score - a.score ||
         Number(hasPublicMaterialEvent(b.candidate)) - Number(hasPublicMaterialEvent(a.candidate)) ||
         a.index - b.index ||
