@@ -7,7 +7,9 @@ export type DiscoveryEventKind =
   | "new_high"
   | "volume_spike"
   | "flow_entry"
-  | "news_mention";
+  | "news_mention"
+  | "disclosure"
+  | "theme_link";
 
 export interface DiscoveryEvent {
   kind: DiscoveryEventKind;
@@ -55,6 +57,8 @@ export interface RankDiscoveryOptions {
 export const DISCOVERY_MAX_CANDIDATES = 100;
 export const DISCOVERY_LIQUIDITY_MEDIAN_RATIO_CUT = 0.1;
 export const DISCOVERY_SEEN_DECAY_DAYS = 3;
+export const DISCOVERY_TOP_BAND_WHY_REQUIRED = 30;
+export const DISCOVERY_WEAK_MIN_STRENGTH = 0.85;
 
 const RISK_FLAG_PATTERN = /관리|투자경고|투자위험|거래정지|단기과열|이상급등/;
 
@@ -87,22 +91,50 @@ export function eligibleUniverse(
 }
 
 export function hasPublicMaterialEvent(candidate: DiscoveryCandidate): boolean {
-  return candidate.events.some((event) => event.kind === "news_mention" || event.kind === "flow_entry" || event.kind === "new_high");
+  return candidate.events.some((event) =>
+    event.kind === "disclosure" || event.kind === "news_mention" || event.kind === "flow_entry" || event.kind === "new_high"
+  );
+}
+
+export function hasContextualWhyEvent(candidate: DiscoveryCandidate): boolean {
+  return candidate.events.some((event) => event.kind === "theme_link");
+}
+
+export function hasDisplayWhyEvent(candidate: DiscoveryCandidate): boolean {
+  return hasPublicMaterialEvent(candidate) || hasContextualWhyEvent(candidate);
 }
 
 export function isWeakDiscoveryCandidate(candidate: DiscoveryCandidate): boolean {
-  return !hasPublicMaterialEvent(candidate) && candidate.events.every((event) => event.kind === "price_move" || event.kind === "volume_spike");
+  return !hasDisplayWhyEvent(candidate) && candidate.events.every((event) => event.kind === "price_move" || event.kind === "volume_spike");
 }
 
+const WHY_KIND_PRIORITY: Record<DiscoveryEventKind, number> = {
+  disclosure: 0,
+  news_mention: 1,
+  flow_entry: 2,
+  theme_link: 3,
+  new_high: 4,
+  volume_spike: 5,
+  price_move: 6,
+};
+
 export function discoveryWhy(candidate: DiscoveryCandidate): string {
-  const strongest = [...candidate.events].sort((a, b) => b.strength - a.strength || a.kind.localeCompare(b.kind))[0];
+  const strongest = [...candidate.events].sort(
+    (a, b) => WHY_KIND_PRIORITY[a.kind] - WHY_KIND_PRIORITY[b.kind] || b.strength - a.strength || a.kind.localeCompare(b.kind)
+  )[0];
   if (!strongest) return "오늘 확인된 사건이 아직 없어요.";
+  if (strongest.kind === "disclosure") {
+    return strongest.label
+      ? `오늘 공시가 확인됐어요: ${strongest.label}`
+      : "오늘 이 종목의 공시가 확인됐어요.";
+  }
   if (strongest.kind === "news_mention") {
     return strongest.label
       ? `오늘 이 종목을 직접 언급한 뉴스가 있어요: ${strongest.label}`
       : "오늘 이 종목을 직접 언급한 뉴스가 있어요.";
   }
   if (strongest.kind === "flow_entry") return strongest.label ?? "수급이 새로 감지된 종목이에요.";
+  if (strongest.kind === "theme_link") return strongest.label ?? "오늘 강한 테마 흐름에 같이 묶여 있어요.";
   if (strongest.kind === "new_high") return strongest.label ?? "새로운 가격 위치가 확인된 종목이에요.";
   if (strongest.kind === "volume_spike") {
     return strongest.label ?? "오늘 거래량 급증, 뚜렷한 공개 재료는 확인 안 됨.";
@@ -117,7 +149,7 @@ function freshnessBoost(candidate: DiscoveryCandidate): number {
 function eventScore(candidate: DiscoveryCandidate): number {
   const maxStrength = Math.max(0, ...candidate.events.map((event) => clamp01(event.strength)));
   const diversity = new Set(candidate.events.map((event) => event.kind)).size;
-  const materialBoost = hasPublicMaterialEvent(candidate) ? 0.22 : -0.25;
+  const materialBoost = hasPublicMaterialEvent(candidate) ? 0.22 : hasContextualWhyEvent(candidate) ? 0.08 : -0.25;
   return maxStrength + freshnessBoost(candidate) + Math.min(0.12, diversity * 0.03) + materialBoost;
 }
 
@@ -135,8 +167,9 @@ export function rankDiscoveryCandidates(
 ): DiscoveryCandidate[] {
   const max = opts.maxCandidates ?? DISCOVERY_MAX_CANDIDATES;
   const watched = new Set(opts.watched ?? []);
-  return candidates
+  const ranked = candidates
     .filter((candidate) => candidate.events.length > 0)
+    .filter((candidate) => !isWeakDiscoveryCandidate(candidate) || Math.max(0, ...candidate.events.map((event) => event.strength)) >= DISCOVERY_WEAK_MIN_STRENGTH)
     .map((candidate, index) => ({
       candidate,
       index,
@@ -149,6 +182,9 @@ export function rankDiscoveryCandidates(
         a.index - b.index ||
         a.candidate.ticker.localeCompare(b.candidate.ticker)
     )
-    .slice(0, max)
     .map((row) => row.candidate);
+  const withWhy = ranked.filter((candidate) => !isWeakDiscoveryCandidate(candidate));
+  const weakTail = ranked.filter((candidate) => isWeakDiscoveryCandidate(candidate));
+  const ordered = withWhy.length >= DISCOVERY_TOP_BAND_WHY_REQUIRED ? [...withWhy, ...weakTail] : withWhy;
+  return ordered.slice(0, max);
 }

@@ -4,7 +4,10 @@ import {
   buildAxisSignals,
   computeFomoScore,
   discoveryWhy,
+  eligibleUniverse,
+  hasDisplayWhyEvent,
   hasPublicMaterialEvent,
+  investorNetStreak,
   rankDiscoveryCandidates,
   resolveStock,
   sectorOf,
@@ -18,9 +21,11 @@ import {
   type MultiAxisHookSelection,
   type SectorStock,
   type StockCountry,
+  type StockSector,
 } from "@fomo/core";
 import { fetchStockDaily } from "./stock-front";
 import { computeStockAttentionSignals, type StockAttentionSignal } from "./stock-signal-coverage";
+import { readSupplyDemandHistory } from "./supply-demand-store";
 
 const UA = { "User-Agent": "Mozilla/5.0", Accept: "application/json,text/plain,*/*" };
 const MARKETS: DiscoveryMarket[] = ["KOSPI", "KOSDAQ"];
@@ -74,6 +79,15 @@ interface RawNaverStock {
   compareToPreviousPrice?: { code?: string; text?: string; name?: string };
   accumulatedTradingValue?: string;
   accumulatedTradingVolume?: string;
+}
+
+interface ThemeMoveSignal {
+  sector: StockSector;
+  rank: number;
+  peerCount: number;
+  averageChangePct: number;
+  relativeChangePct: number;
+  positiveCount: number;
 }
 
 function todayKst(): string {
@@ -184,11 +198,94 @@ function eventFromNews(attention: StockAttentionSignal | undefined, asOf: string
   };
 }
 
+function buildThemeMoveSignals(rows: readonly NaverMarketRow[]): Map<string, ThemeMoveSignal> {
+  const groups = new Map<StockSector, Array<{ ticker: string; changePct: number }>>();
+  for (const row of rows) {
+    const sector = sectorOf(row.canonical);
+    if (!sector || typeof row.changePct !== "number") continue;
+    const current = groups.get(sector) ?? [];
+    current.push({ ticker: row.canonical, changePct: row.changePct });
+    groups.set(sector, current);
+  }
+
+  const out = new Map<string, ThemeMoveSignal>();
+  for (const [sector, peers] of groups) {
+    if (peers.length < 3) continue;
+    const avg = peers.reduce((sum, peer) => sum + peer.changePct, 0) / peers.length;
+    const positiveCount = peers.filter((peer) => peer.changePct > 0).length;
+    const sorted = [...peers].sort((a, b) => b.changePct - a.changePct || a.ticker.localeCompare(b.ticker));
+    sorted.forEach((peer, index) => {
+      out.set(peer.ticker, {
+        sector,
+        rank: index + 1,
+        peerCount: sorted.length,
+        averageChangePct: Math.round(avg * 10) / 10,
+        relativeChangePct: Math.round((peer.changePct - avg) * 10) / 10,
+        positiveCount,
+      });
+    });
+  }
+  return out;
+}
+
+function eventFromTheme(row: NaverMarketRow, theme: ThemeMoveSignal | undefined, asOf: string): DiscoveryEvent | null {
+  if (!theme || typeof row.changePct !== "number" || row.changePct <= 0) return null;
+  const strongTheme = theme.averageChangePct >= 1.5 && theme.positiveCount >= 2;
+  const leadingTheme = theme.rank <= 3 && row.changePct >= 5;
+  if (!strongTheme && !leadingTheme) return null;
+  return {
+    kind: "theme_link",
+    firstSeen: true,
+    strength: Math.min(0.92, 0.48 + Math.max(0, theme.averageChangePct) / 10 + Math.max(0, row.changePct) / 40),
+    source: "FOMO 섹터맵·네이버 시세",
+    asOf,
+    confidence: "M",
+    label: `오늘 ${theme.sector} 흐름이 셌고, 이 종목이 거기 묶여 있어요.`,
+  };
+}
+
+async function eventFromFlow(ticker: string): Promise<DiscoveryEvent | null> {
+  if (!process.env.DATABASE_URL) return null;
+  const history = await readSupplyDemandHistory(ticker, 10);
+  if (history.length === 0) return null;
+  const streak = investorNetStreak(history);
+  const useForeign = Math.abs(streak.foreign) >= Math.abs(streak.institution);
+  const n = useForeign ? streak.foreign : streak.institution;
+  if (n < 2) return null;
+  const actor = useForeign ? "외국인이" : "기관이";
+  return {
+    kind: "flow_entry",
+    firstSeen: true,
+    strength: Math.min(1, 0.52 + n / 10),
+    source: "KRX 수급",
+    asOf: history[0]?.date ?? todayKst(),
+    confidence: "H",
+    label: `${actor} ${n}일째 사는 중이에요.`,
+  };
+}
+
+function eventAxisSignal(event: DiscoveryEvent): AxisSignal | null {
+  if (event.kind !== "theme_link" && event.kind !== "flow_entry" && event.kind !== "disclosure") return null;
+  const axis = event.kind === "theme_link" ? "herd" : event.kind === "flow_entry" ? "flow" : "time";
+  const sourceKind = event.kind === "theme_link" ? "market" : "official";
+  const hookText = event.label?.trim();
+  if (!hookText) return null;
+  return {
+    axis,
+    fired: true,
+    strength: event.kind === "theme_link" ? Math.max(0.91, event.strength) : Math.max(0.93, event.strength),
+    rarity: 0,
+    hookText,
+    evidence: [{ text: hookText, sourceKind, source: event.source, asOf: event.asOf }],
+  };
+}
+
 function stockPayload(row: NaverMarketRow, candidate: DiscoveryCandidate): DiscoveryStockPayload {
   const def = resolveStock(candidate.ticker);
   const sector = def ? sectorOf(def.canonical) : undefined;
   const why = discoveryWhy(candidate);
   const hasMaterial = hasPublicMaterialEvent(candidate);
+  const hasDisplayWhy = hasDisplayWhyEvent(candidate);
   return {
     canonical: candidate.ticker,
     market: row.market,
@@ -196,26 +293,40 @@ function stockPayload(row: NaverMarketRow, candidate: DiscoveryCandidate): Disco
     naverCode: row.naverCode,
     marquee: def?.marquee === true,
     sector: sector ?? candidate.sector ?? row.market,
-    whyShown: hasMaterial
+    whyShown: hasDisplayWhy
       ? why
-      : "큰 가격 움직임은 보였지만, 연결된 공개 재료는 아직 확인되지 않았어요.",
-    ...(hasMaterial ? { reason: why } : {}),
+      : "큰 가격 움직임은 보였지만, 연결된 공개 재료는 확인 안 됨.",
+    ...(hasDisplayWhy ? { reason: why } : {}),
   };
 }
 
-function frontSeed(row: NaverMarketRow, candidate: DiscoveryCandidate, attention: StockAttentionSignal | undefined, sparkline: number[]): DiscoveryFrontSeed {
+function frontSeed(
+  row: NaverMarketRow,
+  candidate: DiscoveryCandidate,
+  attention: StockAttentionSignal | undefined,
+  theme: ThemeMoveSignal | undefined,
+  sparkline: number[]
+): DiscoveryFrontSeed {
   const signals: CardFrontSignals = {
     ...(typeof row.changePct === "number" ? { changePct: row.changePct } : {}),
     ...(attention ? { mentionCount: attention.mentionCount, mentionScore: attention.mentionScore } : {}),
     ...(attention?.newsEventLabel ? { newsEventLabel: attention.newsEventLabel } : {}),
     ...(attention?.newsEventSource ? { newsEventSource: attention.newsEventSource } : {}),
+    ...(theme ? {
+      themeLabel: theme.sector,
+      themeRelativeRank: theme.rank,
+      themePeerCount: theme.peerCount,
+      themeAverageChangePct: theme.averageChangePct,
+      themeRelativeChangePct: theme.relativeChangePct,
+    } : {}),
     asOf: candidate.asOf,
   };
   const fomo = computeFomoScore({
     ...(typeof signals.changePct === "number" ? { changePct: signals.changePct } : {}),
     ...(typeof signals.mentionScore === "number" ? { mentionScore: signals.mentionScore } : {}),
   });
-  const axisSignals = buildAxisSignals({ signals });
+  const eventSignals = candidate.events.map(eventAxisSignal).filter((signal): signal is AxisSignal => signal !== null);
+  const axisSignals = [...buildAxisSignals({ signals }), ...eventSignals];
   const axisHook = selectMultiAxisHook(axisSignals);
   return {
     signals,
@@ -236,20 +347,36 @@ export async function buildDiscoveryResponse(): Promise<DiscoveryResponse> {
     computeStockAttentionSignals().catch((): Record<string, StockAttentionSignal> => ({})),
   ]);
   const vocabByCode = new Map(STOCK_VOCAB.filter((s) => s.naverCode).map((s) => [s.naverCode!, s]));
+  const normalizedRows = rows.map((row) => {
+    const def = vocabByCode.get(row.naverCode);
+    return { ...row, canonical: def?.canonical ?? row.canonical };
+  });
+  const eligibleTickers = new Set(
+    eligibleUniverse(
+      normalizedRows.map((row) => ({
+        ticker: row.canonical,
+        ...(typeof row.tradingValue === "number" ? { avgTradingValue20d: row.tradingValue } : {}),
+      }))
+    ).map((row) => row.ticker)
+  );
+  const themeSignals = buildThemeMoveSignals(normalizedRows);
   const byTicker = new Map<string, { row: NaverMarketRow; events: DiscoveryEvent[] }>();
 
-  for (const row of rows) {
-    const def = vocabByCode.get(row.naverCode);
-    const ticker = def?.canonical ?? row.canonical;
-    const events = [eventFromPrice(row, asOf)].filter((event): event is DiscoveryEvent => event !== null);
+  for (const row of normalizedRows) {
+    const ticker = row.canonical;
+    if (!eligibleTickers.has(ticker)) continue;
+    const events = [eventFromPrice(row, asOf), eventFromTheme(row, themeSignals.get(ticker), asOf)].filter(
+      (event): event is DiscoveryEvent => event !== null
+    );
     if (events.length > 0) byTicker.set(ticker, { row: { ...row, canonical: ticker }, events });
   }
 
   for (const [ticker, attention] of Object.entries(attentionMap)) {
     const def = resolveStock(ticker);
     if (!def?.naverCode) continue;
+    if (!eligibleTickers.has(def.canonical)) continue;
     const row =
-      rows.find((r) => r.naverCode === def.naverCode) ??
+      normalizedRows.find((r) => r.naverCode === def.naverCode) ??
       ({ canonical: def.canonical, naverCode: def.naverCode, market: def.market as DiscoveryMarket } satisfies NaverMarketRow);
     const event = eventFromNews(attention, asOf);
     if (!event) continue;
@@ -257,10 +384,18 @@ export async function buildDiscoveryResponse(): Promise<DiscoveryResponse> {
     byTicker.set(def.canonical, { row: { ...row, canonical: def.canonical }, events: [...(current?.events ?? []), event] });
   }
 
+  const flowRows = await mapLimit([...byTicker.keys()], 8, async (ticker) => ({ ticker, event: await eventFromFlow(ticker) }));
+  for (const result of flowRows) {
+    if (result.status !== "fulfilled" || !result.value.event) continue;
+    const current = byTicker.get(result.value.ticker);
+    if (!current) continue;
+    byTicker.set(result.value.ticker, { ...current, events: [...current.events, result.value.event] });
+  }
+
   const candidates = [...byTicker.entries()].map(([ticker, { row, events }]): DiscoveryCandidate => {
     const def = resolveStock(ticker);
     const sector = sectorOf(ticker);
-    const reason = events.find((event) => event.label)?.label;
+    const reason = discoveryWhy({ ticker, market: row.market, events, asOf });
     return {
       ticker,
       market: row.market,
@@ -269,7 +404,7 @@ export async function buildDiscoveryResponse(): Promise<DiscoveryResponse> {
       ...(sector ? { sector } : {}),
       events,
       asOf,
-      ...(reason ? { reason } : {}),
+      ...(hasDisplayWhyEvent({ ticker, market: row.market, events, asOf }) ? { reason } : {}),
       marquee: def?.marquee === true,
     };
   });
@@ -297,7 +432,7 @@ export async function buildDiscoveryResponse(): Promise<DiscoveryResponse> {
     if (!row) continue;
     const attention = attentionMap[candidate.ticker];
     stocks.push(stockPayload(row, candidate));
-    fronts[candidate.ticker] = frontSeed(row, candidate, attention, sparklineByTicker.get(candidate.ticker) ?? []);
+    fronts[candidate.ticker] = frontSeed(row, candidate, attention, themeSignals.get(candidate.ticker), sparklineByTicker.get(candidate.ticker) ?? []);
   }
   const raritySets = applyAxisRarity(stocks.map((stock) => fronts[stock.canonical]?.axisSignals ?? []));
   stocks.forEach((stock, index) => {
