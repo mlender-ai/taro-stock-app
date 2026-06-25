@@ -8,7 +8,6 @@ import {
   communityWordings,
   fomoCardView,
   fomoStateSummary,
-  fomoWatchPoint,
   selectFomoHook,
   translateTaFact,
   confidenceGrade,
@@ -428,22 +427,92 @@ function StockPriceHeader({ basics, front }: { basics: StockBasics | null; front
   );
 }
 
-function StockFundamentalsBlock({ basics }: { basics: StockBasics | null }) {
-  if (!basics) {
-    return (
-      <div className="space-y-2" aria-busy="true">
-        <div className="h-5 w-1/3 animate-pulse rounded bg-surface" />
-        <div className="h-20 animate-pulse rounded-lg border border-hairline bg-surface" />
-      </div>
-    );
+type BasicMetricView = {
+  label: string;
+  value: string;
+  term?: string;
+  note?: string;
+};
+
+function formatRatio(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}배`;
+}
+
+function formatSignedPct(value: number): string {
+  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
+  return `${sign}${Math.abs(value).toFixed(1)}%`;
+}
+
+function frontSignalMetrics(front: StockFrontResponse | null): BasicMetricView[] {
+  if (!front) return [];
+  const s = front.signals;
+  const metrics: BasicMetricView[] = [];
+  if (s.marketCapRank) {
+    metrics.push({
+      label: "시가총액 순위",
+      value: `${s.marketCapRank.market ? `${s.marketCapRank.market} ` : ""}${s.marketCapRank.rank}위`,
+      term: "시장 내 위치",
+    });
   }
-  const empty = basics.metrics.length === 0 && !basics.financials && !basics.summary;
+  if (typeof s.volumeRatio === "number" && s.volumeRatio > 0) {
+    metrics.push({
+      label: "거래량",
+      value: `평소 ${formatRatio(s.volumeRatio)}`,
+      term: "최근 거래",
+      note: "최근 거래가 평소보다 얼마나 붙었는지 보는 지표예요.",
+    });
+  }
+  if (typeof s.foreignNetStreak === "number" && s.foreignNetStreak !== 0) {
+    metrics.push({
+      label: "외국인 수급",
+      value: `${Math.abs(s.foreignNetStreak)}일째 ${s.foreignNetStreak > 0 ? "사는 중" : "파는 중"}`,
+      term: "KRX",
+    });
+  }
+  if (typeof s.institutionNetStreak === "number" && s.institutionNetStreak !== 0) {
+    metrics.push({
+      label: "기관 수급",
+      value: `${Math.abs(s.institutionNetStreak)}일째 ${s.institutionNetStreak > 0 ? "사는 중" : "파는 중"}`,
+      term: "KRX",
+    });
+  }
+  if (typeof s.mentionCount === "number" && s.mentionCount > 0) {
+    metrics.push({
+      label: "오늘 언급",
+      value: `${s.mentionCount.toLocaleString()}건`,
+      term: "뉴스·원문",
+    });
+  }
+  if (
+    s.themeLabel &&
+    typeof s.themeRelativeRank === "number" &&
+    typeof s.themePeerCount === "number" &&
+    s.themePeerCount > 0
+  ) {
+    metrics.push({
+      label: "테마 안 위치",
+      value: `${cleanText(s.themeLabel)} ${s.themeRelativeRank}/${s.themePeerCount}`,
+      term: "상대 흐름",
+      ...(typeof s.themeRelativeChangePct === "number"
+        ? { note: `테마 평균 대비 ${formatSignedPct(s.themeRelativeChangePct)} 차이예요.` }
+        : {}),
+    });
+  }
+  return metrics.slice(0, 6);
+}
+
+function StockFundamentalsBlock({ basics, front }: { basics: StockBasics | null; front: StockFrontResponse | null }) {
+  const fallbackMetrics = frontSignalMetrics(front);
+  const metrics: BasicMetricView[] = basics?.metrics.length ? basics.metrics : fallbackMetrics;
+  const hasNaverFundamentals = !!basics?.metrics.length || !!basics?.financials || !!basics?.summary;
+  const empty = metrics.length === 0 && !basics?.financials && !basics?.summary;
   return (
     <section>
       <p className="font-pixel text-sm text-whiteout">기본 지표</p>
-      {basics.metrics.length > 0 && (
+      {metrics.length > 0 && (
         <ul className="mt-3 grid grid-cols-2 gap-2">
-          {basics.metrics.map((m, i) => (
+          {metrics.map((m, i) => (
             <li key={`m-${i}`} className="rounded-lg border border-hairline bg-surface px-3 py-2">
               <span className="block text-[11px] text-muted">
                 {m.label}
@@ -455,8 +524,13 @@ function StockFundamentalsBlock({ basics }: { basics: StockBasics | null }) {
           ))}
         </ul>
       )}
+      {!hasNaverFundamentals && fallbackMetrics.length > 0 && (
+        <p className="mt-2 text-[11px] leading-5 text-muted">
+          재무 지표가 비어 있어, 카드에서 확인된 시장·수급 지표를 먼저 보여드려요.
+        </p>
+      )}
 
-      {basics.financials && (
+      {basics?.financials && (
         <div className="mt-5">
           <p className="font-pixel text-sm text-whiteout">실적 흐름</p>
           <div className="mt-2 overflow-x-auto">
@@ -509,6 +583,45 @@ const DETAIL_TONE_COLOR: Record<FomoTone, string> = {
   cooling: "#3B82F6",
 };
 
+function shortSignalLabel(text: string | undefined, max = 24): string | undefined {
+  const cleaned = cleanText(text ?? "").replace(/\s+/g, " ").trim();
+  if (!cleaned) return undefined;
+  return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
+}
+
+function stockWatchPoint(front: StockFrontResponse | null): string {
+  if (!front) return "";
+  const s = front.signals;
+  const headline = shortSignalLabel(front.axisHook?.hookText || s.newsEventLabel, 28);
+  if (headline && (front.axisHook?.axis === "time" || s.newsEventLabel)) {
+    return `‘${headline}’ 이후 거래가 실제로 붙는지 봐요.`;
+  }
+  const foreign = s.foreignNetStreak ?? 0;
+  const institution = s.institutionNetStreak ?? 0;
+  const flow = Math.abs(foreign) >= Math.abs(institution)
+    ? { actor: "외국인", days: Math.abs(foreign), dir: foreign > 0 ? "매수" : foreign < 0 ? "매도" : "" }
+    : { actor: "기관", days: Math.abs(institution), dir: institution > 0 ? "매수" : institution < 0 ? "매도" : "" };
+  if (flow.days >= 2 && flow.dir) {
+    return `${flow.actor} ${flow.dir}가 하루짜리인지 이어지는지 봐요.`;
+  }
+  if (typeof s.volumeRatio === "number" && s.volumeRatio >= 1.5) {
+    return `평소 ${formatRatio(s.volumeRatio)} 거래가 며칠 이어지는지 봐요.`;
+  }
+  if (s.themeLabel && typeof s.themeRelativeRank === "number" && typeof s.themePeerCount === "number") {
+    return `${cleanText(s.themeLabel)} 안에서 ${s.themeRelativeRank}/${s.themePeerCount} 위치가 유지되는지 봐요.`;
+  }
+  if (front.changeDir === "up" && front.changeText) {
+    return `오늘 오른 가격대에서 거래가 붙는지 봐요.`;
+  }
+  if (front.changeDir === "down" && front.changeText) {
+    return `오늘 하락 뒤에도 수급이 남는지 봐요.`;
+  }
+  if (front.taFact) {
+    return `${translateTaFact(front.taFact)} 흐름이 이어지는지 봐요.`;
+  }
+  return "새로 확인되는 수급·거래 신호가 있는지 봐요.";
+}
+
 /**
  * 포모 상태 히어로(척추 ③ 주인공) — 큰 포모 점수(C) + 라벨 + 근거등급 + 왜(해부).
  * 카드(②)와 *동일 출처*(fetchStockFront 의 FomoScoreResult). 강도 비례 톤, 예측·판정 0.
@@ -543,7 +656,6 @@ function FomoHero({ front, rankLabel, headlineOverride }: { front: StockFrontRes
         </span>
       </div>
       <p className="mt-3 text-sm leading-6 text-whiteout">{view.headline}</p>
-      <p className="mt-1 text-sm leading-6 text-muted">{fomoWatchPoint(fomo)}</p>
       <span className="mt-3 inline-flex items-center rounded-full border border-hairline px-2.5 py-1 font-pixel text-[11px] text-muted">
         {grade}
       </span>
@@ -646,7 +758,8 @@ function buildReadPoints(front: StockFrontResponse | null, insight: CondensedIns
     if (typeof institutionNetStreak === "number" && institutionNetStreak < 0) {
       bear.push({ text: `기관이 ${Math.abs(institutionNetStreak)}일째 파는 중이에요.`, source: "수급" });
     }
-    watch.push({ text: fomoWatchPoint(front.fomo), source: "관전 포인트" });
+    const dynamicWatchPoint = stockWatchPoint(front);
+    if (dynamicWatchPoint) watch.push({ text: dynamicWatchPoint, source: "관전 포인트" });
   }
 
   return {
@@ -968,7 +1081,7 @@ export function StockInsightView({
           )}
 
           <div className="mt-7">
-            <StockFundamentalsBlock basics={basics} />
+            <StockFundamentalsBlock basics={basics} front={front} />
           </div>
 
           {/* 회사가 뭐 하는 곳 — 맨 아래 한 줄로 강등(긴 blurb 폐기). */}
