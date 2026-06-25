@@ -56,7 +56,7 @@ function codeToCanonical(): Map<string, string> {
 }
 
 const NEWS_EVENT_NOISE =
-  /인기검색|검색\s?순위|주요\s?뉴스|오늘의\s?증시|마감\s?시황|장중\s?시황|특징주\s?모음|주식\s?초고수|단타|ETF|ETN|상장지수|레버리지|인버스|TOP\s?\d|상위\s?\d/i;
+  /인기검색|검색\s?순위|주요\s?뉴스|오늘의\s?증시|마감\s?시황|장중\s?시황|특징주\s?모음|주식\s?초고수|초고수|단타|ETF|ETN|상장지수|레버리지|인버스|TOP\s?\d|상위\s?\d/i;
 
 function cleanNewsEventTitle(title: string): string | undefined {
   const cleaned = title
