@@ -22,6 +22,7 @@ import {
   type DiscoveryEvent,
   type DiscoveryMarket,
   type FomoScoreResult,
+  type InvestorFlow,
   type MultiAxisHookSelection,
   type SectorStock,
   type StockCountry,
@@ -32,22 +33,24 @@ import { fetchDartDisclosuresByStock, type DartDisclosureHit } from "./dart-disc
 import { fetchNaverCompanyResearch, fetchNaverStockNews } from "./fomo-news-sources";
 import { fetchStockDaily } from "./stock-front";
 import { computeStockAttentionSignals, type StockAttentionSignal } from "./stock-signal-coverage";
-import { readSupplyDemandHistory } from "./supply-demand-store";
+import { readSupplyDemandHistoryByTickers } from "./supply-demand-store";
 
 const UA = { "User-Agent": "Mozilla/5.0", Accept: "application/json,text/plain,*/*" };
 const MARKETS: DiscoveryMarket[] = ["KOSPI", "KOSDAQ"];
 const PAGE_SIZE = 100;
 const PAGES_PER_MARKET = 5;
 const SPARKLINE_CONCURRENCY = 8;
-const TARGETED_MATERIAL_ENABLED = process.env.DISCOVERY_TARGETED_MATERIAL === "1";
-const DISCOVERY_FLOW_CACHE_ENABLED = process.env.DISCOVERY_FLOW_CACHE === "1";
-const TARGETED_MATERIAL_CANDIDATE_LIMIT = TARGETED_MATERIAL_ENABLED ? 12 : 0;
+const TARGETED_MATERIAL_ENABLED = process.env.DISCOVERY_TARGETED_MATERIAL !== "0";
+const DISCOVERY_FLOW_CACHE_ENABLED = process.env.DISCOVERY_FLOW_CACHE !== "0";
+const TARGETED_MATERIAL_CANDIDATE_LIMIT = TARGETED_MATERIAL_ENABLED
+  ? Math.max(0, Math.min(40, Number(process.env.DISCOVERY_TARGETED_MATERIAL_LIMIT ?? 24) || 24))
+  : 0;
 const TARGETED_MATERIAL_CONCURRENCY = 4;
 const NON_STOCK_NAME_PATTERN = /ETF|ETN|KODEX|TIGER|ACE|RISE|SOL\s|PLUS|KBSTAR|HANARO|히어로즈|레버리지|인버스|선물/i;
 const MATERIAL_NEWS_NOISE =
   /인기검색|검색\s?순위|주요\s?뉴스|오늘의\s?증시|마감\s?시황|장중\s?시황|특징주\s?모음|주식\s?초고수|초고수|단타|ETF|ETN|상장지수|레버리지|인버스|TOP\s?\d|상위\s?\d/i;
 const DISCOVERY_SOURCE_LABEL = TARGETED_MATERIAL_ENABLED
-  ? "네이버 시세·종목뉴스·리서치·DART 공시"
+  ? "네이버 시세·종목뉴스·리서치·DART 공시·수급 캐시"
   : "네이버 시세·뉴스 언급";
 
 export interface DiscoveryFrontSeed {
@@ -409,13 +412,11 @@ function eventFromMarketContext(row: NaverMarketRow, theme: ThemeMoveSignal | un
   };
 }
 
-async function eventFromFlow(ticker: string): Promise<DiscoveryEvent | null> {
-  if (!process.env.DATABASE_URL) return null;
-  const history = await readSupplyDemandHistory(ticker, 10);
+function eventFromFlowHistory(history: readonly InvestorFlow[]): DiscoveryEvent | null {
   if (history.length === 0) return null;
   const streak = investorNetStreak(history);
-  const useForeign = Math.abs(streak.foreign) >= Math.abs(streak.institution);
-  const n = useForeign ? streak.foreign : streak.institution;
+  const useForeign = streak.foreign >= streak.institution;
+  const n = Math.max(streak.foreign, streak.institution);
   if (n < 2) return null;
   const actor = useForeign ? "외국인이" : "기관이";
   return {
@@ -609,12 +610,13 @@ export async function buildDiscoveryResponse(): Promise<DiscoveryResponse> {
   }
 
   if (DISCOVERY_FLOW_CACHE_ENABLED) {
-    const flowRows = await mapLimit([...byTicker.keys()], 8, async (ticker) => ({ ticker, event: await eventFromFlow(ticker) }));
-    for (const result of flowRows) {
-      if (result.status !== "fulfilled" || !result.value.event) continue;
-      const current = byTicker.get(result.value.ticker);
+    const histories = await readSupplyDemandHistoryByTickers([...byTicker.keys()], 10);
+    for (const [ticker, history] of Object.entries(histories)) {
+      const event = eventFromFlowHistory(history);
+      if (!event) continue;
+      const current = byTicker.get(ticker);
       if (!current) continue;
-      byTicker.set(result.value.ticker, { ...current, events: [...current.events, result.value.event] });
+      byTicker.set(ticker, { ...current, events: [...current.events, event] });
     }
   }
 

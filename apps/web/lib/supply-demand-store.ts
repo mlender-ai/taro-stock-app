@@ -114,3 +114,38 @@ export async function readSupplyDemandHistory(
     return [];
   }
 }
+
+/** 여러 종목의 최근 N거래일 수급을 한 번에 조회. 발견 덱에서 카드별 DB 왕복을 막기 위한 배치 경로. */
+export async function readSupplyDemandHistoryByTickers(
+  tickers: readonly string[],
+  days = 10
+): Promise<Record<string, InvestorFlow[]>> {
+  if (!process.env.DATABASE_URL) return {};
+  const unique = Array.from(new Set(tickers.filter(Boolean)));
+  if (unique.length === 0) return {};
+  const take = Math.max(1, Math.min(days, 60));
+
+  try {
+    const rows = await prisma.supplyDemandDaily.findMany({
+      where: { ticker: { in: unique } },
+      orderBy: [{ ticker: "asc" }, { date: "desc" }],
+    });
+
+    const out: Record<string, InvestorFlow[]> = {};
+    for (const row of rows) {
+      const current = out[row.ticker] ?? [];
+      if (current.length >= take) continue;
+      current.push({
+        date: row.date,
+        foreignNet: row.foreignNet,
+        institutionNet: row.institutionNet,
+        ...(row.individualNet != null ? { individualNet: row.individualNet } : {}),
+      });
+      out[row.ticker] = current;
+    }
+    return out;
+  } catch (err) {
+    console.warn("[supply-demand-store] batch history read skipped (table missing?)", (err as Error)?.message);
+    return {};
+  }
+}

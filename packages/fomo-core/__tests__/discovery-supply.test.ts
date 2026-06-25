@@ -119,6 +119,18 @@ describe("WO-05 discovery supply engine", () => {
     expect(ranked).toHaveLength(0);
   });
 
+  it("keeps real WHY cards above price-only cards even when price-only strength is larger", () => {
+    const priceOnly = candidate("가격만큰종목", 1, "price_move", "오늘 가격이 +18.00% 움직였어요.");
+    const themeWhy = candidate("테마이유", 0.45, "theme_link", "오늘 원자력 흐름이 셌고, 이 종목이 거기 묶여 있어요.");
+    const materialWhy = candidate("뉴스이유", 0.4, "news_mention", "종목 지정 기사");
+
+    expect(rankDiscoveryCandidates([priceOnly, themeWhy, materialWhy]).map((row) => row.ticker)).toEqual([
+      "뉴스이유",
+      "테마이유",
+      "가격만큰종목",
+    ]);
+  });
+
   it("ranks obscure stocks above famous stocks at the same signal strength", () => {
     const famous = candidate("대형주", 0.7, "news_mention", "대형주 기사");
     famous.marketCapRank = 3;
