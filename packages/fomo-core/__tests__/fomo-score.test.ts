@@ -11,6 +11,7 @@ import {
   rankFeedByFomo,
   isFrontHookSafe,
   C_WEIGHTS,
+  FOMO_SCORE_CAPS,
   type FomoScoreInputs,
 } from "../src";
 
@@ -76,14 +77,25 @@ describe("computeFomoScore — 포모 점수 엔진(§2)", () => {
   });
 
   it("가중치대로 — 거래량(45)이 언급(20)보다 C에 크게 기여", () => {
-    const volOnly = computeFomoScore({ volumeRatio: 3.5 }).fomoScore; // 100 * 45/45
-    const mentionOnly = computeFomoScore({ mentionScore: 100 }).fomoScore; // 100 * 20/20
-    // 둘 다 단독이면 100점(재정규화)이지만, 같이 있을 때 거래량 만점·언급 0이 언급만점·거래량0보다 높아야
+    const volOnly = computeFomoScore({ volumeRatio: 3.5 }).fomoScore;
+    const mentionOnly = computeFomoScore({ mentionScore: 100 }).fomoScore;
+    // 단일축은 100점 포화를 막고, 같이 있을 때 거래량 만점·언급 0이 언급만점·거래량0보다 높아야 한다.
     const volHi = computeFomoScore({ volumeRatio: 3.5, mentionScore: 0 }).fomoScore;
     const mentionHi = computeFomoScore({ volumeRatio: 1, mentionScore: 100 }).fomoScore;
     expect(volHi).toBeGreaterThan(mentionHi);
-    expect(volOnly).toBe(100);
-    expect(mentionOnly).toBe(100);
+    expect(volOnly).toBe(FOMO_SCORE_CAPS.singleVolume);
+    expect(mentionOnly).toBe(FOMO_SCORE_CAPS.singleMention);
+  });
+
+  it("가격 단일축은 100으로 포화되지 않고, 큰 하락은 heat 만점이 아니라 cooling 상태로 분리", () => {
+    const spike = computeFomoScore({ changePct: 18.86 });
+    const plunge = computeFomoScore({ changePct: -16.67 });
+
+    expect(spike.fomoScore).toBe(FOMO_SCORE_CAPS.singlePrice);
+    expect(spike.label).toBe("lone");
+    expect(plunge.fomoScore).toBeLessThan(FOMO_SCORE_CAPS.singlePrice);
+    expect(plunge.label).toBe("cooling");
+    expect(plunge.priceMove).toBe("down");
   });
 
   it("💎 incoming — C<60 & L≥60 에서만 (수급 선행)", () => {
