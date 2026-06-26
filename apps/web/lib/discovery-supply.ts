@@ -41,18 +41,18 @@ const MARKETS: DiscoveryMarket[] = ["KOSPI", "KOSDAQ"];
 const PAGE_SIZE = 100;
 const PAGES_PER_MARKET = 10;
 const SPARKLINE_CONCURRENCY = 8;
-const DISCOVERY_DECK_CARD_COUNT = 30;
+const DISCOVERY_DECK_CARD_COUNT = 50;
 const TARGETED_MATERIAL_ENABLED = process.env.DISCOVERY_TARGETED_MATERIAL !== "0";
 const DISCOVERY_FLOW_CACHE_ENABLED = process.env.DISCOVERY_FLOW_CACHE !== "0";
 const TARGETED_MATERIAL_CANDIDATE_LIMIT = TARGETED_MATERIAL_ENABLED
-  ? Math.max(0, Math.min(240, Number(process.env.DISCOVERY_TARGETED_MATERIAL_LIMIT ?? 240) || 240))
+  ? Math.max(0, Math.min(720, Number(process.env.DISCOVERY_TARGETED_MATERIAL_LIMIT ?? 720) || 720))
   : 0;
 const TARGETED_MATERIAL_CONCURRENCY = 8;
 const NON_STOCK_NAME_PATTERN = /ETF|ETN|KODEX|TIGER|ACE|RISE|SOL\s|PLUS|KBSTAR|HANARO|히어로즈|레버리지|인버스|선물/i;
 const MATERIAL_NEWS_NOISE =
   /인기검색|검색\s?순위|주요\s?뉴스|오늘의\s?증시|마감\s?시황|장중\s?시황|특징주\s?모음|주식\s?초고수|초고수|단타|ETF|ETN|상장지수|레버리지|인버스|TOP\s?\d|상위\s?\d/i;
 const LINKED_NEWS_NOISE =
-  /코스피|코스닥|증시|시황|장\s?초반|장중|마감|출발|차익\s?실현|순매도|순매수|2거래일|우상향했던|하락한|상승한/i;
+  /코스피|코스닥|증시|시황|장\s?초반|장중|마감|출발|차익\s?실현|순매도|순매수|2거래일|우상향했던|하락한|상승한|반등|장밋빛\s?전망|투자전략|홀딩\s?전략/i;
 const DISCOVERY_SOURCE_LABEL = TARGETED_MATERIAL_ENABLED
   ? "네이버 시세·종목뉴스·리서치·DART 공시·수급 캐시"
   : "네이버 시세·뉴스 언급";
@@ -61,8 +61,9 @@ const INDUSTRY_HINTS: Array<{ label: string; pattern: RegExp }> = [
   { label: "유통", pattern: /유통|백화점|신세계|광주신세계|대형마트|편의점/i },
   { label: "화학", pattern: /화학|케미칼|석유화학|롯데케미칼/i },
   { label: "에너지", pattern: /에너지|태양광|풍력|신재생|VPP|발전|전력|수소|ESS|일진전기|LS ELECTRIC|LS\b|현대일렉트릭/i },
+  { label: "금융", pattern: /SK증권|유안타증권|교보증권|대신증권|현대차증권|유진투자증권|한화투자증권|키움증권|NH투자증권|미래에셋증권|한국금융지주|DB손해보험|현대해상|한화생명|케이뱅크/i },
   { label: "반도체", pattern: /반도체|HBM|메모리|파운드리|MLCC|기판|웨이퍼|EUV|패키징|공정|테스|심텍/i },
-  { label: "건설", pattern: /건설|건설사|대우건설/i },
+  { label: "건설", pattern: /건설|건설사|대우건설|현대건설|삼성E&A/i },
   { label: "AI", pattern: /\b(?:AI|GPU|SW|Agentic|OS)\b|인공지능|클라우드|데이터센터|소프트웨어|문서|에이전틱|마키나락스|엠로/i },
   { label: "2차전지", pattern: /2차전지|이차전지|배터리|전지|리튬|양극재|음극재|전해질|분리막/i },
   { label: "방산", pattern: /방산|디펜스|국방|무기|유도무기|항공우주|군|KAI|LIG|로템|함정/i },
@@ -75,7 +76,7 @@ const INDUSTRY_HINTS: Array<{ label: string; pattern: RegExp }> = [
   { label: "조선", pattern: /조선|중공업|선박|해양|조선소/i },
   { label: "로봇", pattern: /로봇|자동화|로보틱스/i },
   { label: "음식료", pattern: /식품|푸드|외식|급식|프레시웨이|음식료/i },
-  { label: "화장품", pattern: /화장품|코스메틱|뷰티|제닉|한국콜마/i },
+  { label: "화장품", pattern: /화장품|코스메틱|뷰티|제닉|한국콜마|애경산업/i },
   { label: "건자재", pattern: /건자재|레미콘|시멘트|건설자재|유진기업/i },
   { label: "디스플레이", pattern: /디스플레이|OLED|LCD|LG디스플레이/i },
   { label: "지주", pattern: /지주|홀딩스|SK디스커버리/i },
@@ -755,7 +756,7 @@ export async function buildDiscoveryResponse(): Promise<DiscoveryResponse> {
     asOf,
     stocks,
     fronts,
-    confidence: stocks.length >= 30 ? "H" : stocks.length >= 10 ? "M" : "L",
+    confidence: stocks.length >= DISCOVERY_DECK_CARD_COUNT ? "H" : stocks.length >= 30 ? "M" : "L",
     source: DISCOVERY_SOURCE_LABEL,
   };
 }
