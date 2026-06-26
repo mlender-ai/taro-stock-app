@@ -86,6 +86,14 @@ describe("WO-05 discovery supply engine", () => {
     expect(discoveryWhy(row)).not.toContain("직접 언급한 뉴스");
   });
 
+  it("ranks direct material above linked stock-tab material", () => {
+    const linked = candidate("연결기사", 0.9, "news_mention", "연결 기사");
+    linked.events[0]!.source = "네이버 종목뉴스 연결";
+    const direct = candidate("직접기사", 0.55, "news_mention", "직접 기사");
+
+    expect(rankDiscoveryCandidates([linked, direct]).map((row) => row.ticker)).toEqual(["직접기사", "연결기사"]);
+  });
+
   it("selects WHY by source strength order before raw numeric strength", () => {
     const row: DiscoveryCandidate = {
       ticker: "동시보유",
@@ -185,6 +193,30 @@ describe("WO-05 discovery supply engine", () => {
 
     expect(firstTen).not.toContain("삼성전자");
     expect(firstTen).not.toContain("SK하이닉스");
+  });
+
+  it("can expand to a 50-card deck without promoting famous names into the front band", () => {
+    const obscureRows = Array.from({ length: 55 }, (_, index) => {
+      const row = candidate(`발굴${index}`, 0.42 + (index % 18) / 100, index % 5 === 0 ? "disclosure" : "news_mention", `발굴 근거 ${index}`);
+      row.marketCapRank = 90 + index;
+      return row;
+    });
+    const famousRows = ["삼성전자", "SK하이닉스", "NAVER", "카카오"].map((ticker, index) => {
+      const row = candidate(ticker, 0.96 - index / 100, "news_mention", `${ticker} 기사`);
+      row.marketCapRank = index + 1;
+      row.marquee = true;
+      return row;
+    });
+
+    const ranked = rankDiscoveryCandidates([...famousRows, ...obscureRows], { maxCandidates: 50 });
+    const firstTen = ranked.slice(0, 10).map((row) => row.ticker);
+
+    expect(ranked).toHaveLength(50);
+    expect(firstTen).not.toContain("삼성전자");
+    expect(firstTen).not.toContain("SK하이닉스");
+    expect(firstTen).not.toContain("NAVER");
+    expect(firstTen).not.toContain("카카오");
+    expect(ranked.every(hasDeckDisplayEvent)).toBe(true);
   });
 
   it("drops price-only moves regardless of direction", () => {

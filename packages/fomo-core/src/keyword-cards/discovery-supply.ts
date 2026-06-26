@@ -131,6 +131,10 @@ function isMaterialEvent(event: DiscoveryEvent): boolean {
   );
 }
 
+function isLinkedNewsEvent(event: DiscoveryEvent): boolean {
+  return event.kind === "news_mention" && /종목뉴스\s?연결/i.test(event.source);
+}
+
 function isDisplayVolumeEvent(event: DiscoveryEvent): boolean {
   return event.kind === "volume_spike" && event.firstSeen && event.direction !== "down" && event.direction !== "flat";
 }
@@ -253,7 +257,8 @@ function eventScore(candidate: DiscoveryCandidate): number {
 
 function eventTier(candidate: DiscoveryCandidate): number {
   const displayEvents = candidate.events.filter((event) => isDeckDisplayEvent(event, candidate));
-  if (displayEvents.some(isMaterialEvent)) return 0;
+  if (displayEvents.some((event) => isMaterialEvent(event) && !isLinkedNewsEvent(event))) return 0;
+  if (displayEvents.some(isLinkedNewsEvent)) return 1;
   if (displayEvents.some((event) => event.kind === "volume_spike")) return 1;
   return 9;
 }
