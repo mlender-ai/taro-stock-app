@@ -15,6 +15,7 @@ import {
   fetchVoices,
   fetchFeed,
   fetchNews,
+  warmDiscovery,
   postVote,
   type FeedResponse,
   type NewsResponse,
@@ -78,6 +79,11 @@ export default function Home() {
     startedRef.current = true;
 
     const sid = getSessionId();
+    void warmDiscovery().catch((err) => {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[Home] discovery prewarm failed", err);
+      }
+    });
 
     const load = Promise.allSettled([
       fetchIndex(),
