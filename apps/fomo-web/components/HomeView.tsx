@@ -48,6 +48,7 @@ export function HomeView({
   const [authOpen, setAuthOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [noticeChecked, setNoticeChecked] = useState(true);
+  const [indexHelpOpen, setIndexHelpOpen] = useState(false);
   const color = index ? scoreToColor(index.score) : undefined;
 
   useEffect(() => {
@@ -88,7 +89,12 @@ export function HomeView({
 
         {/* 시장 온도(FOMO Index) */}
         {index ? (
-          <div className="mt-3 flex items-center justify-between rounded-xl border border-hairline bg-surface px-4 py-2.5">
+          <button
+            type="button"
+            onClick={() => setIndexHelpOpen(true)}
+            className="mt-3 flex w-full items-center justify-between rounded-xl border border-hairline bg-surface px-4 py-2.5 text-left transition-colors hover:border-whiteout/20"
+            aria-label="오늘의 시장 온도 계산 방식 보기"
+          >
             <span className="text-xs text-muted">오늘의 시장 온도</span>
             <div className="flex items-baseline gap-2">
               <span className="font-number text-xl font-bold leading-none" style={{ color }}>
@@ -103,12 +109,17 @@ export function HomeView({
                 </span>
               )}
             </div>
-          </div>
+          </button>
         ) : (
-          <div className="mt-3 flex items-center justify-between rounded-xl border border-hairline bg-surface px-4 py-2.5">
+          <button
+            type="button"
+            onClick={() => setIndexHelpOpen(true)}
+            className="mt-3 flex w-full items-center justify-between rounded-xl border border-hairline bg-surface px-4 py-2.5 text-left transition-colors hover:border-whiteout/20"
+            aria-label="오늘의 시장 온도 계산 방식 보기"
+          >
             <span className="text-xs text-muted">오늘의 시장 온도</span>
             <span className="font-pixel text-[11px] text-muted">데이터 수집 중…</span>
-          </div>
+          </button>
         )}
 
         <div className={`mt-3 flex flex-1 flex-col ${tab === "card" ? "justify-center" : ""}`}>
@@ -132,6 +143,8 @@ export function HomeView({
         <LoginPage loggedIn={loggedIn} onClose={() => setAuthOpen(false)} onAuthed={onLoggedIn} />
       )}
 
+      {indexHelpOpen && <FomoIndexInfoSheet index={index} onClose={() => setIndexHelpOpen(false)} />}
+
       {noticeOpen && (
         <FirstVisitNoticeSheet
           checked={noticeChecked}
@@ -148,6 +161,74 @@ export function HomeView({
         />
       )}
     </>
+  );
+}
+
+function FomoIndexInfoSheet({
+  index,
+  onClose,
+}: {
+  index: FomoIndexResponse | null;
+  onClose: () => void;
+}) {
+  const rows = [
+    { label: "시장 움직임", points: "30점", desc: "국내외 주요 지수와 자산 흐름을 봅니다." },
+    { label: "언급·커뮤니티", points: "30점", desc: "뉴스와 공개 글에서 관심이 늘었는지 봅니다." },
+    { label: "감정 투표", points: "30점", desc: "사용자가 남긴 오늘의 감정 분포를 더합니다." },
+    { label: "고래·크립토", points: "10점", desc: "큰 자금 흐름과 코인 시장 분위기를 보조로 봅니다." },
+  ];
+  const components = index?.components;
+  const valueOf = (key: keyof FomoIndexResponse["components"]) => components?.[key];
+  const values = [valueOf("market"), valueOf("community"), valueOf("emotion"), valueOf("whale")];
+
+  return (
+    <div className="fixed inset-0 z-[85]" role="dialog" aria-modal="true" aria-labelledby="fomo-index-info-title">
+      <button className="absolute inset-0 bg-black/72 backdrop-blur-md" onClick={onClose} aria-label="닫기" type="button" />
+      <div className="absolute inset-x-0 bottom-0 mx-auto max-w-md">
+        <section className="fomo-sheet-rise rounded-t-[28px] border border-hairline bg-[#1A1A1A] px-6 pb-[calc(24px+env(safe-area-inset-bottom))] pt-5">
+          <div className="mx-auto h-1 w-14 rounded-full bg-white/20" />
+          <div className="mt-6 flex items-start justify-between gap-4">
+            <div>
+              <p className="font-pixel text-[11px] text-muted">FOMO INDEX</p>
+              <h1 id="fomo-index-info-title" className="mt-2 text-2xl font-semibold text-whiteout">
+                시장 온도는 이렇게 계산해요
+              </h1>
+            </div>
+            <button
+              className="rounded-full border border-hairline px-3 py-1.5 text-sm text-muted transition-colors hover:text-whiteout"
+              onClick={onClose}
+              type="button"
+            >
+              닫기
+            </button>
+          </div>
+
+          <p className="mt-5 text-sm leading-6 text-muted">
+            오늘의 시장 온도는 0~100점 체감 지표예요. 여러 공개 신호를 같은 저울에 올려 시장이 얼마나 뜨겁거나
+            차분한지 보여줍니다.
+          </p>
+
+          <div className="mt-6 space-y-3">
+            {rows.map((row, index) => (
+              <div key={row.label} className="rounded-2xl border border-hairline bg-white/[0.035] px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold text-whiteout">{row.label}</span>
+                  <span className="font-number text-sm font-semibold" style={{ color: NEON }}>
+                    {values[index] ?? "—"} / {row.points}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-muted">{row.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-5 text-xs leading-5 text-muted">
+            데이터가 부족한 항목은 중립값으로 낮게 반영돼요. 이 점수는 시장 분위기를 읽기 위한 정보이며,
+            투자 자문·매수·매도 신호가 아닙니다.
+          </p>
+        </section>
+      </div>
+    </div>
   );
 }
 

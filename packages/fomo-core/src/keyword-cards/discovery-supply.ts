@@ -70,6 +70,8 @@ export const DISCOVERY_DIR_DOWN_NOISE_PENALTY = 0.5;
 export const DISCOVERY_DIR_DOWN_MATERIAL_PENALTY = 0.15;
 export const DISCOVERY_STRENGTH_WEIGHT = 0.65;
 export const DISCOVERY_FAMOUS_FRONT_RANK_CUTOFF = 30;
+export const DISCOVERY_FAMOUS_FRONT_BAND_SIZE = 16;
+export const DISCOVERY_FAMOUS_DECK_MIX_COUNT = 4;
 
 const RISK_FLAG_PATTERN = /관리|투자경고|투자위험|거래정지|단기과열|이상급등/;
 
@@ -278,13 +280,52 @@ function seenPenalty(ticker: string, seen: readonly SeenRecord[], watched: Reado
   return (left / DISCOVERY_SEEN_DECAY_DAYS) * 0.3;
 }
 
+interface RankedDiscoveryRow {
+  candidate: DiscoveryCandidate;
+  index: number;
+  score: number;
+  tier: number;
+  fameTier: number;
+}
+
+function mixFamousRowsIntoDeck(sorted: readonly RankedDiscoveryRow[], max: number): RankedDiscoveryRow[] {
+  const deck = sorted.slice(0, max);
+  const frontBand = Math.min(DISCOVERY_FAMOUS_FRONT_BAND_SIZE, max);
+  const used = new Set(deck.map((row) => row.candidate.ticker));
+  const famousRows = sorted
+    .filter((row) => row.fameTier === 1 && !used.has(row.candidate.ticker))
+    .slice(0, DISCOVERY_FAMOUS_DECK_MIX_COUNT);
+
+  for (const famous of famousRows) {
+    for (let i = deck.length - 1; i >= frontBand; i -= 1) {
+      const current = deck[i];
+      if (!current || current.fameTier === 1) continue;
+      used.delete(current.candidate.ticker);
+      deck[i] = famous;
+      used.add(famous.candidate.ticker);
+      break;
+    }
+  }
+
+  for (let i = 0; i < Math.min(frontBand, deck.length); i += 1) {
+    if (deck[i]?.fameTier !== 1) continue;
+    const replacement = deck.findIndex((row, index) => index >= frontBand && row.fameTier !== 1);
+    if (replacement < 0) break;
+    const current = deck[i]!;
+    deck[i] = deck[replacement]!;
+    deck[replacement] = current;
+  }
+
+  return deck;
+}
+
 export function rankDiscoveryCandidates(
   candidates: readonly DiscoveryCandidate[],
   opts: RankDiscoveryOptions = {}
 ): DiscoveryCandidate[] {
   const max = opts.maxCandidates ?? DISCOVERY_MAX_CANDIDATES;
   const watched = new Set(opts.watched ?? []);
-  return candidates
+  const sorted = candidates
     .filter(hasDeckDisplayEvent)
     .map((candidate, index) => ({
       candidate,
@@ -296,13 +337,12 @@ export function rankDiscoveryCandidates(
     .sort(
       (a, b) =>
         a.tier - b.tier ||
-        a.fameTier - b.fameTier ||
         Number(hasDisplayWhyEvent(b.candidate)) - Number(hasDisplayWhyEvent(a.candidate)) ||
         b.score - a.score ||
         Number(hasPublicMaterialEvent(b.candidate)) - Number(hasPublicMaterialEvent(a.candidate)) ||
         a.index - b.index ||
         a.candidate.ticker.localeCompare(b.candidate.ticker)
-    )
-    .slice(0, max)
+    );
+  return mixFamousRowsIntoDeck(sorted, max)
     .map((row) => row.candidate);
 }
