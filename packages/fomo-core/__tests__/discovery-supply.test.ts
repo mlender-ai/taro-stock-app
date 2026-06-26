@@ -209,13 +209,22 @@ describe("WO-05 discovery supply engine", () => {
     });
 
     const ranked = rankDiscoveryCandidates([...famousRows, ...obscureRows], { maxCandidates: 50 });
-    const firstTen = ranked.slice(0, 10).map((row) => row.ticker);
+    const firstBand = ranked.slice(0, 16).map((row) => row.ticker);
+    const tickers = ranked.map((row) => row.ticker);
 
     expect(ranked).toHaveLength(50);
-    expect(firstTen).not.toContain("삼성전자");
-    expect(firstTen).not.toContain("SK하이닉스");
-    expect(firstTen).not.toContain("NAVER");
-    expect(firstTen).not.toContain("카카오");
+    expect(firstBand).not.toContain("삼성전자");
+    expect(firstBand).not.toContain("SK하이닉스");
+    expect(firstBand).not.toContain("NAVER");
+    expect(firstBand).not.toContain("카카오");
+    expect(tickers).toContain("삼성전자");
+    expect(tickers).toContain("SK하이닉스");
+    expect(tickers).toContain("NAVER");
+    expect(tickers).toContain("카카오");
+    expect(tickers.indexOf("삼성전자")).toBeGreaterThanOrEqual(16);
+    expect(tickers.indexOf("SK하이닉스")).toBeGreaterThanOrEqual(16);
+    expect(tickers.indexOf("NAVER")).toBeGreaterThanOrEqual(16);
+    expect(tickers.indexOf("카카오")).toBeGreaterThanOrEqual(16);
     expect(ranked.every(hasDeckDisplayEvent)).toBe(true);
   });
 

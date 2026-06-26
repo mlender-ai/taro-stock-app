@@ -551,9 +551,19 @@ function frontSeed(
   const currentNewsEvent = candidate.events.find(
     (event) => isDeckDisplayEvent(event, candidate) && (event.kind === "news_mention" || event.kind === "disclosure")
   );
+  const materialMentionScore =
+    currentNewsEvent?.kind === "news_mention" || currentNewsEvent?.kind === "disclosure"
+      ? Math.round(Math.max(0, Math.min(1, currentNewsEvent.strength)) * 100)
+      : undefined;
+  const mentionSignals =
+    attention
+      ? { mentionCount: attention.mentionCount, mentionScore: attention.mentionScore }
+      : typeof materialMentionScore === "number"
+        ? { mentionCount: 1, mentionScore: materialMentionScore }
+        : undefined;
   const signals: CardFrontSignals = {
     ...(typeof row.changePct === "number" ? { changePct: row.changePct } : {}),
-    ...(attention ? { mentionCount: attention.mentionCount, mentionScore: attention.mentionScore } : {}),
+    ...(mentionSignals ? mentionSignals : {}),
     ...(currentNewsEvent?.label ? { newsEventLabel: currentNewsEvent.label } : {}),
     ...(currentNewsEvent?.source ? { newsEventSource: currentNewsEvent.source } : {}),
     ...(row.marketCapRank ? { marketCapRank: { scope: "market", market: row.market, rank: row.marketCapRank } } : {}),
