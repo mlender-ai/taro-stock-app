@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { scoreToColor, type EmotionType } from "@fomo/core";
 import { KeywordCardFeed } from "@/components/KeywordCardFeed";
-import { CaretUpIcon, CaretDownIcon } from "@/components/icons";
+import { CaretUpIcon, CaretDownIcon, XMarkIcon } from "@/components/icons";
 import { KeywordHistory } from "@/components/KeywordHistory";
 import { LoginPage } from "@/components/LoginPage";
 import type {
@@ -172,14 +172,12 @@ function FomoIndexInfoSheet({
   onClose: () => void;
 }) {
   const rows = [
-    { label: "시장 움직임", points: "30점", desc: "국내외 주요 지수와 자산 흐름을 봅니다." },
-    { label: "언급·커뮤니티", points: "30점", desc: "뉴스와 공개 글에서 관심이 늘었는지 봅니다." },
-    { label: "감정 투표", points: "30점", desc: "사용자가 남긴 오늘의 감정 분포를 더합니다." },
-    { label: "고래·크립토", points: "10점", desc: "큰 자금 흐름과 코인 시장 분위기를 보조로 봅니다." },
+    { key: "market" as const, label: "시장 움직임", points: "30점", desc: "주요 지수와 거래 흐름이 뜨거운지 봅니다." },
+    { key: "community" as const, label: "뉴스·언급", points: "30점", desc: "공개 뉴스와 글에서 특정 종목·섹터 언급이 늘었는지 봅니다." },
+    { key: "emotion" as const, label: "사용자 반응", points: "30점", desc: "앱 안에서 남긴 관심·반응 데이터가 충분할 때 보조로 반영합니다." },
+    { key: "whale" as const, label: "외부 보조 신호", points: "10점", desc: "국내장 밖의 큰 흐름은 작게만 참고합니다." },
   ];
   const components = index?.components;
-  const valueOf = (key: keyof FomoIndexResponse["components"]) => components?.[key];
-  const values = [valueOf("market"), valueOf("community"), valueOf("emotion"), valueOf("whale")];
 
   return (
     <div className="fixed inset-0 z-[85]" role="dialog" aria-modal="true" aria-labelledby="fomo-index-info-title">
@@ -195,26 +193,27 @@ function FomoIndexInfoSheet({
               </h1>
             </div>
             <button
-              className="rounded-full border border-hairline px-3 py-1.5 text-sm text-muted transition-colors hover:text-whiteout"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-hairline text-muted transition-colors hover:text-whiteout"
               onClick={onClose}
               type="button"
+              aria-label="닫기"
             >
-              닫기
+              <XMarkIcon size={20} />
             </button>
           </div>
 
           <p className="mt-5 text-sm leading-6 text-muted">
-            오늘의 시장 온도는 0~100점 체감 지표예요. 여러 공개 신호를 같은 저울에 올려 시장이 얼마나 뜨겁거나
-            차분한지 보여줍니다.
+            오늘의 시장 온도는 발견 덱 위에 얹는 0~100점 분위기 지표예요. 카드의 개별 포모 점수와는 별도로,
+            시장 전체가 얼마나 뜨겁거나 차분한지 빠르게 보여줍니다.
           </p>
 
           <div className="mt-6 space-y-3">
-            {rows.map((row, index) => (
+            {rows.map((row) => (
               <div key={row.label} className="rounded-2xl border border-hairline bg-white/[0.035] px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-semibold text-whiteout">{row.label}</span>
                   <span className="font-number text-sm font-semibold" style={{ color: NEON }}>
-                    {values[index] ?? "—"} / {row.points}
+                    {components?.[row.key] ?? "—"} / {row.points}
                   </span>
                 </div>
                 <p className="mt-1 text-xs leading-5 text-muted">{row.desc}</p>
@@ -223,7 +222,7 @@ function FomoIndexInfoSheet({
           </div>
 
           <p className="mt-5 text-xs leading-5 text-muted">
-            데이터가 부족한 항목은 중립값으로 낮게 반영돼요. 이 점수는 시장 분위기를 읽기 위한 정보이며,
+            데이터가 부족한 항목은 낮은 신뢰도로 반영돼요. 이 점수는 시장 분위기를 읽기 위한 정보이며,
             투자 자문·매수·매도 신호가 아닙니다.
           </p>
         </section>

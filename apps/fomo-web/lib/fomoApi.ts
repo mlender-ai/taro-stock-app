@@ -253,7 +253,20 @@ export interface DiscoveryResponse {
 }
 
 export const fetchDiscovery = () =>
-  cachedGet("discovery:today", () => getSameOrigin<DiscoveryResponse>("/api/fomo/discovery"), CACHE_TTL.stockFront);
+  cachedGet(
+    "discovery:today:v2",
+    async () => {
+      try {
+        return await getSameOrigin<DiscoveryResponse>("/api/fomo/discovery");
+      } catch (err) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[fomoApi] same-origin discovery failed; retrying backend", err);
+        }
+        return get<DiscoveryResponse>("/api/fomo/discovery");
+      }
+    },
+    CACHE_TTL.stockFront
+  );
 
 export interface AxisSnapshotEntry {
   axisSignals: import("@fomo/core").AxisSignal[];
