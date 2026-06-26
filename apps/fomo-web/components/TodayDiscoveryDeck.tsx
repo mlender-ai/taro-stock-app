@@ -12,17 +12,27 @@ interface TodayDiscoveryDeckProps {
   onRequireLogin?: (() => void) | undefined;
 }
 
-function DiscoveryEmpty() {
+function DiscoveryEmpty({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="mt-16 px-8 text-center text-sm leading-6 text-whiteout">
-      오늘 발견 풀을 불러오지 못했어요.
-      <br />
-      잠깐 뒤 다시 들어와 주세요.
+    <div className="mt-16 px-8 text-center text-sm leading-6 text-whiteout" role="status">
+      <p>
+        오늘 발견 풀을 불러오지 못했어요.
+        <br />
+        다시 불러오는 중이에요.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-5 rounded-full border border-hairline bg-surface px-5 py-2 text-xs font-semibold text-whiteout transition-colors hover:border-whiteout/30"
+      >
+        지금 다시 불러오기
+      </button>
     </div>
   );
 }
 
 export function TodayDiscoveryDeck({ loggedIn, onRequireLogin }: TodayDiscoveryDeckProps) {
+  const [retryKey, setRetryKey] = useState(0);
   const [state, setState] = useState<
     | { kind: "loading" }
     | { kind: "error" }
@@ -62,12 +72,18 @@ export function TodayDiscoveryDeck({ loggedIn, onRequireLogin }: TodayDiscoveryD
       alive = false;
       window.removeEventListener(DISCOVERY_UPDATED_EVENT, onDiscoveryUpdated);
     };
-  }, []);
+  }, [retryKey]);
+
+  useEffect(() => {
+    if (state.kind !== "error") return;
+    const retry = window.setTimeout(() => setRetryKey((value) => value + 1), 3_500);
+    return () => window.clearTimeout(retry);
+  }, [state.kind]);
 
   if (state.kind === "loading") {
     return <FullPageLoading estimateMs={LOADING_PRESETS.main.estimateMs} steps={LOADING_PRESETS.main.steps} />;
   }
-  if (state.kind === "error") return <DiscoveryEmpty />;
+  if (state.kind === "error") return <DiscoveryEmpty onRetry={() => setRetryKey((value) => value + 1)} />;
 
   return (
     <StockSwipeDeck

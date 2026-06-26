@@ -28,22 +28,35 @@ import {
 } from "@/lib/fomoApi";
 
 type Phase = "splash" | "splashLeaving" | "gate" | "home";
+const SPLASH_SESSION_KEY = "fomo_splash_seen_session";
+
+function shouldShowSplash(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.sessionStorage.getItem(SPLASH_SESSION_KEY) !== "1";
+  } catch {
+    return true;
+  }
+}
+
+function markSplashSeen(): void {
+  try {
+    window.sessionStorage.setItem(SPLASH_SESSION_KEY, "1");
+  } catch {
+    /* 세션 저장이 막혀도 스플래시 종료 흐름은 유지한다. */
+  }
+}
 
 /**
- * 진입 여정 오케스트레이터 — 진입 시 바로 home(스플래시 제거). 데이터는 백그라운드 로드.
- * (감정 투표 flag 가 켜져 오늘 미선택이면 gate 로, 현재는 OFF 라 항상 home.)
+ * 진입 여정 오케스트레이터 — 스플래시가 떠 있는 동안 발견 덱 데이터를 먼저 당긴다.
+ * (감정 투표 flag 가 켜져 오늘 미선택이면 gate 로, 현재는 OFF 라 대부분 home.)
  */
 export default function Home() {
-  const [phase, setPhase] = useState<Phase>(() => {
-    if (typeof window !== "undefined" && !localStorage.getItem("fomo_splash_seen")) {
-      return "splash";
-    }
-    return "home";
-  });
+  const [phase, setPhase] = useState<Phase>("splash");
   const [gateReopen, setGateReopen] = useState(false);
 
   const dismissSplash = useCallback(() => {
-    localStorage.setItem("fomo_splash_seen", "1");
+    markSplashSeen();
     setPhase("splashLeaving");
     setTimeout(() => setPhase("home"), 500);
   }, []);
@@ -58,6 +71,10 @@ export default function Home() {
   const [news, setNews] = useState<NewsResponse | null>(null);
   const [mine, setMine] = useState<EmotionType | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    if (!shouldShowSplash()) setPhase("home");
+  }, []);
 
   // 로그인 상태는 클라에서만 확정(SSR 불일치 방지).
   useEffect(() => {
