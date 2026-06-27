@@ -343,6 +343,10 @@ export interface StockContext {
   frontSeed?: StockFrontResponse | undefined;
   /** 발견 공급 엔진이 가진 네이버 종목 코드. STOCK_VOCAB 미등록 발견주 기본지표 조회용. */
   naverCode?: string | undefined;
+  /** US/글로벌 종목 심볼. */
+  symbol?: string | undefined;
+  market?: string | undefined;
+  country?: string | undefined;
 }
 
 function hasUsableFront(front: StockFrontResponse | null | undefined): front is StockFrontResponse {
@@ -973,14 +977,19 @@ export function StockInsightView({
       .then((r) => alive && setBasics(r))
       .catch(() => alive && setBasics(null))
       .finally(() => alive && setBasicsLoaded(true));
-    fetchStockInsight(stock, context?.naverCode ? { naverCode: context.naverCode } : {})
+    fetchStockInsight(stock, {
+      ...(context?.naverCode ? { naverCode: context.naverCode } : {}),
+      ...(context?.symbol ? { symbol: context.symbol } : {}),
+      ...(context?.market ? { market: context.market } : {}),
+      ...(context?.country ? { country: context.country } : {}),
+    })
       .then((r) => alive && setInsight(r))
       .catch(() => alive && setInsight(null))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
-  }, [stock, context?.frontSeed, context?.naverCode]);
+  }, [stock, context?.frontSeed, context?.naverCode, context?.symbol, context?.market, context?.country]);
 
   const hasInsight =
     !!insight && insight.confidence !== "insufficient" && insight.bull.length + insight.bear.length > 0;

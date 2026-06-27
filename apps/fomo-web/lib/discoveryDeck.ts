@@ -30,6 +30,7 @@ export const DISCOVERY_MIX = {
 export type DeckStock = Omit<SectorStock, "sector"> & {
   reason?: string;
   whyShown?: string;
+  symbol?: string;
   axisSignals?: AxisSignal[];
   axisHook?: MultiAxisHookSelection;
   sector: string;

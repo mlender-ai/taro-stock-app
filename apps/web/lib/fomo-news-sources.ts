@@ -58,6 +58,16 @@ async function fetchYahooSymbol(symbol: string, nowIso: string): Promise<RawArti
 }
 
 /**
+ * US per-ticker news. This is Yahoo Finance RSS, not the Yahoo chart endpoint forbidden for Node.
+ * It is used as a material/news source only and fails closed to [].
+ */
+export async function fetchYahooStockNews(symbol: string, pageSize = 8): Promise<RawArticle[]> {
+  const clean = symbol.trim().toUpperCase();
+  if (!/^[A-Z.]{1,6}$/.test(clean)) return [];
+  return (await fetchYahooSymbol(clean, new Date().toISOString())).slice(0, pageSize);
+}
+
+/**
  * Yahoo Finance 뉴스 소스 — 심볼 유니버스를 병렬 수집해 합산.
  * [비활성] 피드는 한국 뉴스 우선 구성으로 전환(2026-06-12). Yahoo는 차트/지수(fomo-market-sources)
  * 용도로만 남긴다. 영문 뉴스가 다시 필요하면 NEWS_SOURCES 에 yahooSource 를 추가.

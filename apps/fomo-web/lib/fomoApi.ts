@@ -39,7 +39,11 @@ const INDEX_REVALIDATE_TIMEOUT_MS = 8_000;
 const DISCOVERY_SAME_ORIGIN_TIMEOUT_MS = 11_500;
 const DISCOVERY_BACKEND_TIMEOUT_MS = 18_000;
 const DISCOVERY_REVALIDATE_TIMEOUT_MS = 24_000;
-const DISCOVERY_FAST_PATH = "/api/fomo/discovery?fast=1";
+export type DiscoveryCountryScope = "KR" | "US" | "all";
+
+function discoveryFastPath(country: DiscoveryCountryScope = "KR"): string {
+  return `/api/fomo/discovery?fast=1&country=${encodeURIComponent(country)}`;
+}
 
 function kstDateKey(now = new Date()): string {
   return new Date(now.getTime() + 9 * HOUR).toISOString().slice(0, 10);
@@ -344,12 +348,12 @@ export const fetchThemeInsight = (theme: string) =>
   );
 
 /** 개별 종목 이해·응축(작업3) — 종목 라벨 탭 시 lazy 로 부른다(테마 뎁스와 동일 구조). */
-export const fetchStockInsight = (stock: string, opts: { naverCode?: string; market?: string; country?: string } = {}) =>
+export const fetchStockInsight = (stock: string, opts: { naverCode?: string; market?: string; country?: string; symbol?: string } = {}) =>
   cachedGet(
-    `stock-insight:${opts.naverCode ?? "name"}:${stock}`,
+    `stock-insight:${opts.country ?? "KR"}:${opts.naverCode ?? opts.symbol ?? "name"}:${stock}`,
     () =>
       get<import("@fomo/core").CondensedInsight>(
-        `/api/fomo/stock-insight?stock=${encodeURIComponent(stock)}${opts.naverCode ? `&code=${encodeURIComponent(opts.naverCode)}` : ""}${opts.market ? `&market=${encodeURIComponent(opts.market)}` : ""}${opts.country ? `&country=${encodeURIComponent(opts.country)}` : ""}`
+        `/api/fomo/stock-insight?stock=${encodeURIComponent(stock)}${opts.naverCode ? `&code=${encodeURIComponent(opts.naverCode)}` : ""}${opts.symbol ? `&symbol=${encodeURIComponent(opts.symbol)}` : ""}${opts.market ? `&market=${encodeURIComponent(opts.market)}` : ""}${opts.country ? `&country=${encodeURIComponent(opts.country)}` : ""}`
       ),
     CACHE_TTL.stockInsight
   );
@@ -404,6 +408,7 @@ export interface DiscoveryStockResponse {
   market: import("@fomo/core").StockMarket;
   country: import("@fomo/core").StockCountry;
   naverCode?: string;
+  symbol?: string;
   marquee: boolean;
   sector: string;
   whyShown?: string;
@@ -418,9 +423,10 @@ export interface DiscoveryResponse {
   source: string;
 }
 
-const discoveryKey = () => `discovery:today:v3:${kstDateKey()}`;
-const discoveryStorageKey = () => `fomo:discovery:${kstDateKey()}`;
+const discoveryKey = (country: DiscoveryCountryScope = "KR") => `discovery:today:v4:${country}:${kstDateKey()}`;
+const discoveryStorageKey = (country: DiscoveryCountryScope = "KR") => `fomo:discovery:${country}:${kstDateKey()}`;
 const LAST_DISCOVERY_STORAGE_KEY = "fomo:discovery:last-good";
+const lastDiscoveryStorageKey = (country: DiscoveryCountryScope = "KR") => `${LAST_DISCOVERY_STORAGE_KEY}:${country}`;
 
 function isDiscoveryResponse(value: unknown): value is DiscoveryResponse {
   const candidate = value as Partial<DiscoveryResponse> | null;
@@ -431,16 +437,16 @@ function hasDiscoveryCards(value: DiscoveryResponse | null | undefined): value i
   return !!value && isDiscoveryResponse(value) && value.stocks.length > 0;
 }
 
-function readStoredDiscovery(): DiscoveryResponse | null {
+function readStoredDiscovery(country: DiscoveryCountryScope = "KR"): DiscoveryResponse | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(discoveryStorageKey()) ?? window.localStorage.getItem(LAST_DISCOVERY_STORAGE_KEY);
+    const raw = window.localStorage.getItem(discoveryStorageKey(country)) ?? window.localStorage.getItem(lastDiscoveryStorageKey(country));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
     const discovery = isDiscoveryResponse(parsed) ? parsed : null;
     if (hasDiscoveryCards(discovery)) return discovery;
-    window.localStorage.removeItem(discoveryStorageKey());
-    window.localStorage.removeItem(LAST_DISCOVERY_STORAGE_KEY);
+    window.localStorage.removeItem(discoveryStorageKey(country));
+    window.localStorage.removeItem(lastDiscoveryStorageKey(country));
     return null;
   } catch (err) {
     console.warn("[fetchDiscovery] localStorage read failed", err);
@@ -448,12 +454,12 @@ function readStoredDiscovery(): DiscoveryResponse | null {
   }
 }
 
-function writeStoredDiscovery(value: DiscoveryResponse): void {
+function writeStoredDiscovery(value: DiscoveryResponse, country: DiscoveryCountryScope = "KR"): void {
   if (typeof window === "undefined") return;
   if (!hasDiscoveryCards(value)) return;
   try {
-    window.localStorage.setItem(discoveryStorageKey(), JSON.stringify(value));
-    window.localStorage.setItem(LAST_DISCOVERY_STORAGE_KEY, JSON.stringify(value));
+    window.localStorage.setItem(discoveryStorageKey(country), JSON.stringify(value));
+    window.localStorage.setItem(lastDiscoveryStorageKey(country), JSON.stringify(value));
   } catch (err) {
     console.warn("[fetchDiscovery] localStorage write failed", err);
   }
@@ -465,18 +471,21 @@ function emitDiscoveryUpdated(value: DiscoveryResponse): void {
 }
 
 async function fetchDiscoveryNetwork({
+  country = "KR",
   sameOriginTimeoutMs = DISCOVERY_SAME_ORIGIN_TIMEOUT_MS,
   backendTimeoutMs = DISCOVERY_BACKEND_TIMEOUT_MS,
 }: {
+  country?: DiscoveryCountryScope;
   sameOriginTimeoutMs?: number;
   backendTimeoutMs?: number;
 } = {}): Promise<DiscoveryResponse> {
+  const path = discoveryFastPath(country);
   try {
     return await fetchJsonWithTimeout<DiscoveryResponse>(
-      DISCOVERY_FAST_PATH,
+      path,
       { cache: "no-store", credentials: "same-origin" },
       sameOriginTimeoutMs,
-      `GET ${DISCOVERY_FAST_PATH}`
+      `GET ${path}`
     );
   } catch (err) {
     if (process.env.NODE_ENV !== "production") {
@@ -488,10 +497,10 @@ async function fetchDiscoveryNetwork({
   for (const origin of backendOrigins()) {
     try {
       return await fetchJsonWithTimeout<DiscoveryResponse>(
-        `${origin}${DISCOVERY_FAST_PATH}`,
+        `${origin}${path}`,
         { cache: "no-store" },
         backendTimeoutMs,
-        `GET ${origin}${DISCOVERY_FAST_PATH}`
+        `GET ${origin}${path}`
       );
     } catch (err) {
       lastError = err;
@@ -500,20 +509,21 @@ async function fetchDiscoveryNetwork({
   throw lastError instanceof Error ? lastError : new Error("GET /api/fomo/discovery failed");
 }
 
-export const getCachedDiscovery = () => readCached<DiscoveryResponse>(discoveryKey());
+export const getCachedDiscovery = (country: DiscoveryCountryScope = "KR") => readCached<DiscoveryResponse>(discoveryKey(country));
 
-export async function fetchDiscovery(): Promise<DiscoveryResponse> {
-  const key = discoveryKey();
+export async function fetchDiscovery(country: DiscoveryCountryScope = "KR"): Promise<DiscoveryResponse> {
+  const key = discoveryKey(country);
   const cached = readCached<DiscoveryResponse>(key);
   if (hasDiscoveryCards(cached)) return cached;
 
-  const stored = readStoredDiscovery();
+  const stored = readStoredDiscovery(country);
   if (stored) {
     setCached(key, stored, CACHE_TTL.stockFront);
     void refreshCached(
       key,
       () =>
         fetchDiscoveryNetwork({
+          country,
           sameOriginTimeoutMs: DISCOVERY_SAME_ORIGIN_TIMEOUT_MS,
           backendTimeoutMs: DISCOVERY_REVALIDATE_TIMEOUT_MS,
         }),
@@ -521,7 +531,7 @@ export async function fetchDiscovery(): Promise<DiscoveryResponse> {
     )
       .then((fresh) => {
         if (!hasDiscoveryCards(fresh)) return;
-        writeStoredDiscovery(fresh);
+        writeStoredDiscovery(fresh, country);
         emitDiscoveryUpdated(fresh);
       })
       .catch((err) => {
@@ -532,13 +542,13 @@ export async function fetchDiscovery(): Promise<DiscoveryResponse> {
     return stored;
   }
 
-  const fresh = await fetchDiscoveryNetwork();
+  const fresh = await fetchDiscoveryNetwork({ country });
   if (hasDiscoveryCards(fresh)) setCached(key, fresh, CACHE_TTL.stockFront);
-  writeStoredDiscovery(fresh);
+  writeStoredDiscovery(fresh, country);
   return fresh;
 }
 
-export const warmDiscovery = () => fetchDiscovery();
+export const warmDiscovery = (country: DiscoveryCountryScope = "KR") => fetchDiscovery(country);
 
 export interface AxisSnapshotEntry {
   axisSignals: import("@fomo/core").AxisSignal[];

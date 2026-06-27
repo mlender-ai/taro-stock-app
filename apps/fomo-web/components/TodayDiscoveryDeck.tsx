@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { StockSwipeDeck } from "@/components/StockSwipeDeck";
-import { DISCOVERY_UPDATED_EVENT, fetchDiscovery, type DiscoveryResponse } from "@/lib/fomoApi";
+import { DISCOVERY_UPDATED_EVENT, fetchDiscovery, type DiscoveryCountryScope, type DiscoveryResponse } from "@/lib/fomoApi";
 import { FullPageLoading, LOADING_PRESETS } from "@/components/FullPageLoading";
 import { MIN_DISCOVERY_STOCKS, type DeckStock } from "@/lib/discoveryDeck";
 import type { FrontEntry } from "@/components/StockSwipeDeck";
@@ -36,6 +36,7 @@ function DiscoveryEmpty({ onRetry }: { onRetry: () => void }) {
 }
 
 export function TodayDiscoveryDeck({ loggedIn, onRequireLogin }: TodayDiscoveryDeckProps) {
+  const [country, setCountry] = useState<DiscoveryCountryScope>("KR");
   const [retryKey, setRetryKey] = useState(0);
   const [state, setState] = useState<
     | { kind: "loading" }
@@ -64,7 +65,7 @@ export function TodayDiscoveryDeck({ loggedIn, onRequireLogin }: TodayDiscoveryD
       let lastError: unknown = null;
       for (let attempt = 0; attempt <= INITIAL_RETRY_DELAYS_MS.length; attempt += 1) {
         try {
-          const discovery = await fetchDiscovery();
+          const discovery = await fetchDiscovery(country);
           if (!alive) return;
           applyDiscovery(discovery);
           return;
@@ -85,7 +86,7 @@ export function TodayDiscoveryDeck({ loggedIn, onRequireLogin }: TodayDiscoveryD
       alive = false;
       window.removeEventListener(DISCOVERY_UPDATED_EVENT, onDiscoveryUpdated);
     };
-  }, [retryKey]);
+  }, [country, retryKey]);
 
   useEffect(() => {
     if (state.kind !== "error") return;
@@ -93,18 +94,58 @@ export function TodayDiscoveryDeck({ loggedIn, onRequireLogin }: TodayDiscoveryD
     return () => window.clearTimeout(retry);
   }, [state.kind]);
 
+  const scopeTabs = (
+    <div className="mb-4 flex gap-2 px-1" role="tablist" aria-label="시장 선택">
+      {[
+        ["KR", "국내"],
+        ["US", "미국"],
+      ].map(([value, label]) => {
+        const active = country === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => setCountry(value as DiscoveryCountryScope)}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+              active ? "border-whiteout bg-whiteout text-canvas" : "border-hairline text-muted hover:text-whiteout"
+            }`}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   if (state.kind === "loading") {
-    return <FullPageLoading estimateMs={LOADING_PRESETS.main.estimateMs} steps={LOADING_PRESETS.main.steps} />;
+    return (
+      <>
+        {scopeTabs}
+        <FullPageLoading estimateMs={LOADING_PRESETS.main.estimateMs} steps={LOADING_PRESETS.main.steps} />
+      </>
+    );
   }
-  if (state.kind === "error") return <DiscoveryEmpty onRetry={() => setRetryKey((value) => value + 1)} />;
+  if (state.kind === "error") {
+    return (
+      <>
+        {scopeTabs}
+        <DiscoveryEmpty onRetry={() => setRetryKey((value) => value + 1)} />
+      </>
+    );
+  }
 
   return (
-    <StockSwipeDeck
-      stocks={state.stocks.slice(0, Math.max(MIN_DISCOVERY_STOCKS, state.stocks.length))}
-      initialFronts={state.fronts}
-      contextLabel="오늘의 발견"
-      loggedIn={loggedIn}
-      onRequireLogin={onRequireLogin}
-    />
+    <>
+      {scopeTabs}
+      <StockSwipeDeck
+        stocks={state.stocks.slice(0, Math.max(MIN_DISCOVERY_STOCKS, state.stocks.length))}
+        initialFronts={state.fronts}
+        contextLabel={country === "US" ? "미국 발견" : "오늘의 발견"}
+        loggedIn={loggedIn}
+        onRequireLogin={onRequireLogin}
+      />
+    </>
   );
 }

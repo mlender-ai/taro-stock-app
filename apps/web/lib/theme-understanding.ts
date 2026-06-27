@@ -19,10 +19,12 @@ import {
   type OfficialFact,
 } from "@fomo/core";
 import { callAI, isAiConfigured } from "@fomo/shared";
-import { fetchAllNews, fetchNaverCompanyResearch, fetchNaverStockNews } from "./fomo-news-sources";
+import { fetchAllNews, fetchNaverCompanyResearch, fetchNaverStockNews, fetchYahooStockNews } from "./fomo-news-sources";
 import { fetchFredDocs } from "./fred";
 import { fetchDcStockTitles } from "./dcinside";
 import { fetchDartDisclosuresForCode } from "./dart-disclosures";
+import { fetchRecentSecFilings } from "./sec-edgar";
+import { usSymbolForStock } from "./us-symbols";
 
 /**
  * 이해 레이어 오케스트레이션 — DATA_ENGINE_STRATEGY §4 Track A. (네트워크 + LLM)
@@ -42,6 +44,7 @@ const MAX_COMMUNITY = 10;
 
 export interface StockUnderstandingOptions {
   naverCode?: string;
+  symbol?: string;
   market?: string;
   country?: string;
 }
@@ -222,16 +225,19 @@ function todayKst(): string {
 export async function collectStockDocs(stock: string, opts: StockUnderstandingOptions = {}): Promise<SourceDoc[]> {
   const def = stockDef(stock);
   const code = validNaverCode(opts.naverCode) ?? def?.naverCode;
+  const symbol = opts.symbol ?? usSymbolForStock(stock);
   const isForeign = def ? def.country !== "KR" : opts.country ? opts.country !== "KR" : false;
   const matches = (s: string) => {
     if (stockMatchesText(stock, s)) return true;
     return s.toLowerCase().includes(stock.trim().toLowerCase());
   };
 
-  const [stockNewsRes, researchRes, dartRes, newsRes, dcRes, commRes, redditRes] = await Promise.allSettled([
+  const [stockNewsRes, researchRes, dartRes, usNewsRes, secRes, newsRes, dcRes, commRes, redditRes] = await Promise.allSettled([
     code ? fetchNaverStockNews(code, MAX_NEWS) : Promise.resolve([]),
     code ? fetchNaverCompanyResearch(code, stock, 6) : Promise.resolve([]),
     code ? fetchDartDisclosuresForCode(code, stock, todayKst()) : Promise.resolve([]),
+    isForeign && symbol ? fetchYahooStockNews(symbol, MAX_NEWS) : Promise.resolve([]),
+    isForeign && symbol ? fetchRecentSecFilings(symbol, 4) : Promise.resolve([]),
     fetchAllNews(),
     fetchDcStockTitles(),
     code ? fetchNaverBoardPosts(code) : Promise.resolve([]),
@@ -295,6 +301,32 @@ export async function collectStockDocs(stock: string, opts: StockUnderstandingOp
     }
   } else {
     console.warn("[stock-understanding] dart disclosure error", stock, dartRes.reason);
+  }
+
+  // SEC EDGAR — 미국/글로벌 종목 공식 공시. 근거 레이어로만 사용한다.
+  if (secRes.status === "fulfilled") {
+    for (const hit of secRes.value.slice(0, 4)) {
+      docs.push({
+        id: nextId(),
+        kind: "official",
+        title: hit.label,
+        body: `${hit.asOf} 접수 공시`,
+        source: hit.source,
+        ...(hit.url ? { url: hit.url } : {}),
+        publishedAt: hit.asOf,
+        tier: "official-high",
+      });
+    }
+  } else {
+    console.warn("[stock-understanding] sec disclosure error", stock, secRes.reason);
+  }
+
+  // US per-ticker 외신 — Yahoo Finance RSS(차트 API 아님), 종목 별칭이 실제 등장하는 기사만.
+  if (usNewsRes.status === "fulfilled") {
+    const hit = usNewsRes.value.filter((a) => matches(`${a.title} ${a.summary ?? ""}`)).slice(0, MAX_NEWS);
+    for (const a of hit) pushNews(a);
+  } else {
+    console.warn("[stock-understanding] us stock news error", stock, usNewsRes.reason);
   }
 
   // 뉴스 — 종목명(별칭 포함)이 제목/요약에 등장하는 기사만.
