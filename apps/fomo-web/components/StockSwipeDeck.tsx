@@ -555,7 +555,7 @@ export function StockSwipeDeck({
         changeDir={e?.changeDir}
         rankLabel={rankLabelFor(stock)}
         sparkline={e?.sparkline}
-        chartSupported={!!stock.naverCode && (e?.sparkline?.length ?? 0) >= 2}
+        chartSupported={(e?.sparkline?.length ?? 0) >= 2}
         subLine={deduped.subLine}
         feedBull={deduped.feedBull}
         feedBear={deduped.feedBear}
@@ -859,6 +859,9 @@ export function StockSwipeDeck({
             fromTheme: selected.sector,
             reason: whyFor(selected),
             ...(selected.naverCode ? { naverCode: selected.naverCode } : {}),
+            ...(selected.symbol ? { symbol: selected.symbol } : {}),
+            market: selected.market,
+            country: selected.country,
             ...(front[selected.canonical] ? { frontSeed: front[selected.canonical] as StockFrontResponse } : {}),
             ...(axisHeadlineFor(selected) ? { axisHeadline: axisHeadlineFor(selected) } : {}),
           }}

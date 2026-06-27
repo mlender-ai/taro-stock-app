@@ -30,16 +30,16 @@ function validNaverCode(code: string | null | undefined): string | undefined {
   return c && /^\d{6}$/.test(c) ? c : undefined;
 }
 
-async function getInsight(stock: string, opts: { naverCode?: string; market?: string; country?: string } = {}): Promise<CondensedInsight> {
+async function getInsight(stock: string, opts: { naverCode?: string; market?: string; country?: string; symbol?: string } = {}): Promise<CondensedInsight> {
   const today = kstDate();
   const slot = kstSlot();
-  const key = `${today}:${slot}:${stock}:${opts.naverCode ?? ""}`;
+  const key = `${today}:${slot}:${stock}:${opts.naverCode ?? opts.symbol ?? ""}:${opts.country ?? ""}`;
   const running = inflight.get(key);
   if (running) return running;
 
   const load = unstable_cache(
     async () => condenseThemeInsight(await understandStock(stock, opts)),
-    ["fomo-stock-insight", cacheVersion(), today, slot, stock, opts.naverCode ?? ""],
+    ["fomo-stock-insight", cacheVersion(), today, slot, stock, opts.naverCode ?? opts.symbol ?? "", opts.country ?? ""],
     { revalidate: REVALIDATE_S }
   );
 
@@ -55,7 +55,7 @@ function timeoutFallback(stock: string): CondensedInsight {
 async function getInsightForRequest(
   stock: string,
   blocking: boolean,
-  opts: { naverCode?: string; market?: string; country?: string } = {}
+  opts: { naverCode?: string; market?: string; country?: string; symbol?: string } = {}
 ): Promise<{ payload: CondensedInsight; coldFallback: boolean }> {
   if (blocking) return { payload: await getInsight(stock, opts), coldFallback: false };
 
@@ -87,11 +87,13 @@ export async function GET(req: Request) {
     return withCors(NextResponse.json({ error: "stock required" }, { status: 400 }));
   }
   const naverCode = validNaverCode(url.searchParams.get("code")) ?? validNaverCode(url.searchParams.get("naverCode"));
+  const symbol = url.searchParams.get("symbol")?.trim().toUpperCase() || undefined;
   const market = url.searchParams.get("market")?.trim() || undefined;
   const country = url.searchParams.get("country")?.trim() || undefined;
   const blocking = url.searchParams.get("blocking") === "1" || req.headers.get("x-warm") === "1";
   const { payload, coldFallback } = await getInsightForRequest(stock, blocking, {
     ...(naverCode ? { naverCode } : {}),
+    ...(symbol ? { symbol } : {}),
     ...(market ? { market } : {}),
     ...(country ? { country } : {}),
   });

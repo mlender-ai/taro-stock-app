@@ -2,11 +2,16 @@ import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { withCors, kstDate, cacheVersion } from "../../../../lib/fomo";
 import { buildDiscoveryResponse, type DiscoveryResponse } from "../../../../lib/discovery-supply";
+import type { DiscoveryCountryScope } from "../../../../lib/market-source-types";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const REVALIDATE_S = 600;
+
+function discoveryCountry(value: string | null): DiscoveryCountryScope {
+  return value === "US" || value === "all" ? value : "KR";
+}
 
 export function OPTIONS() {
   return withCors(new NextResponse(null, { status: 204 }));
@@ -16,9 +21,10 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const fast = url.searchParams.get("fast") === "1";
+    const country = discoveryCountry(url.searchParams.get("country"));
     const load = unstable_cache(
-      async () => buildDiscoveryResponse({ targetedMaterial: !fast }),
-      ["fomo-discovery", cacheVersion(), kstDate(), fast ? "fast" : "full"],
+      async () => buildDiscoveryResponse({ targetedMaterial: !fast, country }),
+      ["fomo-discovery", cacheVersion(), kstDate(), country, fast ? "fast" : "full"],
       { revalidate: REVALIDATE_S }
     );
     return withCors(

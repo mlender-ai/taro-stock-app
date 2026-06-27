@@ -30,10 +30,13 @@ import {
   type RawArticle,
 } from "@fomo/core";
 import { fetchDartDisclosuresByStock, type DartDisclosureHit } from "./dart-disclosures";
-import { fetchNaverCompanyResearch, fetchNaverStockNews } from "./fomo-news-sources";
+import { fetchNaverCompanyResearch, fetchNaverStockNews, fetchYahooStockNews } from "./fomo-news-sources";
+import type { DiscoveryCountryScope, DiscoveryMarketRow } from "./market-source-types";
+import { fetchRecentSecFilings } from "./sec-edgar";
 import { fetchStockDaily } from "./stock-front";
 import { computeStockAttentionSignals, type StockAttentionSignal } from "./stock-signal-coverage";
 import { readSupplyDemandHistoryByTickers } from "./supply-demand-store";
+import { fetchUsMarketRows } from "./us-market-source";
 
 const UA = { "User-Agent": "Mozilla/5.0", Accept: "application/json,text/plain,*/*" };
 const MARKETS: DiscoveryMarket[] = ["KOSPI", "KOSDAQ"];
@@ -55,8 +58,8 @@ const MATERIAL_NEWS_NOISE =
 const MATERIAL_NEWS_CATALYST =
   /공시|계약|공급계약|수주|납품|실적|매출|영업이익|순이익|가이던스|전망치|컨센서스|어닝|흑자|적자|턴어라운드|임상|허가|승인|FDA|품목허가|신약|치료제|기술이전|라이선스|증설|공장|양산|수율|수주잔고|M&A|인수|합병|지분|투자|유상증자|무상증자|자사주|배당|분할|상장|정부|정책|규제|지원|보조금|관세|제재|신제품|출시|개발|특허|공급|독점|선정|채택|수출|수입|국책|프로젝트|수혜/i;
 const DISCOVERY_SOURCE_LABEL = TARGETED_MATERIAL_DEFAULT_ENABLED
-  ? "네이버 시세·종목뉴스·리서치·DART 공시·수급 캐시"
-  : "네이버 시세·뉴스 언급";
+  ? "네이버/KR 시세·DART·수급 캐시·Twelve Data/US 시세·SEC"
+  : "시장 시세·공시·수급 캐시";
 const MARKET_LABELS = new Set(["KOSPI", "KOSDAQ", "NASDAQ", "NYSE"]);
 const INDUSTRY_HINTS: Array<{ label: string; pattern: RegExp }> = [
   { label: "유통", pattern: /유통|백화점|신세계|광주신세계|대형마트|편의점/i },
@@ -96,6 +99,7 @@ export interface DiscoveryFrontSeed {
 
 export interface DiscoveryStockPayload extends Omit<SectorStock, "sector"> {
   sector: string;
+  symbol?: string;
   whyShown?: string;
   reason?: string;
 }
@@ -110,18 +114,7 @@ export interface DiscoveryResponse {
 
 export interface BuildDiscoveryResponseOptions {
   targetedMaterial?: boolean;
-}
-
-interface NaverMarketRow {
-  canonical: string;
-  naverCode: string;
-  market: DiscoveryMarket;
-  marketCapRank?: number;
-  priceText?: string;
-  changeText?: string;
-  changeDir?: "up" | "down" | "flat";
-  changePct?: number;
-  tradingValue?: number;
+  country?: DiscoveryCountryScope;
 }
 
 interface RawNaverStock {
@@ -170,7 +163,7 @@ function signedChangeText(row: RawNaverStock, dir: "up" | "down" | "flat", pct: 
   return change && pctText ? `${prefix}${change} (${pctText})` : pctText;
 }
 
-function parseMarketRow(row: RawNaverStock, market: DiscoveryMarket): NaverMarketRow | null {
+function parseMarketRow(row: RawNaverStock, market: DiscoveryMarket): DiscoveryMarketRow | null {
   const canonical = (row.stockName ?? row.itemName ?? "").trim();
   const naverCode = row.itemCode?.trim();
   if (!canonical || !naverCode) return null;
@@ -182,8 +175,11 @@ function parseMarketRow(row: RawNaverStock, market: DiscoveryMarket): NaverMarke
   const tradingValue = numberFromText(row.accumulatedTradingValue);
   return {
     canonical,
+    symbol: naverCode,
     naverCode,
     market,
+    country: "KR",
+    currency: "KRW",
     ...(row.closePrice ? { priceText: `${row.closePrice.replace(/원$/, "")}원` } : {}),
     ...(changeText ? { changeText } : {}),
     changeDir: dir,
@@ -192,27 +188,34 @@ function parseMarketRow(row: RawNaverStock, market: DiscoveryMarket): NaverMarke
   };
 }
 
-async function fetchMarketPage(market: DiscoveryMarket, page: number): Promise<NaverMarketRow[]> {
+async function fetchMarketPage(market: DiscoveryMarket, page: number): Promise<DiscoveryMarketRow[]> {
   const url = `https://m.stock.naver.com/api/stocks/marketValue/${market}?page=${page}&pageSize=${PAGE_SIZE}`;
   const res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw new Error(`naver market ${market} ${page} ${res.status}`);
   const data = (await res.json()) as { stocks?: RawNaverStock[] };
-  return (data.stocks ?? []).map((row) => parseMarketRow(row, market)).filter((row): row is NaverMarketRow => row !== null);
+  return (data.stocks ?? []).map((row) => parseMarketRow(row, market)).filter((row): row is DiscoveryMarketRow => row !== null);
 }
 
-async function fetchMarketRows(): Promise<NaverMarketRow[]> {
+async function fetchKrMarketRows(): Promise<DiscoveryMarketRow[]> {
   const settled = await Promise.allSettled(
     MARKETS.flatMap((market) => Array.from({ length: PAGES_PER_MARKET }, (_, i) => fetchMarketPage(market, i + 1)))
   );
   const rows = settled.flatMap((row) => (row.status === "fulfilled" ? row.value : []));
-  const byCode = new Map<string, NaverMarketRow>();
-  for (const row of rows) if (!byCode.has(row.naverCode)) byCode.set(row.naverCode, row);
+  const byCode = new Map<string, DiscoveryMarketRow>();
+  for (const row of rows) if (row.naverCode && !byCode.has(row.naverCode)) byCode.set(row.naverCode, row);
   const rankByMarket = new Map<DiscoveryMarket, number>();
   return [...byCode.values()].map((row) => {
     const rank = (rankByMarket.get(row.market) ?? 0) + 1;
     rankByMarket.set(row.market, rank);
     return { ...row, marketCapRank: rank };
   });
+}
+
+async function fetchMarketRows(scope: DiscoveryCountryScope): Promise<DiscoveryMarketRow[]> {
+  const sources: Array<Promise<DiscoveryMarketRow[]>> =
+    scope === "US" ? [fetchUsMarketRows()] : scope === "all" ? [fetchKrMarketRows(), fetchUsMarketRows()] : [fetchKrMarketRows()];
+  const settled = await Promise.allSettled(sources);
+  return settled.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
 }
 
 async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
@@ -233,7 +236,7 @@ async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T) 
   return out;
 }
 
-function eventFromPrice(row: NaverMarketRow, asOf: string): DiscoveryEvent | null {
+function eventFromPrice(row: DiscoveryMarketRow, asOf: string): DiscoveryEvent | null {
   if (typeof row.changePct !== "number" || Math.abs(row.changePct) < 5) return null;
   return {
     kind: "price_move",
@@ -283,8 +286,51 @@ function materialEventFromArticle(article: RawArticle, asOf: string, sourceFallb
   };
 }
 
-async function eventFromTargetedMaterial(row: NaverMarketRow, asOf: string): Promise<DiscoveryEvent | null> {
-  if (!/^\d{6}$/.test(row.naverCode)) return null;
+function materialEventFromUsArticle(article: RawArticle, asOf: string, sourceFallback: string): DiscoveryEvent | null {
+  const cleaned = decodeHtmlEntities(article.title)
+    .replace(/[“”"]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/[.!?。]+$/g, "")
+    .trim();
+  if (!cleaned || cleaned.length < 6 || MATERIAL_NEWS_NOISE.test(cleaned)) return null;
+  const label = cleaned.length > 54 ? `${cleaned.slice(0, 52).replace(/\s+\S*$/, "").trim()}…` : cleaned;
+  if (!isFrontHookSafe(`오늘 이 종목을 직접 언급한 외신이 있어요: ${label}`)) return null;
+  return {
+    kind: "news_mention",
+    firstSeen: true,
+    strength: 0.82,
+    source: article.source || sourceFallback,
+    asOf: article.publishedAt?.slice(0, 10) || asOf,
+    confidence: "M",
+    label,
+  };
+}
+
+async function eventFromTargetedMaterial(row: DiscoveryMarketRow, asOf: string): Promise<DiscoveryEvent | null> {
+  if (row.country !== "KR") {
+    const [filingResult, newsResult] = await Promise.allSettled([
+      fetchRecentSecFilings(row.symbol, 2),
+      fetchYahooStockNews(row.symbol, 6),
+    ]);
+    const filing = filingResult.status === "fulfilled" ? filingResult.value[0] : undefined;
+    if (filing) {
+      return {
+        kind: "disclosure",
+        firstSeen: true,
+        strength: 0.92,
+        source: filing.source,
+        asOf: filing.asOf,
+        confidence: "H",
+        label: filing.label,
+      };
+    }
+    const stockNews =
+      newsResult.status === "fulfilled"
+        ? newsResult.value.find((article) => isPrimaryStockArticle(row.canonical, article))
+        : undefined;
+    return stockNews ? materialEventFromUsArticle(stockNews, asOf, "Yahoo Finance") : null;
+  }
+  if (!row.naverCode || !/^\d{6}$/.test(row.naverCode)) return null;
   const [newsResult, researchResult] = await Promise.allSettled([
     fetchNaverStockNews(row.naverCode, 8),
     fetchNaverCompanyResearch(row.naverCode, row.canonical, 4),
@@ -305,7 +351,7 @@ async function eventFromTargetedMaterial(row: NaverMarketRow, asOf: string): Pro
   return null;
 }
 
-function buildThemeMoveSignals(rows: readonly NaverMarketRow[]): Map<string, ThemeMoveSignal> {
+function buildThemeMoveSignals(rows: readonly DiscoveryMarketRow[]): Map<string, ThemeMoveSignal> {
   const groups = new Map<StockSector, Array<{ ticker: string; changePct: number }>>();
   for (const row of rows) {
     const sector = sectorOf(row.canonical);
@@ -335,7 +381,7 @@ function buildThemeMoveSignals(rows: readonly NaverMarketRow[]): Map<string, The
   return out;
 }
 
-function eventFromTheme(row: NaverMarketRow, theme: ThemeMoveSignal | undefined, asOf: string): DiscoveryEvent | null {
+function eventFromTheme(row: DiscoveryMarketRow, theme: ThemeMoveSignal | undefined, asOf: string): DiscoveryEvent | null {
   if (!theme || typeof row.changePct !== "number") return null;
   const strongTheme = theme.averageChangePct >= 1.5 && theme.positiveCount >= 2;
   const leadingTheme = theme.rank <= 3 && row.changePct >= 5;
@@ -370,12 +416,12 @@ function industryHintForTicker(ticker: string): string | undefined {
   return undefined;
 }
 
-function eventFromMarketContext(row: NaverMarketRow, theme: ThemeMoveSignal | undefined, asOf: string): DiscoveryEvent {
+function eventFromMarketContext(row: DiscoveryMarketRow, theme: ThemeMoveSignal | undefined, asOf: string): DiscoveryEvent {
   const sector = theme?.sector ?? sectorOf(row.canonical) ?? industryHintForTicker(row.canonical);
   const rankText = row.marketCapRank ? `시총 ${row.marketCapRank}위권` : "시총 상위권";
   const changePct = row.changePct;
   const change = typeof changePct === "number" ? pctText(changePct) : undefined;
-  const source = "네이버 시세";
+  const source = row.country === "KR" ? "네이버 시세" : "Twelve Data 시세";
   if (sector && theme && typeof changePct === "number") {
     const relativeLabel =
       theme.rank <= 3
@@ -412,7 +458,7 @@ function eventFromMarketContext(row: NaverMarketRow, theme: ThemeMoveSignal | un
       source,
       asOf,
       confidence: "M",
-      label: `${row.market === "KOSDAQ" ? "코스닥" : "코스피"} ${rankText}에서 새로 확인하는 종목이에요.`,
+      label: `${row.market} ${rankText}에서 새로 확인하는 종목이에요.`,
     };
   }
   return {
@@ -442,6 +488,40 @@ function eventFromFlowHistory(history: readonly InvestorFlow[]): DiscoveryEvent 
     confidence: "H",
     label: `${actor} ${n}일째 사는 중이에요.`,
   };
+}
+
+function addStaticRecoveryRows(byTicker: Map<string, { row: DiscoveryMarketRow; events: DiscoveryEvent[] }>, asOf: string): void {
+  let added = 0;
+  for (const def of STOCK_VOCAB) {
+    if (added >= 16) return;
+    if (def.country !== "KR" || !def.naverCode || byTicker.has(def.canonical)) continue;
+    const sector = sectorOf(def.canonical) ?? industryHintForTicker(def.canonical);
+    if (!sector) continue;
+    byTicker.set(def.canonical, {
+      row: {
+        canonical: def.canonical,
+        symbol: def.naverCode,
+        naverCode: def.naverCode,
+        market: def.market as DiscoveryMarket,
+        country: "KR",
+        currency: "KRW",
+        marketCapRank: 999,
+      },
+      events: [
+        {
+          kind: "market_context",
+          firstSeen: false,
+          strength: 0.28,
+          source: "FOMO 종목 사전",
+          asOf,
+          confidence: "L",
+          direction: "flat",
+          label: `${sector} 흐름에서 함께 확인할 종목이에요.`,
+        },
+      ],
+    });
+    added += 1;
+  }
 }
 
 function cleanSectorLabel(label: string | undefined): string | undefined {
@@ -503,7 +583,7 @@ function eventAxisSignal(event: DiscoveryEvent, candidate: DiscoveryCandidate): 
   };
 }
 
-function stockPayload(row: NaverMarketRow, candidate: DiscoveryCandidate): DiscoveryStockPayload {
+function stockPayload(row: DiscoveryMarketRow, candidate: DiscoveryCandidate): DiscoveryStockPayload {
   const def = resolveStock(candidate.ticker);
   const sector = cleanSectorLabel(candidate.sector) ?? (def ? sectorOf(def.canonical) : undefined);
   const why = discoveryWhy(candidate);
@@ -513,8 +593,9 @@ function stockPayload(row: NaverMarketRow, candidate: DiscoveryCandidate): Disco
   return {
     canonical: candidate.ticker,
     market: row.market,
-    country: def?.country ?? "KR",
-    naverCode: row.naverCode,
+    country: row.country,
+    ...(row.naverCode ? { naverCode: row.naverCode } : {}),
+    symbol: row.symbol,
     marquee: def?.marquee === true,
     sector: sector ?? inferDiscoverySectorLabel(candidate.ticker, candidate.events, undefined, candidate.asOf),
     whyShown: hasDisplayWhy
@@ -528,13 +609,13 @@ function isSameDayEvent(event: DiscoveryEvent, candidate: DiscoveryCandidate): b
   return event.asOf.slice(0, 10) === candidate.asOf.slice(0, 10);
 }
 
-function fallbackContextEvent(candidate: DiscoveryCandidate): DiscoveryEvent | undefined {
+function fallbackContextEvent(candidate: DiscoveryCandidate, allowDown = false): DiscoveryEvent | undefined {
   return candidate.events
     .filter((event) => {
-      if (!isSameDayEvent(event, candidate) || event.direction === "down") return false;
+      if (!isSameDayEvent(event, candidate) || (!allowDown && event.direction === "down")) return false;
       if (event.kind === "price_move") return false;
       if (event.kind !== "market_context") return true;
-      return !!event.label && !/^KOSPI |^KOSDAQ /.test(event.label);
+      return !!event.label && !/^KOSPI |^KOSDAQ |^NASDAQ |^NYSE /.test(event.label);
     })
     .sort((a, b) => {
       const aTheme = a.kind === "theme_link" ? 1 : 0;
@@ -552,7 +633,7 @@ function fallbackDiscoveryReason(candidate: DiscoveryCandidate): string {
 
 function fallbackContextQuality(event: DiscoveryEvent): number {
   if (event.kind === "theme_link") return 2;
-  if (event.kind === "market_context" && event.label && !/^코스피 |^코스닥 /.test(event.label)) return 1;
+  if (event.kind === "market_context" && event.label && !/^코스피 |^코스닥 |^NASDAQ |^NYSE /.test(event.label)) return 1;
   return 0;
 }
 
@@ -561,7 +642,8 @@ export function recoverDiscoveryCandidates(
   candidates: readonly DiscoveryCandidate[],
   maxCandidates = DISCOVERY_DECK_CARD_COUNT
 ): DiscoveryCandidate[] {
-  if (ranked.length >= DISCOVERY_RECOVERY_MIN_CARDS) return ranked.slice(0, maxCandidates);
+  if (ranked.length >= maxCandidates) return ranked.slice(0, maxCandidates);
+  if (ranked.length >= DISCOVERY_RECOVERY_MIN_CARDS && candidates.length <= ranked.length) return ranked.slice(0, maxCandidates);
   const used = new Set(ranked.map((candidate) => candidate.ticker));
   const fallback = candidates
     .filter((candidate) => !used.has(candidate.ticker))
@@ -593,11 +675,32 @@ export function recoverDiscoveryCandidates(
     })
     .map((row) => row.candidate);
 
-  return [...ranked, ...fallback].slice(0, maxCandidates);
+  const usedAfterFallback = new Set([...ranked, ...fallback].map((candidate) => candidate.ticker));
+  const looseFallback = candidates
+    .filter((candidate) => !usedAfterFallback.has(candidate.ticker))
+    .filter((candidate) => fallbackContextEvent(candidate, true) !== undefined)
+    .map((candidate, index) => ({
+      candidate: {
+        ...candidate,
+        reason: candidate.reason ?? fallbackDiscoveryReason(candidate),
+      },
+      index,
+      context: fallbackContextEvent(candidate, true)!,
+    }))
+    .sort((a, b) => {
+      const aFamous = typeof a.candidate.marketCapRank === "number" && a.candidate.marketCapRank <= DISCOVERY_RECOVERY_FAMOUS_FRONT_CUTOFF ? 1 : 0;
+      const bFamous = typeof b.candidate.marketCapRank === "number" && b.candidate.marketCapRank <= DISCOVERY_RECOVERY_FAMOUS_FRONT_CUTOFF ? 1 : 0;
+      const aQuality = fallbackContextQuality(a.context);
+      const bQuality = fallbackContextQuality(b.context);
+      return aFamous - bFamous || bQuality - aQuality || b.context.strength - a.context.strength || a.index - b.index;
+    })
+    .map((row) => row.candidate);
+
+  return [...ranked, ...fallback, ...looseFallback].slice(0, maxCandidates);
 }
 
 function frontSeed(
-  row: NaverMarketRow,
+  row: DiscoveryMarketRow,
   candidate: DiscoveryCandidate,
   attention: StockAttentionSignal | undefined,
   theme: ThemeMoveSignal | undefined,
@@ -651,16 +754,17 @@ function frontSeed(
 }
 
 export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOptions = {}): Promise<DiscoveryResponse> {
+  const scope = options.country ?? "KR";
   const targetedMaterialEnabled = options.targetedMaterial ?? TARGETED_MATERIAL_DEFAULT_ENABLED;
   const targetedMaterialLimit = targetedMaterialEnabled ? TARGETED_MATERIAL_CANDIDATE_LIMIT : 0;
   const asOf = todayKst();
   const [rows, attentionMap] = await Promise.all([
-    fetchMarketRows(),
+    fetchMarketRows(scope),
     computeStockAttentionSignals().catch((): Record<string, StockAttentionSignal> => ({})),
   ]);
   const vocabByCode = new Map(STOCK_VOCAB.filter((s) => s.naverCode).map((s) => [s.naverCode!, s]));
   const normalizedRows = rows.map((row) => {
-    const def = vocabByCode.get(row.naverCode);
+    const def = row.naverCode ? vocabByCode.get(row.naverCode) : undefined;
     return { ...row, canonical: def?.canonical ?? row.canonical };
   });
   const eligibleTickers = new Set(
@@ -672,7 +776,7 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     ).map((row) => row.ticker)
   );
   const themeSignals = buildThemeMoveSignals(normalizedRows);
-  const byTicker = new Map<string, { row: NaverMarketRow; events: DiscoveryEvent[] }>();
+  const byTicker = new Map<string, { row: DiscoveryMarketRow; events: DiscoveryEvent[] }>();
 
   for (const row of normalizedRows) {
     const ticker = row.canonical;
@@ -690,7 +794,14 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     if (!def?.naverCode || !eligibleTickers.has(def.canonical)) continue;
     const row =
       normalizedRows.find((r) => r.naverCode === def.naverCode) ??
-      ({ canonical: def.canonical, naverCode: def.naverCode, market: def.market as DiscoveryMarket } satisfies NaverMarketRow);
+      ({
+        canonical: def.canonical,
+        symbol: def.naverCode,
+        naverCode: def.naverCode,
+        market: def.market as DiscoveryMarket,
+        country: "KR",
+        currency: "KRW",
+      } satisfies DiscoveryMarketRow);
     const current = byTicker.get(def.canonical);
     const event: DiscoveryEvent = {
       kind: "disclosure",
@@ -728,7 +839,8 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
   }
 
   if (DISCOVERY_FLOW_CACHE_ENABLED) {
-    const histories = await readSupplyDemandHistoryByTickers([...byTicker.keys()], 10);
+    const krTickers = [...byTicker.entries()].filter(([, value]) => value.row.country === "KR").map(([ticker]) => ticker);
+    const histories = krTickers.length > 0 ? await readSupplyDemandHistoryByTickers(krTickers, 10) : {};
     for (const [ticker, history] of Object.entries(histories)) {
       const event = eventFromFlowHistory(history);
       if (!event) continue;
@@ -737,6 +849,8 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
       byTicker.set(ticker, { ...current, events: [...current.events, event] });
     }
   }
+
+  if (scope !== "US") addStaticRecoveryRows(byTicker, asOf);
 
   const candidates = [...byTicker.entries()].map(([ticker, { row, events }]): DiscoveryCandidate => {
     const def = resolveStock(ticker);
@@ -756,8 +870,8 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     return {
       ticker,
       market: row.market,
-      country: (def?.country ?? "KR") as StockCountry,
-      naverCode: row.naverCode,
+      country: row.country as StockCountry,
+      ...(row.naverCode ? { naverCode: row.naverCode } : {}),
       sector,
       events: directedEvents,
       asOf,
@@ -780,7 +894,9 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     SPARKLINE_CONCURRENCY,
     async (candidate) => ({
       ticker: candidate.ticker,
-      sparkline: candidate.naverCode ? (await fetchStockDaily(candidate.naverCode, 110)).closes.slice(-42) : [],
+      sparkline:
+        rowsByTicker.get(candidate.ticker)?.sparkline ??
+        (candidate.naverCode ? (await fetchStockDaily(candidate.naverCode, 110)).closes.slice(-42) : []),
     })
   );
   const sparklineByTicker = new Map(
@@ -813,6 +929,6 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     stocks,
     fronts,
     confidence: stocks.length >= DISCOVERY_DECK_CARD_COUNT ? "H" : stocks.length >= 30 ? "M" : "L",
-    source: targetedMaterialEnabled ? DISCOVERY_SOURCE_LABEL : "네이버 시세·DART 공시·수급 캐시",
+    source: targetedMaterialEnabled ? DISCOVERY_SOURCE_LABEL : "시장 시세·공시·수급 캐시",
   };
 }
