@@ -36,9 +36,9 @@ export const FOMO_INDEX_UPDATED_EVENT = "fomo:index-updated";
 const INDEX_SAME_ORIGIN_TIMEOUT_MS = 1_800;
 const INDEX_BACKEND_TIMEOUT_MS = 4_000;
 const INDEX_REVALIDATE_TIMEOUT_MS = 8_000;
-const DISCOVERY_SAME_ORIGIN_TIMEOUT_MS = 2_500;
-const DISCOVERY_BACKEND_TIMEOUT_MS = 8_000;
-const DISCOVERY_REVALIDATE_TIMEOUT_MS = 12_000;
+const DISCOVERY_SAME_ORIGIN_TIMEOUT_MS = 1_800;
+const DISCOVERY_BACKEND_TIMEOUT_MS = 18_000;
+const DISCOVERY_REVALIDATE_TIMEOUT_MS = 24_000;
 
 function kstDateKey(now = new Date()): string {
   return new Date(now.getTime() + 9 * HOUR).toISOString().slice(0, 10);
@@ -419,6 +419,7 @@ export interface DiscoveryResponse {
 
 const discoveryKey = () => `discovery:today:v3:${kstDateKey()}`;
 const discoveryStorageKey = () => `fomo:discovery:${kstDateKey()}`;
+const LAST_DISCOVERY_STORAGE_KEY = "fomo:discovery:last-good";
 
 function isDiscoveryResponse(value: unknown): value is DiscoveryResponse {
   const candidate = value as Partial<DiscoveryResponse> | null;
@@ -428,7 +429,7 @@ function isDiscoveryResponse(value: unknown): value is DiscoveryResponse {
 function readStoredDiscovery(): DiscoveryResponse | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(discoveryStorageKey());
+    const raw = window.localStorage.getItem(discoveryStorageKey()) ?? window.localStorage.getItem(LAST_DISCOVERY_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
     return isDiscoveryResponse(parsed) ? parsed : null;
@@ -442,6 +443,7 @@ function writeStoredDiscovery(value: DiscoveryResponse): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(discoveryStorageKey(), JSON.stringify(value));
+    window.localStorage.setItem(LAST_DISCOVERY_STORAGE_KEY, JSON.stringify(value));
   } catch (err) {
     console.warn("[fetchDiscovery] localStorage write failed", err);
   }
@@ -470,13 +472,22 @@ async function fetchDiscoveryNetwork({
     if (process.env.NODE_ENV !== "production") {
       console.warn("[fomoApi] same-origin discovery failed; retrying backend", err);
     }
-    return fetchJsonWithTimeout<DiscoveryResponse>(
-      `${API_BASE}/api/fomo/discovery`,
-      { cache: "no-store" },
-      backendTimeoutMs,
-      "GET backend /api/fomo/discovery"
-    );
   }
+
+  let lastError: unknown = null;
+  for (const origin of backendOrigins()) {
+    try {
+      return await fetchJsonWithTimeout<DiscoveryResponse>(
+        `${origin}/api/fomo/discovery`,
+        { cache: "no-store" },
+        backendTimeoutMs,
+        `GET ${origin}/api/fomo/discovery`
+      );
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("GET /api/fomo/discovery failed");
 }
 
 export const getCachedDiscovery = () => readCached<DiscoveryResponse>(discoveryKey());
@@ -502,7 +513,11 @@ export async function fetchDiscovery(): Promise<DiscoveryResponse> {
         writeStoredDiscovery(fresh);
         emitDiscoveryUpdated(fresh);
       })
-      .catch((err) => console.warn("[fetchDiscovery] revalidate failed", err));
+      .catch((err) => {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[fetchDiscovery] revalidate failed", err);
+        }
+      });
     return stored;
   }
 

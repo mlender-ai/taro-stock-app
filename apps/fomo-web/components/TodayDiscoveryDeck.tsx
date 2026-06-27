@@ -12,6 +12,10 @@ interface TodayDiscoveryDeckProps {
   onRequireLogin?: (() => void) | undefined;
 }
 
+const INITIAL_RETRY_DELAYS_MS = [1_200, 2_400] as const;
+
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
 function DiscoveryEmpty({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="mt-16 px-8 text-center text-sm leading-6 text-whiteout" role="status">
@@ -57,16 +61,25 @@ export function TodayDiscoveryDeck({ loggedIn, onRequireLogin }: TodayDiscoveryD
     window.addEventListener(DISCOVERY_UPDATED_EVENT, onDiscoveryUpdated);
     setState({ kind: "loading" });
     (async () => {
-      try {
-        const discovery = await fetchDiscovery();
-        if (!alive) return;
-        applyDiscovery(discovery);
-      } catch (err) {
-        if (process.env.NODE_ENV !== "production") {
-          console.warn("[TodayDiscoveryDeck] fetch failed", err);
+      let lastError: unknown = null;
+      for (let attempt = 0; attempt <= INITIAL_RETRY_DELAYS_MS.length; attempt += 1) {
+        try {
+          const discovery = await fetchDiscovery();
+          if (!alive) return;
+          applyDiscovery(discovery);
+          return;
+        } catch (err) {
+          lastError = err;
+          if (attempt < INITIAL_RETRY_DELAYS_MS.length) {
+            await wait(INITIAL_RETRY_DELAYS_MS[attempt] ?? 0);
+            if (!alive) return;
+          }
         }
-        if (alive) setState({ kind: "error" });
       }
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[TodayDiscoveryDeck] fetch failed", lastError);
+      }
+      if (alive) setState({ kind: "error" });
     })();
     return () => {
       alive = false;
