@@ -42,6 +42,12 @@ describe("discovery material news filter", () => {
     expect(cleanMaterialTitle("아이씨티케이, 120억원 규모 공급계약 공시")).toBe("아이씨티케이, 120억원 규모 공급계약 공시");
     expect(cleanMaterialTitle("코아스템켐온, 신약 임상 2상 승인")).toBe("코아스템켐온, 신약 임상 2상 승인");
     expect(cleanMaterialTitle("삼현, 방산 부품 수주잔고 확대")).toBe("삼현, 방산 부품 수주잔고 확대");
+    expect(cleanMaterialTitle("'삼전닉스 호남 반도체 클러스터' 소식에 광주신세계 부각")).toBe(
+      "'삼전닉스 호남 반도체 클러스터' 소식에 광주신세계 부각"
+    );
+    expect(cleanMaterialTitle("호남 반도체 클러스터 관련주로 광주신세계 주목")).toBe(
+      "호남 반도체 클러스터 관련주로 광주신세계 주목"
+    );
   });
 
   it("rejects non-material human-interest and market-wrap headlines", () => {
@@ -56,12 +62,12 @@ describe("discovery material news filter", () => {
     expect(cleanMaterialTitle("장중 시황, 반도체주 차익 실현")).toBeUndefined();
   });
 
-  it("keeps concrete US catalyst titles instead of collapsing them into generic foreign-news labels", () => {
+  it("turns concrete US catalyst titles into material hooks instead of generic foreign-news labels", () => {
     expect(cleanUsMaterialTitle("SoundHound AI Reports First Quarter Revenue Growth and Raises Guidance")).toBe(
-      "SoundHound AI Reports First Quarter Revenue Growth and Raises…"
+      "SoundHound AI, 실적·가이던스 소식이 나왔어요."
     );
     expect(cleanUsMaterialTitle("D-Wave Quantum Announces New Partnership With Aerospace Customer")).toBe(
-      "D-Wave Quantum Announces New Partnership With Aerospace Customer"
+      "D-Wave Quantum, 고객·파트너십 소식이 나왔어요."
     );
     expect(cleanUsMaterialTitle("Analyst raises price target on Micron shares")).toBeUndefined();
     expect(cleanUsMaterialTitle("D-Wave Quantum (QBTS) Is Down 11.3% After U.S. Quantum Orders And Funding News")).toBeUndefined();
