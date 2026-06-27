@@ -68,6 +68,10 @@ describe("discovery material news filter", () => {
     expect(cleanUsMaterialTitle("SoundHound AI vs. C3.ai: Which AI Stock Is the Better Buy Now")).toBeUndefined();
     expect(cleanUsMaterialTitle("3 Unprofitable Stocks We Approach with Caution")).toBeUndefined();
     expect(cleanUsMaterialTitle("Upstart Holdings, Inc. (UPST) Gains As Market Dips: What You Should Know")).toBeUndefined();
+    expect(cleanUsMaterialTitle("Snowflake (SNOW) Down 5.1% Since Last Earnings Report: Can It Rebound")).toBeUndefined();
+    expect(cleanUsMaterialTitle("The Market Rotation Is On. ServiceNow, Workday, and AppLovin Rise")).toBeUndefined();
+    expect(cleanUsMaterialTitle("The $7 Trillion AI Boom Is Running Out of Power")).toBeUndefined();
+    expect(cleanUsMaterialTitle("OpenAI IPO Fears Hit Oracle and Other Stocks Exposed to the AI Trade")).toBeUndefined();
   });
 });
 
