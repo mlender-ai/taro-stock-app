@@ -61,7 +61,7 @@ const NON_STOCK_NAME_PATTERN = /ETF|ETN|KODEX|TIGER|ACE|RISE|SOL\s|PLUS|KBSTAR|H
 const MATERIAL_NEWS_NOISE =
   /인기검색|검색\s?순위|주요\s?뉴스|오늘의\s?증시|마감\s?시황|장중\s?시황|특징주\s?모음|주식\s?초고수|초고수|단타|ETF|ETN|상장지수|레버리지|인버스|TOP\s?\d|상위\s?\d|회장|최고경영자|CEO|고백|회고|소회|인터뷰|기부|ESG|봉사|사회공헌|미담|창업주|오너|가문|고향|강연|도서|출간|어려울\s?때마다|찾았다/i;
 const MATERIAL_NEWS_CATALYST =
-  /공시|계약|공급계약|수주|납품|실적|매출|영업이익|순이익|가이던스|전망치|컨센서스|어닝|흑자|적자|턴어라운드|임상|허가|승인|FDA|품목허가|신약|치료제|기술이전|라이선스|증설|공장|양산|수율|수주잔고|M&A|인수|합병|지분|투자|유상증자|무상증자|자사주|배당|분할|상장|정부|정책|규제|지원|보조금|관세|제재|신제품|출시|개발|특허|공급|독점|선정|채택|수출|수입|국책|프로젝트|수혜/i;
+  /공시|계약|공급계약|수주|납품|실적|매출|영업이익|순이익|가이던스|전망치|컨센서스|어닝|흑자|적자|턴어라운드|임상|허가|승인|FDA|품목허가|신약|치료제|기술이전|라이선스|증설|공장|양산|수율|수주잔고|M&A|인수|합병|지분|투자|유상증자|무상증자|자사주|배당|분할|상장|정부|정책|규제|지원|보조금|관세|제재|신제품|출시|개발|특허|공급|독점|선정|채택|수출|수입|국책|프로젝트|수혜|클러스터|산단|거점|밸류체인|관련주|부각|모멘텀|호재|주목|협력|제휴/i;
 const US_MATERIAL_NEWS_NOISE =
   /price\s?target|target price|analyst|rating|upgrade|downgrade|initiates?|maintains?|reiterates?|buybacks?\s+explained|history of|should you buy|stock to buy|better buy|which .* stock|motley fool|zacks|benzinga|investorplace|approach with caution|missing link|strain inside|what you|can it|market rotation|running out of power|internet.?s .+ odd duck|boom is|fears hit|gains as market dips|why .* stock (?:is )?(?:up|down|rising|falling)|\b(?:is|are|was|were)?\s*(?:up|down|higher|lower|gains?|loses?|rises?|falls?)\s+\d+(?:\.\d+)?%|\b(?:is|are|was|were)\s+(?:up|down|higher|lower)\b|shares? (?:rise|fall|slip|jump|gain|lose) after hours/i;
 const US_MATERIAL_NEWS_CATALYST =
@@ -294,6 +294,8 @@ export function cleanUsMaterialTitle(title: string): string | undefined {
   }
   if (!US_MATERIAL_NEWS_CATALYST.test(cleaned)) return undefined;
   if (/[\[\]{}<>]/.test(cleaned)) return undefined;
+  const translated = translateUsMaterialTitle(cleaned);
+  if (translated) return translated;
   const compact = cleaned.length > 68 ? `${cleaned.slice(0, 66).replace(/\s+\S*$/, "").trim()}…` : cleaned;
   return isFrontHookSafe(`${compact} 소식이 나왔어요.`) ? compact : undefined;
 }
@@ -303,6 +305,49 @@ function isPrimaryStockArticle(canonical: string, article: RawArticle): boolean 
     title: article.title,
     ...(article.summary ? { summary: article.summary } : {}),
   }) === "primary";
+}
+
+function isMentionedStockArticle(canonical: string, article: RawArticle): boolean {
+  return stockMentionRole(canonical, {
+    title: article.title,
+    ...(article.summary ? { summary: article.summary } : {}),
+  }) !== "none";
+}
+
+function pickTargetedMaterialArticle(canonical: string, articles: readonly RawArticle[]): RawArticle | undefined {
+  const materialArticles = articles.filter((article) => cleanMaterialTitle(article.title));
+  return (
+    materialArticles.find((article) => isPrimaryStockArticle(canonical, article)) ??
+    materialArticles.find((article) => isMentionedStockArticle(canonical, article))
+  );
+}
+
+function usSubject(title: string): string | undefined {
+  const match = title.match(/^([A-Z][A-Za-z0-9 .&'-]{1,42}?)(?:\s+\([A-Z.]+\))?\s+(?:Reports|Raises|Announces|Unveils|Launches|Introduces|Signs|Secures|Expands|Files|Receives|Wins|Posts|Beats)\b/i);
+  return match?.[1]?.trim().replace(/\s+/g, " ");
+}
+
+function translateUsMaterialTitle(title: string): string | undefined {
+  const subject = usSubject(title);
+  if (!subject) return undefined;
+  const lower = title.toLowerCase();
+  let detail: string | undefined;
+  if (/revenue|earnings|results|guidance|forecast|margin|profit/.test(lower)) {
+    detail = "실적·가이던스 소식";
+  } else if (/partnership|customer|deal|contract|order|supply|supplier/.test(lower)) {
+    detail = "고객·파트너십 소식";
+  } else if (/sec|8-k|10-q|filing/.test(lower)) {
+    detail = "SEC 공시";
+  } else if (/approval|fda|trial|drug/.test(lower)) {
+    detail = "신약·허가 소식";
+  } else if (/acquisition|merger|stake|investment/.test(lower)) {
+    detail = "인수·투자 소식";
+  } else if (/launch|unveil|introduce|product|chip|gpu|ai|data center|solution/.test(lower)) {
+    detail = "제품·AI 인프라 소식";
+  }
+  if (!detail) return undefined;
+  const translated = `${subject}, ${detail}이 나왔어요.`;
+  return isFrontHookSafe(translated) ? translated : undefined;
 }
 
 function materialEventFromArticle(article: RawArticle, asOf: string, sourceFallback: string): DiscoveryEvent | null {
@@ -367,13 +412,13 @@ async function eventFromTargetedMaterial(row: DiscoveryMarketRow, asOf: string):
 
   const stockNews =
     newsResult.status === "fulfilled"
-      ? newsResult.value.find((article) => isPrimaryStockArticle(row.canonical, article))
+      ? pickTargetedMaterialArticle(row.canonical, newsResult.value)
       : undefined;
   if (stockNews) return materialEventFromArticle(stockNews, asOf, "네이버 종목뉴스");
 
   const research =
     researchResult.status === "fulfilled"
-      ? researchResult.value.find((article) => isPrimaryStockArticle(row.canonical, article))
+      ? pickTargetedMaterialArticle(row.canonical, researchResult.value)
       : undefined;
   if (research) return materialEventFromArticle(research, asOf, "네이버 증권 리서치");
 
