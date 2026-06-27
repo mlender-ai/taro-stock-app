@@ -381,7 +381,8 @@ function materialEventFromUsArticle(article: RawArticle, asOf: string, sourceFal
 }
 
 function materialEventFromAttentionSignal(attention: StockAttentionSignal | undefined, asOf: string): DiscoveryEvent | null {
-  const label = attention?.newsEventLabel?.trim();
+  const rawLabel = attention?.newsEventLabel?.trim();
+  const label = rawLabel ? cleanMaterialTitle(rawLabel) : undefined;
   if (!label || /^오늘 가격이/.test(label)) return null;
   return {
     kind: "news_mention",
@@ -1097,6 +1098,7 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
   }
 
   for (const [ticker, current] of byTicker.entries()) {
+    if (current.row.country !== "KR") continue;
     if (current.events.some((event) => event.kind === "disclosure" || event.kind === "news_mention")) continue;
     const event = materialEventFromAttentionSignal(attentionMap[ticker], asOf);
     if (!event) continue;
