@@ -867,6 +867,8 @@ export function StockSwipeDeck({
   }, [idx, front, stocks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const top = at(idx);
+  const next = at(idx + 1);
+  const isReadyCard = (card: DiscoveryDeckCard): boolean => isThemeBundleCard(card) || !!front[card.canonical];
   const flingTransform = (dir: "left" | "right") =>
     `translateX(${dir === "right" ? 140 : -140}%) rotate(${dir === "right" ? 16 : -16}deg)`;
   const topTransform = restoreStart
@@ -877,19 +879,21 @@ export function StockSwipeDeck({
         : flingTransform(exiting)
       : `translate(${dx}px, ${dy}px) rotate(${dx * 0.04}deg)`;
   const topTransition = dragging.current || restorePrimed ? "none" : `transform ${EXIT_MS}ms cubic-bezier(0.22,1,0.36,1)`;
-  const topReady = isThemeBundleCard(top) ? true : !!front[top.canonical];
+  const topReady = isReadyCard(top);
+  const nextReady = isReadyCard(next);
+  const showNextCard = stocks.length > 1 && topReady && nextReady;
 
   return (
     <div className="w-full">
       <div className="relative mx-auto h-[60svh] min-h-[460px] max-h-[580px] w-full select-none sm:min-h-[500px]">
         {/* 다음 카드 — 뒤에 살짝 드러나는 스택(틴더식 peek). 위 카드가 불투명이라 body 통과 비침은 없음. */}
-        {stocks.length > 1 && (
+        {showNextCard && (
           <div
             aria-hidden
             className="absolute inset-0 overflow-hidden rounded-2xl border border-hairline-soft bg-surface-raised px-6 py-7"
             style={{ transform: "translateY(14px) scale(0.95)", opacity: 0.6, zIndex: 0 }}
           >
-            {renderFace(at(idx + 1))}
+            {renderFace(next)}
           </div>
         )}
 
@@ -902,7 +906,10 @@ export function StockSwipeDeck({
           onClick={() => {
             if (topReady && isStockCard(top) && !moved.current && !exiting && !restoring) openDepth(top, "card");
           }}
-          className="absolute inset-0 z-10 cursor-pointer overflow-hidden rounded-2xl border border-hairline-soft bg-surface-raised px-6 py-7"
+          className={`absolute inset-0 z-10 overflow-hidden rounded-2xl border border-hairline-soft bg-surface-raised px-6 py-7 ${
+            topReady ? "cursor-pointer" : "cursor-wait"
+          }`}
+          aria-busy={!topReady}
           style={{ transform: topTransform, transition: topTransition }}
         >
           {/* 드래그 스탬프(틴더식 아이콘) — 거리에 비례해 또렷·확대. 우=관심(하트)·좌=패스(X)·위=슈퍼관심(별). */}

@@ -9,9 +9,9 @@ import type {
   MoodSignal,
   ScoredArticle,
 } from "@fomo/core";
-import { getSessionId } from "@/lib/session";
 import { cachedGet, readCached, refreshCached, setCached } from "./apiCache";
 import { discoveryMatchesCountry, type DiscoveryCountryScope } from "./discoveryCountryScope";
+import { getSessionId } from "./session";
 
 export type { BannerItem } from "@fomo/core";
 
@@ -39,7 +39,6 @@ const INDEX_BACKEND_TIMEOUT_MS = 4_000;
 const INDEX_REVALIDATE_TIMEOUT_MS = 8_000;
 const DISCOVERY_SAME_ORIGIN_TIMEOUT_MS = 11_500;
 const DISCOVERY_BACKEND_TIMEOUT_MS = 18_000;
-const DISCOVERY_REVALIDATE_TIMEOUT_MS = 24_000;
 export type { DiscoveryCountryScope } from "./discoveryCountryScope";
 
 function discoveryFastPath(country: DiscoveryCountryScope = "KR"): string {
@@ -506,11 +505,6 @@ function writeStoredDiscovery(value: DiscoveryResponse, country: DiscoveryCountr
   }
 }
 
-function emitDiscoveryUpdated(country: DiscoveryCountryScope, value: DiscoveryResponse): void {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent<DiscoveryUpdatedDetail>(DISCOVERY_UPDATED_EVENT, { detail: { country, discovery: value } }));
-}
-
 async function fetchDiscoveryNetwork({
   country = "KR",
   sameOriginTimeoutMs = DISCOVERY_SAME_ORIGIN_TIMEOUT_MS,
@@ -554,40 +548,28 @@ export const getCachedDiscovery = (country: DiscoveryCountryScope = "KR") => rea
 
 export async function fetchDiscovery(country: DiscoveryCountryScope = "KR"): Promise<DiscoveryResponse> {
   const key = discoveryKey(country);
+  let fetchError: unknown = null;
+  try {
+    const fresh = await refreshCached(key, () => fetchDiscoveryNetwork({ country }), CACHE_TTL.stockFront);
+    if (hasDiscoveryCards(fresh, country)) {
+      writeStoredDiscovery(fresh, country);
+      return fresh;
+    }
+  } catch (err) {
+    fetchError = err;
+  }
+
   const cached = readCached<DiscoveryResponse>(key);
   if (hasDiscoveryCards(cached, country)) return cached;
 
   const stored = readStoredDiscovery(country);
   if (stored) {
     setCached(key, stored, CACHE_TTL.stockFront);
-    void refreshCached(
-      key,
-      () =>
-        fetchDiscoveryNetwork({
-          country,
-          sameOriginTimeoutMs: DISCOVERY_SAME_ORIGIN_TIMEOUT_MS,
-          backendTimeoutMs: DISCOVERY_REVALIDATE_TIMEOUT_MS,
-        }),
-      CACHE_TTL.stockFront
-      )
-      .then((fresh) => {
-        if (!hasDiscoveryCards(fresh, country)) return;
-        writeStoredDiscovery(fresh, country);
-        emitDiscoveryUpdated(country, fresh);
-      })
-      .catch((err) => {
-        if (process.env.NODE_ENV !== "production") {
-          console.warn("[fetchDiscovery] revalidate failed", err);
-        }
-      });
     return stored;
   }
 
-  const fresh = await fetchDiscoveryNetwork({ country });
-  if (!hasDiscoveryCards(fresh, country)) throw new Error(`GET /api/fomo/discovery returned invalid ${country} deck`);
-  setCached(key, fresh, CACHE_TTL.stockFront);
-  writeStoredDiscovery(fresh, country);
-  return fresh;
+  if (fetchError instanceof Error) throw fetchError;
+  throw new Error(`GET /api/fomo/discovery returned invalid ${country} deck`);
 }
 
 export const warmDiscovery = (country: DiscoveryCountryScope = "KR") => fetchDiscovery(country);
