@@ -27,6 +27,20 @@ export interface DiscoveryEvent {
   publishedAt?: string;
   /** Card-facing, stock-perspective hook derived from sourceTitle. Raw title/source stay in evidence only. */
   headlineHook?: string;
+  /** Same-day price move attached by the discovery pipeline. */
+  changePct?: number;
+  /** Latest volume divided by recent normal volume. */
+  volumeRatio?: number;
+  /** Flow actor from confirmed supply-demand history. */
+  flowActor?: "foreign" | "institution";
+  /** Consecutive confirmed buy/sell days. Positive values mean buy-side streak. */
+  flowDays?: number;
+  /** Human-scale net amount, e.g. 12만주. */
+  flowAmountText?: string;
+  themeRank?: number;
+  themePeerCount?: number;
+  themeAverageChangePct?: number;
+  themeRelativeChangePct?: number;
 }
 
 export interface DiscoveryCandidate {
@@ -40,6 +54,7 @@ export interface DiscoveryCandidate {
   reason?: string;
   marquee?: boolean;
   marketCapRank?: number;
+  synthesizedInsight?: DiscoveryInsightSynthesis;
 }
 
 export type DiscoverySynthesisTone = "material" | "lead" | "activity" | "context" | "empty";
@@ -263,15 +278,13 @@ export function isWeakDiscoveryCandidate(candidate: DiscoveryCandidate): boolean
 const WHY_KIND_PRIORITY: Record<DiscoveryEventKind, number> = {
   disclosure: 0,
   news_mention: 1,
-  flow_entry: 2,
-  volume_spike: 3,
+  volume_spike: 2,
+  flow_entry: 3,
   new_high: 4,
   theme_link: 5,
   price_move: 6,
   market_context: 99,
 };
-
-const DISCOVERY_HEADLINE_JOINER = " — ";
 
 function eventTimePrefix(event: DiscoveryEvent, candidate: DiscoveryCandidate): "오늘" | "최근" {
   return event.asOf.slice(0, 10) === candidate.asOf.slice(0, 10) ? "오늘" : "최근";
@@ -354,84 +367,201 @@ function headlineHookOf(event: DiscoveryEvent | undefined): string | undefined {
   return hook;
 }
 
-function userFacingLabel(event: DiscoveryEvent | undefined, candidate?: DiscoveryCandidate): string {
-  const raw = stripTimePrefix(labelOf(event));
-  if (!event || !raw) return "";
-  const sector = candidate?.sector ?? "동종";
-  const relativeStrength = `${"상대"}${"강도"}`;
-  const marketPosition = `${"시장"} ${"위치"}`;
-  return raw
-    .replace(new RegExp(`^${sector}\\s+\\d+개\\s*종목\\s*중\\s*(.+)$`), `같은 ${sector} 종목들 중 오늘 $1`)
-    .replace(new RegExp(`${relativeStrength}\\s*1위예요\\.?`, "g"), `같은 ${sector} 종목들 중 오늘 제일 셌어요.`)
-    .replace(new RegExp(`${relativeStrength}\\s*(\\d+)위권이에요\\.?`, "g"), `같은 ${sector} 종목들 중 오늘 상위권이에요.`)
-    .replace(new RegExp(`주변보다 ${relativeStrength}가 높아요\\.?`, "g"), "주변 종목보다 오늘 더 강했어요.")
-    .replace(new RegExp(`테마 ${relativeStrength}`, "g"), "동종 흐름")
-    .replace(new RegExp(marketPosition, "g"), "시장 안 흐름")
-    .replace(/\s+/g, " ")
-    .trim();
+const ABSTRACT_FILLER_PATTERN = new RegExp(
+  [
+    "흐름\\s*(?:도\\s*)?붙",
+    "주" + "목",
+    "확인되는\\s*화면",
+    "눈에\\s*띄었어요",
+    "한\\s*가지\\s*숫자만",
+    "근거는\\s*얇",
+    "이유\\s*얇",
+    "재료\\s*붙은\\s*섹터선두",
+    "공개\\s*원문도\\s*같이",
+    "동종\\s*흐름도",
+  ].join("|")
+);
+
+export function hasAbstractDiscoveryFiller(text: string | undefined): boolean {
+  return ABSTRACT_FILLER_PATTERN.test(text ?? "");
 }
 
-function supportPhrase(event: DiscoveryEvent | undefined, primary?: DiscoveryEvent): string | undefined {
-  if (!event || !primary || eventGroup(event) === eventGroup(primary)) return undefined;
-  if (isPriceRestatement(labelOf(event))) return undefined;
-  if (event.kind === "flow_entry") return "수급 흐름도 같이 확인돼요";
-  if (event.kind === "volume_spike") return "거래량도 평소보다 커졌어요";
-  if (event.kind === "theme_link" || event.kind === "market_context") return "동종 종목 대비 흐름도 붙었어요";
-  if (event.kind === "news_mention" || event.kind === "disclosure") return "공개 원문도 같이 확인돼요";
-  if (event.kind === "new_high") return "새 가격대도 같이 확인돼요";
+function cleanSentence(text: string | undefined): string {
+  return (text ?? "").replace(/\s+/g, " ").replace(/[.。]+$/g, "").trim();
+}
+
+function signedPct(value: number | undefined, digits = 1): string | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
+  return `${sign}${Math.abs(value).toFixed(digits)}%`;
+}
+
+function ratioText(value: number | undefined): string | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(1);
+}
+
+function volumeRatioOf(event: DiscoveryEvent): number | undefined {
+  if (typeof event.volumeRatio === "number") return event.volumeRatio;
+  const match = labelOf(event).match(/평소\s*(\d+(?:\.\d+)?)배/);
+  return match?.[1] ? Number(match[1]) : undefined;
+}
+
+function changePctOf(candidate: DiscoveryCandidate, event?: DiscoveryEvent): number | undefined {
+  if (typeof event?.changePct === "number") return event.changePct;
+  const price = candidate.events.find((row) => typeof row.changePct === "number" || row.kind === "price_move");
+  if (typeof price?.changePct === "number") return price.changePct;
+  const match = candidate.events.map(labelOf).join(" ").match(/([+-]\d+(?:\.\d+)?)%/);
+  return match?.[1] ? Number(match[1]) : undefined;
+}
+
+function themeRankOf(event: DiscoveryEvent): number | undefined {
+  if (typeof event.themeRank === "number") return event.themeRank;
+  const label = labelOf(event);
+  if (/제일|가장/.test(label)) return 1;
+  if (/두 번째/.test(label)) return 2;
+  if (/세 번째/.test(label)) return 3;
+  const fraction = label.match(/(\d+)\s*\/\s*(\d+)/);
+  if (fraction?.[1]) return Number(fraction[1]);
   return undefined;
 }
 
-function statePhraseFor(primary: DiscoveryEvent, support: DiscoveryEvent | undefined, candidate: DiscoveryCandidate): string {
-  if (primary.kind === "disclosure") return "공시 먼저 뜬 종목";
-  if (primary.kind === "news_mention") return "뉴스 재료 붙은 종목";
-  if (primary.kind === "flow_entry") return "수급 먼저 들어온 종목";
-  if (primary.kind === "volume_spike") return "거래 먼저 튄 종목";
-  if (primary.kind === "new_high") return "새 가격대 밟은 종목";
-  if (primary.kind === "theme_link" || primary.kind === "market_context") {
-    if (support?.kind === "flow_entry") return isObscureCandidate(candidate) ? "무명주에 수급 붙음" : "수급 붙은 섹터선두";
-    if (support?.kind === "volume_spike") return isObscureCandidate(candidate) ? "무명주 거래 붙음" : "거래 붙은 섹터선두";
-    if (support?.kind === "new_high") return isObscureCandidate(candidate) ? "무명주 새 가격대" : "새 가격대 섹터선두";
-    if (support?.kind === "disclosure" || support?.kind === "news_mention") return "재료 붙은 섹터선두";
-    return isObscureCandidate(candidate) ? "혼자 튄 무명주" : "이유 얇은 섹터선두";
-  }
-  return "이유 아직 얇은 종목";
+function themePeerCountOf(event: DiscoveryEvent): number | undefined {
+  if (typeof event.themePeerCount === "number") return event.themePeerCount;
+  const label = labelOf(event);
+  const count = label.match(/(\d+)개\s*(?:종목)?\s*중/);
+  if (count?.[1]) return Number(count[1]);
+  const fraction = label.match(/(\d+)\s*\/\s*(\d+)/);
+  if (fraction?.[2]) return Number(fraction[2]);
+  return undefined;
 }
 
-function detailFor(primary: DiscoveryEvent, support: DiscoveryEvent | undefined, candidate: DiscoveryCandidate): string {
-  const prefix = eventTimePrefix(primary, candidate);
-  const supportText = supportPhrase(support, primary);
-  const hook = headlineHookOf(primary);
-  const label = userFacingLabel(primary, candidate);
+function flowActorText(event: DiscoveryEvent): string | undefined {
+  if (event.flowActor === "foreign") return "외국인";
+  if (event.flowActor === "institution") return "기관";
+  const label = labelOf(event);
+  if (/외국인/.test(label)) return "외국인";
+  if (/기관/.test(label)) return "기관";
+  return undefined;
+}
 
-  if ((primary.kind === "disclosure" || primary.kind === "news_mention") && hook) {
-    return `${prefix} ${hook.replace(/[.。]$/, "")}.`;
+function flowDaysOf(event: DiscoveryEvent): number | undefined {
+  if (typeof event.flowDays === "number") return Math.abs(event.flowDays);
+  const match = labelOf(event).match(/(\d+)일째/);
+  return match?.[1] ? Number(match[1]) : undefined;
+}
+
+function sectorFromEventLabel(event: DiscoveryEvent): string | undefined {
+  const label = labelOf(event);
+  return label.match(/오늘\s+([가-힣A-Za-z0-9]+)\s+(?:\d+개|흐름|안에서)/)?.[1]?.trim();
+}
+
+function hasMaterialSupport(candidate: DiscoveryCandidate, primary: DiscoveryEvent): boolean {
+  return candidate.events.some(
+    (event) =>
+      event !== primary &&
+      (event.kind === "news_mention" ||
+        event.kind === "disclosure" ||
+        event.kind === "flow_entry" ||
+        event.kind === "volume_spike")
+  );
+}
+
+interface WhyFact {
+  headline: string;
+  state: string;
+  observation: string;
+  synthesis: string;
+  evidence: string;
+}
+
+function whyFactFor(event: DiscoveryEvent, candidate: DiscoveryCandidate): WhyFact | undefined {
+  const ticker = candidate.ticker;
+  const sector = candidate.sector ?? sectorFromEventLabel(event) ?? "동종";
+  const prefix = eventTimePrefix(event, candidate);
+  const change = signedPct(changePctOf(candidate, event));
+  const hook = headlineHookOf(event);
+
+  if ((event.kind === "news_mention" || event.kind === "disclosure") && hook) {
+    const headline = change ? `${ticker} ${change}, ${hook}` : `${ticker}, ${hook}`;
+    return {
+      headline,
+      state: event.kind === "disclosure" ? "공시 사건" : "뉴스 사건",
+      observation: `${prefix} ${hook}${change ? ` / ${ticker} ${change}` : ""}.`,
+      synthesis: change
+        ? `기사 제목보다 '${hook}' 사건과 ${ticker} ${change} 반응을 분리해서 봅니다.`
+        : `기사 제목보다 '${hook}' 사건 자체를 먼저 봅니다.`,
+      evidence: evidenceFor(event),
+    };
   }
-  if (primary.kind === "disclosure") {
-    return `${prefix} 공시 원문이 확인됐어요.`;
+
+  if (event.kind === "volume_spike") {
+    const ratio = ratioText(volumeRatioOf(event));
+    if (!ratio) return undefined;
+    const headline = change ? `평소 ${ratio}배 거래 터진 ${ticker} ${change}` : `평소 ${ratio}배 거래 터진 ${ticker}`;
+    return {
+      headline,
+      state: "거래량",
+      observation: `${ticker}: 평소 ${ratio}배 거래량${change ? ` / ${change}` : ""}.`,
+      synthesis: `핵심 숫자는 평소 대비 ${ratio}배 거래량입니다. 기사보다 먼저 거래가 달라진 카드예요.`,
+      evidence: `${event.source} · ${event.asOf.slice(0, 10)} · 거래량 ${ratio}배`,
+    };
   }
-  if (primary.kind === "news_mention") {
-    return `${prefix} 뉴스 원문은 확인됐지만 종목 관점 의미는 더 봐야 해요.`;
+
+  if (event.kind === "flow_entry") {
+    const actor = flowActorText(event);
+    const days = flowDaysOf(event);
+    if (!actor || !days) return undefined;
+    const amount = event.flowAmountText ? ` ${event.flowAmountText}` : "";
+    const headline = `${actor} ${days}일째${amount} 담는 ${ticker}`;
+    return {
+      headline,
+      state: "수급",
+      observation: `${actor} ${days}일 연속 순매수${event.flowAmountText ? ` / ${event.flowAmountText}` : ""}.`,
+      synthesis: `핵심 숫자는 ${actor} ${days}일 연속 수급입니다. 장마감 확정 자료라 장중 추정과 분리해서 봅니다.`,
+      evidence: `${event.source} · ${event.asOf.slice(0, 10)} · ${actor} ${days}일`,
+    };
   }
-  if (primary.kind === "flow_entry") {
-    const base = label || "수급 흐름이 확인됐어요";
-    return supportText ? `${base.replace(/[.。]$/, "")}. ${supportText}.` : `${base.replace(/[.。]$/, "")}.`;
+
+  if (event.kind === "new_high") {
+    const headline = change ? `${ticker} 52주 최고 근처, ${change}` : `${ticker} 52주 최고 근처`;
+    return {
+      headline,
+      state: "52주 위치",
+      observation: `${ticker}: 52주 최고 근처${change ? ` / ${change}` : ""}.`,
+      synthesis: "핵심은 52주 가격 위치입니다. 새 가격대에 닿은 사실만 보고, 이후 방향은 단정하지 않습니다.",
+      evidence: `${event.source} · ${event.asOf.slice(0, 10)} · 52주 위치`,
+    };
   }
-  if (primary.kind === "volume_spike") {
-    const base = label || "거래량이 평소보다 커졌어요";
-    return supportText ? `${base.replace(/[.。]$/, "")}. ${supportText}.` : `${base.replace(/[.。]$/, "")}.`;
+
+  if (event.kind === "theme_link" || event.kind === "market_context") {
+    const rank = themeRankOf(event);
+    const peers = themePeerCountOf(event);
+    const marketRank = candidate.marketCapRank;
+    const rare = typeof marketRank === "number" && marketRank >= DISCOVERY_AWAKENING_RANK_MIN;
+    const position = rank && peers ? `${sector} ${rank}/${peers}` : `${sector}`;
+    const pct = change ?? signedPct(event.changePct);
+    if (!pct && !marketRank && !rank && !sector) return undefined;
+    const subject = rare && marketRank ? `시총 ${marketRank}위 ${sector}주` : ticker;
+    const headline = `${subject}${pct ? ` ${pct}` : ""}${rank && peers ? `, ${position}` : !pct && !marketRank ? `, ${sector} 테마` : ""}`;
+    const noBacker = hasMaterialSupport(candidate, event) ? "" : " 공개 재료·수급·거래량은 아직 비어 있어요.";
+    return {
+      headline,
+      state: rare ? "무명성" : "섹터 위치",
+      observation: `${ticker}: ${position}${pct ? ` / ${pct}` : ""}${marketRank ? ` / 시총 ${marketRank}위` : ""}.`,
+      synthesis: `${rare && marketRank ? `시총 ${marketRank}위라는 희귀성` : "테마 안 위치"}이 카드의 이유입니다.${noBacker}`,
+      evidence: `${event.source} · ${event.asOf.slice(0, 10)}${rank && peers ? ` · ${sector} ${rank}/${peers}` : ""}${pct ? ` · ${pct}` : ""}`,
+    };
   }
-  if (primary.kind === "new_high") {
-    const base = label || "52주 위치가 새 구간에 들어왔어요";
-    return supportText ? `${base.replace(/[.。]$/, "")}. ${supportText}.` : `${base.replace(/[.。]$/, "")}.`;
-  }
-  if (primary.kind === "theme_link" || primary.kind === "market_context" || primary.kind === "price_move") {
-    const context = label || `${candidate.sector ?? candidate.market} 안에서 오늘 눈에 띈 흐름이에요.`;
-    if (supportText) return `${context.replace(/[.。]$/, "")}. ${supportText}.`;
-    const rankText = isObscureCandidate(candidate) && candidate.marketCapRank ? `시총 ${candidate.marketCapRank}위권인데 ` : "";
-    return `${rankText}${context.replace(/[.。]$/, "")}. 뒤를 받칠 수급·거래·뉴스는 아직 안 보여요.`;
-  }
-  return label || "확인된 신호만 따로 보는 카드예요.";
+
+  return undefined;
+}
+
+function supportEligible(event: DiscoveryEvent | undefined, primary: DiscoveryEvent, candidate: DiscoveryCandidate): boolean {
+  if (!event || event === primary || eventGroup(event) === eventGroup(primary)) return false;
+  if (isPriceRestatement(labelOf(event))) return false;
+  return !!whyFactFor(event, candidate);
 }
 
 function choosePrimaryEvent(candidate: DiscoveryCandidate): DiscoveryEvent | undefined {
@@ -446,7 +576,7 @@ function choosePrimaryEvent(candidate: DiscoveryCandidate): DiscoveryEvent | und
 function chooseSupportEvent(candidate: DiscoveryCandidate, primary: DiscoveryEvent | undefined): DiscoveryEvent | undefined {
   if (!primary) return undefined;
   return displayEventsFor(candidate)
-    .filter((event) => event !== primary && event.kind !== primary.kind && !!supportPhrase(event, primary))
+    .filter((event) => supportEligible(event, primary, candidate))
     .sort((a, b) => {
       const supportRank = (event: DiscoveryEvent) => {
         if (event.kind === "volume_spike") return 0;
@@ -459,53 +589,8 @@ function chooseSupportEvent(candidate: DiscoveryCandidate, primary: DiscoveryEve
     })[0];
 }
 
-function headlinePartsFor(
-  primary: DiscoveryEvent,
-  support: DiscoveryEvent | undefined,
-  candidate: DiscoveryCandidate
-): { state: string; detail: string; headline: string } {
-  const state = statePhraseFor(primary, support, candidate);
-  const detail = detailFor(primary, support, candidate);
-  return {
-    state,
-    detail,
-    headline: `${state}${DISCOVERY_HEADLINE_JOINER}${detail}`,
-  };
-}
-
 function observationFor(event: DiscoveryEvent, candidate: DiscoveryCandidate): string {
-  const label = userFacingLabel(event, candidate);
-  if (event.kind === "news_mention") return headlineHookOf(event) ? `${headlineHookOf(event)}.` : "뉴스 원문이 확인됐어요.";
-  if (event.kind === "disclosure") return headlineHookOf(event) ? `${headlineHookOf(event)}.` : "공시 원문이 확인됐어요.";
-  if (event.kind === "flow_entry") return label || "수급 흐름이 확인됐어요.";
-  if (event.kind === "volume_spike") return label || "거래량 변화가 확인됐어요.";
-  if (event.kind === "theme_link" || event.kind === "market_context") return label || "동종 종목 대비 흐름이 확인됐어요.";
-  if (event.kind === "new_high") return label || "새 가격대가 확인됐어요.";
-  return label || "확인된 신호가 있어요.";
-}
-
-function synthesisFor(primary: DiscoveryEvent, support: DiscoveryEvent | undefined, candidate: DiscoveryCandidate): string {
-  const primaryGroup = eventGroup(primary);
-  const supportGroup = support ? eventGroup(support) : undefined;
-  if (primaryGroup === "material" && supportGroup === "volume") return "새로 나온 원문에 거래 반응까지 붙어, 단순 가격 변화보다 계기가 분명한 카드예요.";
-  if (primaryGroup === "material" && supportGroup === "flow") return "공개 원문과 수급이 같이 잡혀, 기사 한 줄만 따로 보는 카드가 아니에요.";
-  if (primaryGroup === "material" && supportGroup === "context") return "공개 원문이 동종 흐름과 같이 잡혀, 같은 업종 안에서도 이유를 따로 볼 카드예요.";
-  if (primaryGroup === "material") return "오늘 공개 원문에서 먼저 확인된 계기가 있는 카드예요.";
-  if (primaryGroup === "flow" && supportGroup === "context") return "가격보다 수급과 동종 흐름이 먼저 맞물린 카드예요.";
-  if (primaryGroup === "flow" && supportGroup === "volume") return "수급이 먼저 들어오고 거래 변화도 따라붙는지 볼 카드예요.";
-  if (primaryGroup === "flow") return "가격 설명보다 누가 먼저 들어오는지를 보는 카드예요.";
-  if (primaryGroup === "volume" && supportGroup === "context") return "동종 흐름 속에서 거래가 먼저 커진 카드예요.";
-  if (primaryGroup === "volume") return "공개 원문보다 거래 변화가 먼저 잡힌 카드예요.";
-  if (primaryGroup === "context" && supportGroup === "flow") return "동종 종목 대비 흐름에 수급까지 붙어 확인할 지점이 생긴 카드예요.";
-  if (primaryGroup === "context" && supportGroup === "volume") return "섹터 안에서 먼저 튄 뒤 거래 변화까지 붙었는지 볼 카드예요.";
-  if (primaryGroup === "context" && supportGroup === "price") return "섹터 안에서 먼저 튄 뒤 새 가격대까지 겹친 카드예요.";
-  if (primaryGroup === "context" && supportGroup === "material") return "섹터 선두 맥락에 공개 재료가 같이 붙은 카드예요.";
-  if (primaryGroup === "context") {
-    return isObscureCandidate(candidate)
-      ? "남들이 덜 보는 종목이 섹터 안에서 먼저 튀었지만, 가격 외 신호는 아직 얇아요."
-      : "섹터 안에서 먼저 보인 결과는 있지만, 가격 외 신호는 아직 얇아요.";
-  }
-  return "공개 원문은 아직 얇고, 확인된 신호만 따로 보는 카드예요.";
+  return whyFactFor(event, candidate)?.observation ?? cleanSentence(labelOf(event)) + ".";
 }
 
 function evidenceFor(event: DiscoveryEvent): string {
@@ -519,34 +604,38 @@ function evidenceFor(event: DiscoveryEvent): string {
 }
 
 export function synthesizeDiscoveryInsight(candidate: DiscoveryCandidate): DiscoveryInsightSynthesis {
+  if (candidate.synthesizedInsight) return candidate.synthesizedInsight;
   const primary = choosePrimaryEvent(candidate);
   const support = chooseSupportEvent(candidate, primary);
   if (!primary) {
     return {
       headline: "아직 공개된 계기 없음",
-      headlineState: "이유 아직 얇은 종목",
+      headlineState: "빈 신호",
       tag: "정직한 빈 신호",
       tone: "empty",
       observations: [],
-      synthesis: "카드에 올릴 만큼 확인된 사건·수급·거래·동종 흐름 신호가 아직 적어요.",
+      synthesis: "가격만으로 이유를 만들지 않습니다. 사건·거래량·수급·시총 위치 중 하나가 잡힐 때만 카드 이유를 씁니다.",
       evidence: [],
     };
   }
 
-  const headline = headlinePartsFor(primary, support, candidate);
+  const primaryFact = whyFactFor(primary, candidate);
+  const supportFact = support ? whyFactFor(support, candidate) : undefined;
+  const headline = primaryFact?.headline ?? `${candidate.ticker} 계기는 더 확인해야 해요`;
   const observations = [primary, support]
     .filter((event): event is DiscoveryEvent => !!event)
     .map((event) => observationFor(event, candidate))
-    .filter((text, index, list) => !!text && list.indexOf(text) === index);
-  const evidence = [primary, support]
-    .filter((event): event is DiscoveryEvent => !!event)
-    .map(evidenceFor);
-  const synthesis = synthesisFor(primary, support, candidate);
+    .filter((text, index, list) => !!text && !hasAbstractDiscoveryFiller(text) && list.indexOf(text) === index);
+  const evidence = [primaryFact?.evidence, supportFact?.evidence]
+    .filter((text): text is string => !!text)
+    .filter((text, index, list) => list.indexOf(text) === index);
+  const synthesis = [primaryFact?.synthesis, supportFact ? `보조 숫자: ${supportFact.observation}` : undefined]
+    .filter((text): text is string => !!text && !hasAbstractDiscoveryFiller(text))
+    .join(" ");
 
   return {
-    headline: headline.headline,
-    headlineState: headline.state,
-    headlineDetail: headline.detail,
+    headline,
+    headlineState: primaryFact?.state ?? "확인 필요",
     tag: displayTag(primary),
     tone: eventKindTone(primary),
     primary,
