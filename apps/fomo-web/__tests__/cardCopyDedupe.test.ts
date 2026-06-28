@@ -51,4 +51,5 @@ describe("dedupeCardCopy", () => {
     expect(copy.why).toBe("큰 가격 움직임은 보였지만, 연결된 공개 재료는 아직 확인되지 않았어요.");
     expect(copy.subLine).toBeUndefined();
   });
+
 });

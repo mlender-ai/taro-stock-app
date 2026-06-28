@@ -13,7 +13,7 @@ type CopyCluster =
 
 interface DedupeInput {
   headline: string;
-  why: string;
+  why?: string | undefined;
   feedBull?: FeedSignalPoint | undefined;
   feedBear?: FeedSignalPoint | undefined;
   subLine?: string | undefined;

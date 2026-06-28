@@ -692,6 +692,21 @@ function DetailChart({ front }: { front: StockFrontResponse | null }) {
 
 type ReadPoint = { text: string; source?: string };
 
+const DISCOVERY_REASON_JOINER = " — ";
+
+function splitDiscoveryReason(text: string | undefined): { state?: string; detail?: string } {
+  const clean = (text ?? "").replace(/\s+/g, " ").trim();
+  if (!clean || !clean.includes(DISCOVERY_REASON_JOINER)) return {};
+  const [rawState, ...rest] = clean.split(DISCOVERY_REASON_JOINER);
+  const state = rawState?.trim();
+  const detail = rest.join(DISCOVERY_REASON_JOINER).trim();
+  if (!state || state.length > 16) return {};
+  return {
+    state,
+    ...(detail ? { detail } : {}),
+  };
+}
+
 function uniquePoints(points: ReadPoint[]): ReadPoint[] {
   const seen = new Set<string>();
   return points.filter((p) => {
@@ -864,16 +879,29 @@ function StockSynthesisBlock({
 }) {
   const points = buildReadPoints(front, insight);
   const signalPoints = [...points.bull, ...points.bear, ...points.watch];
-  const observations = uniquePoints(signalPoints).slice(0, 3);
+  const contextParts = splitDiscoveryReason(contextReason);
+  const contextObservation =
+    contextParts.detail && !/뒤를 받칠 수급·거래·뉴스는 아직 안 보여요/.test(contextParts.detail)
+      ? { text: contextParts.detail, source: "카드 근거" }
+      : undefined;
+  const observations = uniquePoints([...(contextObservation ? [contextObservation] : []), ...signalPoints]).slice(0, 3);
   if (observations.length === 0 && !contextReason) return null;
 
   const primary = observations[0];
   const support = primary ? observations.find((p) => !copyRestates(p.text, primary.text)) : undefined;
-  const synthesis = contextReason
-    ? cleanText(contextReason)
-    : support
+  const contextSynthesis =
+    contextParts.state === "혼자 튄 무명주"
+      ? "남들이 덜 보는 종목이 섹터 안에서 먼저 튀었지만, 가격 외 신호는 아직 얇아요."
+      : contextParts.state === "이유 얇은 섹터선두"
+        ? "섹터 안에서 먼저 보인 결과는 있지만, 가격 외 신호는 아직 얇아요."
+        : contextParts.state
+          ? `${contextParts.state}이라서 먼저 확인하는 화면이에요.`
+          : undefined;
+  const synthesis =
+    contextSynthesis ??
+    (support
       ? "서로 다른 확인 신호가 같이 잡혀, 한 가지 숫자만 볼 화면은 아니에요."
-      : "확인된 신호를 가격·수급·원문 근거로 나눠 보는 화면이에요.";
+      : "확인된 신호를 가격·수급·원문 근거로 나눠 보는 화면이에요.");
   const evidence = uniquePoints(observations)
     .map((p) => p.source)
     .filter((source): source is string => !!source)
@@ -887,9 +915,9 @@ function StockSynthesisBlock({
     <section className="mt-6 rounded-2xl border border-hairline bg-surface px-4 py-4">
       <p className="font-pixel text-sm text-whiteout">핵심 줄거리</p>
       <div className="mt-3 space-y-3">
-        <div>
-          <p className="text-[11px] text-muted">관찰</p>
-          {observations.length > 0 ? (
+        {observations.length > 0 && (
+          <div>
+            <p className="text-[11px] text-muted">관찰</p>
             <ul className="mt-1 space-y-1">
               {observations.map((p, i) => (
                 <li key={`obs-${i}`} className="text-sm leading-6 text-whiteout">
@@ -898,20 +926,18 @@ function StockSynthesisBlock({
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className="mt-1 text-sm leading-6 text-muted">아직 나눠 볼 확인 항목은 적어요.</p>
-          )}
-        </div>
+          </div>
+        )}
         <div>
           <p className="text-[11px] text-muted">종합</p>
           <p className="mt-1 text-sm leading-6 text-whiteout">{cleanText(synthesis)}</p>
         </div>
-        <div>
-          <p className="text-[11px] text-muted">증명</p>
-          <p className="mt-1 text-sm leading-6 text-muted">
-            {evidenceLines.length > 0 ? cleanText(evidenceLines.join(" / ")) : "카드에서 넘어온 확인 근거 기준이에요."}
-          </p>
-        </div>
+        {evidenceLines.length > 0 && (
+          <div>
+            <p className="text-[11px] text-muted">증명</p>
+            <p className="mt-1 text-sm leading-6 text-muted">{cleanText(evidenceLines.join(" / "))}</p>
+          </div>
+        )}
       </div>
     </section>
   );

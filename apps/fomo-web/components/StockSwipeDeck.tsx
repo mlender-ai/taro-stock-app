@@ -19,6 +19,7 @@ import type { DeckStock } from "@/lib/discoveryDeck";
 import { isThemeBundleCard, type DiscoveryDeckCard, type DeckThemeBundle } from "@/lib/discoveryDeck";
 import { whyShown } from "@/lib/whyShown";
 import { dedupeCardCopy } from "@/lib/cardCopyDedupe";
+import { compactDiscoveryCardHeadline } from "@/lib/discoveryHeadline";
 import { recordDiscoveryEvent } from "@/lib/discoveryMetrics";
 import { FlameIcon, GemIcon, StarIcon, CaretUpIcon, CaretDownIcon, UndoIcon, HeartIcon, XMarkIcon } from "@/components/icons";
 
@@ -178,12 +179,6 @@ function clampStyle(lines: number): CSSProperties {
     WebkitLineClamp: lines,
     overflow: "hidden",
   };
-}
-
-function compactEvidenceLine(text: string | undefined): string | undefined {
-  const clean = (text ?? "").replace(/\s+/g, " ").trim();
-  if (!clean) return undefined;
-  return clean.length > 58 ? `${clean.slice(0, 57)}…` : clean;
 }
 
 function compactReasonHeadlineSeed(text: string | undefined): string | undefined {
@@ -567,21 +562,30 @@ export function StockSwipeDeck({
 
   // 카드 표현 — 포모 점수(척추, 단일 출처) → fomoCardView.
   // 긴 원문 재료는 why/depth 로 보내고, 앞면은 잘리지 않는 핵심 독해만 남긴다.
-  const cardFor = (stock: DeckStock): { view: FomoCardView; subLine?: string; usedReasonHeadline?: boolean } => {
+  const cardFor = (stock: DeckStock): { view: FomoCardView; subLine?: string; usedDiscoveryHeadline?: boolean } => {
     const e = front[stock.canonical];
     if (!e) {
+      const discoveryHeadline = compactDiscoveryCardHeadline({
+        reason: stock.reason,
+        sector: stock.sector,
+      });
       const view: FomoCardView = {
         scoreText: "",
         emoji: "",
         badge: "신호 확인 중",
-        headline: nonPriceOnlyHeadline(stock.reason) ?? "가격·거래량 근거를 맞춰 불러오고 있어요.",
+        headline: nonPriceOnlyHeadline(discoveryHeadline) ?? "가격·거래량 근거를 맞춰 불러오고 있어요.",
         tone: "calm",
         isLeading: false,
       };
-      return { view, subLine: "가격·거래량 신호를 불러오고 있어요." };
+      return { view, ...(discoveryHeadline ? { usedDiscoveryHeadline: true } : { subLine: "가격·거래량 신호를 불러오고 있어요." }) };
     }
     const fomo = e?.fomo ?? EMPTY_FOMO;
-    const reasonHeadlineSeed = compactReasonHeadlineSeed(stock.reason);
+    const surfaceReasonHeadline = compactDiscoveryCardHeadline({
+      reason: stock.reason,
+      sector: stock.sector,
+      marketCapRank: e?.signals.marketCapRank?.rank,
+    });
+    const reasonHeadlineSeed = surfaceReasonHeadline ?? compactReasonHeadlineSeed(stock.reason);
     const discoveryHeadline = nonPriceOnlyHeadline(reasonHeadlineSeed);
     const signalsForHook: CardFrontSignals = {
       ...(e?.signals ?? {}),
@@ -612,12 +616,11 @@ export function StockSwipeDeck({
       nonPriceOnlyHeadline(legacyHook.headline) ??
       fallbackHeadline;
     const view = { ...baseView, headline };
-    const usedReasonHeadline = !!discoveryHeadline && !e?.signals.newsEventLabel && !axisHook && legacyHook.kind === "news_event";
-    const evidenceLine = usedReasonHeadline ? undefined : compactEvidenceLine(stock.reason);
+    const usedDiscoveryHeadline = !!discoveryHeadline && !!surfaceReasonHeadline;
     return {
       view,
-      ...(evidenceLine || legacyHook.subLine ? { subLine: evidenceLine ?? legacyHook.subLine } : {}),
-      ...(usedReasonHeadline ? { usedReasonHeadline } : {}),
+      ...(!usedDiscoveryHeadline && legacyHook.subLine ? { subLine: legacyHook.subLine } : {}),
+      ...(usedDiscoveryHeadline ? { usedDiscoveryHeadline } : {}),
     };
   };
   const rankLabelFor = (stock: DeckStock): string | undefined => {
@@ -643,10 +646,10 @@ export function StockSwipeDeck({
     if (!e) {
       return <StockCardLoadingFace stock={stock} themeLabel={stock.sector} progress={progress} />;
     }
-    const { view, subLine } = cardFor(stock);
+    const { view, subLine, usedDiscoveryHeadline } = cardFor(stock);
     const deduped = dedupeCardCopy({
       headline: view.headline,
-      why: whyFor(stock),
+      why: usedDiscoveryHeadline ? undefined : whyFor(stock),
       feedBull: e?.feedBull,
       feedBear: e?.feedBear,
       subLine,

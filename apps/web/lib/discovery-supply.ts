@@ -840,6 +840,36 @@ function fallbackDiscoveryReason(candidate: DiscoveryCandidate): string {
   return hasDisplayWhyEvent(candidate) ? discoveryWhy(candidate) : "아직 공개된 계기 없음";
 }
 
+function logDiscoverySignalCoverage(stage: string, candidates: readonly DiscoveryCandidate[]): void {
+  const byKind = new Map<DiscoveryEvent["kind"], number>();
+  let material = 0;
+  let flow = 0;
+  let contextOnly = 0;
+  let priceOnly = 0;
+  let displayWhy = 0;
+  for (const candidate of candidates) {
+    const kinds = new Set(candidate.events.map((event) => event.kind));
+    for (const kind of kinds) byKind.set(kind, (byKind.get(kind) ?? 0) + 1);
+    if (kinds.has("disclosure") || kinds.has("news_mention")) material += 1;
+    if (kinds.has("flow_entry")) flow += 1;
+    if ((kinds.has("theme_link") || kinds.has("market_context")) && !kinds.has("disclosure") && !kinds.has("news_mention") && !kinds.has("flow_entry") && !kinds.has("volume_spike")) {
+      contextOnly += 1;
+    }
+    if (kinds.has("price_move") && kinds.size === 1) priceOnly += 1;
+    if (hasDisplayWhyEvent(candidate)) displayWhy += 1;
+  }
+  console.info("[discovery-supply] signal coverage", {
+    stage,
+    candidates: candidates.length,
+    displayWhy,
+    material,
+    flow,
+    contextOnly,
+    priceOnly,
+    byKind: Object.fromEntries([...byKind.entries()].sort((a, b) => a[0].localeCompare(b[0]))),
+  });
+}
+
 export function recoverDiscoveryCandidates(
   ranked: readonly DiscoveryCandidate[],
   candidates: readonly DiscoveryCandidate[],
@@ -1315,6 +1345,7 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
       marquee: def?.marquee === true,
     };
   });
+  logDiscoverySignalCoverage("before-rank", candidates);
   const rowsByTicker = new Map([...byTicker.entries()].map(([ticker, value]) => [ticker, value.row]));
   let ranked = pushFamousCandidatesOutOfFrontBand(recoverDiscoveryCandidates(
     rankDiscoveryCandidates(candidates, { maxCandidates: DISCOVERY_DECK_CARD_COUNT }),
@@ -1325,6 +1356,7 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     ranked = await hydrateFrontBandMaterial(ranked, rowsByTicker, asOf);
   }
   ranked = await hydrateReachedNewsHooks(ranked, rowsByTicker, asOf);
+  logDiscoverySignalCoverage("after-rank", ranked);
   const fronts: Record<string, DiscoveryFrontSeed> = {};
   const stocks: DiscoveryStockPayload[] = [];
 
