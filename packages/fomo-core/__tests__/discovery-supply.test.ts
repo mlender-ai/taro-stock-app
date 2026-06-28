@@ -76,7 +76,7 @@ describe("WO-05 discovery supply engine", () => {
     const row = candidate("리서치", 0.7, "news_mention", "신규 설비 증설 점검");
     row.events[0]!.source = "한화투자증권 리서치";
 
-    expect(discoveryWhy(row)).toBe("오늘 신규 설비 증설 점검 · 한화투자증권 리서치");
+    expect(discoveryWhy(row)).toBe("뉴스 재료 붙은 종목 — 오늘 신규 설비 증설 점검 · 한화투자증권 리서치.");
     expect(discoveryWhy(row)).not.toContain("언급한 뉴스");
     expect(discoveryWhy(row)).not.toContain("직접 다룬 리서치");
   });
@@ -85,7 +85,7 @@ describe("WO-05 discovery supply engine", () => {
     const row = candidate("연결기사", 0.7, "news_mention", "업종 흐름 기사");
     row.events[0]!.source = "네이버 종목뉴스 연결";
 
-    expect(discoveryWhy(row)).toBe("오늘 업종 흐름 기사 · 네이버 종목뉴스 연결");
+    expect(discoveryWhy(row)).toBe("뉴스 재료 붙은 종목 — 오늘 업종 흐름 기사 · 네이버 종목뉴스 연결.");
     expect(discoveryWhy(row)).not.toContain("직접 언급한 뉴스");
     expect(discoveryWhy(row)).not.toContain("뉴스 탭에 함께 묶인 흐름");
   });
@@ -100,7 +100,7 @@ describe("WO-05 discovery supply engine", () => {
     recentTheme.events[0]!.direction = "up";
 
     expect(hasDisplayWhyEvent(recentNews)).toBe(true);
-    expect(discoveryWhy(recentNews)).toBe("최근 호남 반도체 클러스터 소식 · 뉴스");
+    expect(discoveryWhy(recentNews)).toBe("뉴스 재료 붙은 종목 — 최근 호남 반도체 클러스터 소식 · 뉴스.");
     expect(hasDisplayWhyEvent(staleNews)).toBe(false);
     expect(hasDisplayWhyEvent(recentTheme)).toBe(false);
   });
@@ -234,7 +234,23 @@ describe("WO-05 discovery supply engine", () => {
     expect(isWeakDiscoveryCandidate(market)).toBe(true);
     expect(hasDisplayWhyEvent(theme)).toBe(true);
     expect(isWeakDiscoveryCandidate(theme)).toBe(false);
-    expect(discoveryWhy(theme)).toBe("오늘 원자력 흐름이 셌고, 이 종목이 거기 묶여 있어요.");
+    expect(discoveryWhy(theme)).toBe("이유 얇은 섹터선두 — 원자력 흐름이 셌고, 이 종목이 거기 묶여 있어요. 뒤를 받칠 수급·거래·뉴스는 아직 안 보여요.");
+  });
+
+  it("does not output price-rank-only headlines for theme leaders", () => {
+    const row = candidate("제닉", 0.7, "theme_link", "오늘 화장품 5개 종목 중 제일 셌어요.");
+    row.marketCapRank = 411;
+    row.sector = "화장품";
+    row.events[0]!.direction = "up";
+
+    const insight = synthesizeDiscoveryInsight(row);
+    const [state, detail = ""] = insight.headline.split(" — ");
+
+    expect(state.length).toBeLessThanOrEqual(16);
+    expect(state).toBe("혼자 튄 무명주");
+    expect(detail).toContain("시총 411위권");
+    expect(detail).toContain("뒤를 받칠 수급·거래·뉴스는 아직 안 보여요");
+    expect(insight.headline).not.toBe("오늘 화장품 5개 종목 중 제일 셌어요.");
   });
 
   it("does not treat flat or bearish theme comparison as a display WHY, but keeps an up leader", () => {
