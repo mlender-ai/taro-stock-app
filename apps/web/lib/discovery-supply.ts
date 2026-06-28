@@ -56,14 +56,14 @@ const THEME_BUNDLE_MAX_ITEMS = 4;
 const TARGETED_MATERIAL_CANDIDATE_LIMIT = TARGETED_MATERIAL_DEFAULT_ENABLED
   ? Math.max(0, Math.min(720, Number(process.env.DISCOVERY_TARGETED_MATERIAL_LIMIT ?? 720) || 720))
   : 0;
-const TARGETED_MATERIAL_CONCURRENCY = 8;
+const TARGETED_MATERIAL_CONCURRENCY = 4;
 const NON_STOCK_NAME_PATTERN = /ETF|ETN|KODEX|TIGER|ACE|RISE|SOL\s|PLUS|KBSTAR|HANARO|히어로즈|레버리지|인버스|선물/i;
 const MATERIAL_NEWS_NOISE =
   /인기검색|검색\s?순위|주요\s?뉴스|오늘의\s?증시|마감\s?시황|장중\s?시황|특징주\s?모음|주식\s?초고수|초고수|단타|ETF|ETN|상장지수|레버리지|인버스|TOP\s?\d|상위\s?\d|회장|최고경영자|CEO|고백|회고|소회|인터뷰|기부|ESG|봉사|사회공헌|미담|창업주|오너|가문|고향|강연|도서|출간|어려울\s?때마다|찾았다/i;
 const MATERIAL_NEWS_CATALYST =
   /공시|계약|공급계약|수주|납품|실적|매출|영업이익|순이익|가이던스|전망치|컨센서스|어닝|흑자|적자|턴어라운드|임상|허가|승인|FDA|품목허가|신약|치료제|기술이전|라이선스|증설|공장|양산|수율|수주잔고|M&A|인수|합병|지분|투자|유상증자|무상증자|자사주|배당|분할|상장|정부|정책|규제|지원|보조금|관세|제재|신제품|출시|개발|특허|공급|독점|선정|채택|수출|수입|국책|프로젝트|수혜|클러스터|산단|거점|밸류체인|관련주|부각|모멘텀|호재|주목|협력|제휴/i;
 const US_MATERIAL_NEWS_NOISE =
-  /price\s?target|target price|analyst|rating|upgrade|downgrade|initiates?|maintains?|reiterates?|buybacks?\s+explained|history of|should you buy|stock to buy|better buy|which .* stock|motley fool|zacks|benzinga|investorplace|approach with caution|missing link|strain inside|what you|can it|market rotation|running out of power|internet.?s .+ odd duck|boom is|fears hit|gains as market dips|limps along|afterglow is gone|and more stocks|more stocks that|stocks that|stock market today|market roundup|why .* stock (?:is )?(?:up|down|rising|falling)|\b(?:is|are|was|were)?\s*(?:up|down|higher|lower|gains?|loses?|rises?|falls?)\s+\d+(?:\.\d+)?%|\b(?:is|are|was|were)\s+(?:up|down|higher|lower)\b|shares? (?:rise|fall|slip|jump|gain|lose) after hours/i;
+  /price\s?target|target price|analyst|rating|upgrade|downgrade|initiates?|maintains?|reiterates?|buybacks?\s+explained|history of|buy,\s*sell,\s*or\s*hold|should you buy|stock to buy|better buy|which .* stock|what investors should know|motley fool|zacks|benzinga|investorplace|approach with caution|missing link|strain inside|what you|can it|market rotation|running out of power|internet.?s .+ odd duck|all-time low|gaining ground|more significant dip|boom is|fears hit|gains as market dips|limps along|afterglow is gone|and more stocks|more stocks that|stocks that|stock market today|market roundup|why .* stock (?:is )?(?:up|down|rising|falling)|\b(?:is|are|was|were)?\s*(?:up|down|higher|lower|gains?|loses?|rises?|falls?)\s+\d+(?:\.\d+)?%|\b(?:is|are|was|were)\s+(?:up|down|higher|lower)\b|shares? (?:rise|fall|slip|jump|gain|lose) after hours/i;
 const US_MATERIAL_NEWS_CATALYST =
   /earnings|results|revenue|profit|margin|guidance|forecast|quarter|q[1-4]|contract|deal|order|supply|supplier|customer|partnership|launch|unveil|product|chip|gpu|ai|data center|approval|fda|trial|drug|sec|8-k|10-q|filing|acquisition|merger|stake|investment|buyback authorization|dividend/i;
 const DISCOVERY_SOURCE_LABEL = TARGETED_MATERIAL_DEFAULT_ENABLED
@@ -282,7 +282,7 @@ export function cleanMaterialTitle(title: string): string | undefined {
   return isFrontHookSafe(`${compact} 소식이 나왔어요.`) ? compact : undefined;
 }
 
-export function cleanUsMaterialTitle(title: string): string | undefined {
+export function cleanUsMaterialTitle(title: string, subjectHint?: string): string | undefined {
   const cleaned = decodeHtmlEntities(title)
     .replace(/^\s*(?:\[[^\]]+\]|【[^】]+】|\([^)]*\))\s*/g, "")
     .replace(/[“”"]/g, "")
@@ -294,10 +294,7 @@ export function cleanUsMaterialTitle(title: string): string | undefined {
   }
   if (!US_MATERIAL_NEWS_CATALYST.test(cleaned)) return undefined;
   if (/[\[\]{}<>]/.test(cleaned)) return undefined;
-  const translated = translateUsMaterialTitle(cleaned);
-  if (translated) return translated;
-  const compact = cleaned.length > 68 ? `${cleaned.slice(0, 66).replace(/\s+\S*$/, "").trim()}…` : cleaned;
-  return isFrontHookSafe(`${compact} 소식이 나왔어요.`) ? compact : undefined;
+  return translateUsMaterialTitle(cleaned, subjectHint);
 }
 
 function isPrimaryStockArticle(canonical: string, article: RawArticle): boolean {
@@ -327,8 +324,8 @@ function usSubject(title: string): string | undefined {
   return match?.[1]?.trim().replace(/\s+/g, " ");
 }
 
-function translateUsMaterialTitle(title: string): string | undefined {
-  const subject = usSubject(title);
+function translateUsMaterialTitle(title: string, subjectHint?: string): string | undefined {
+  const subject = subjectHint?.trim() || usSubject(title);
   if (!subject) return undefined;
   const lower = title.toLowerCase();
   let detail: string | undefined;
@@ -344,9 +341,16 @@ function translateUsMaterialTitle(title: string): string | undefined {
     detail = "인수·투자 소식";
   } else if (/launch|unveil|introduce|product|chip|gpu|ai|data center|solution/.test(lower)) {
     detail = "제품·AI 인프라 소식";
+  } else if (/delivery|deliveries/.test(lower)) {
+    detail = "인도량 확인 이슈";
+  } else if (/funding|securitization|liquidity/.test(lower)) {
+    detail = "자금조달·유동화 이슈";
+  } else if (/nuclear|reactor|reactors/.test(lower)) {
+    detail = "원전 설계·개발 이슈";
   }
   if (!detail) return undefined;
-  const translated = `${subject}, ${detail}이 나왔어요.`;
+  const particle = /(공시|이슈)$/.test(detail) ? "가" : "이";
+  const translated = `${subject}, ${detail}${particle} 나왔어요.`;
   return isFrontHookSafe(translated) ? translated : undefined;
 }
 
@@ -366,8 +370,8 @@ function materialEventFromArticle(article: RawArticle, asOf: string, sourceFallb
   };
 }
 
-function materialEventFromUsArticle(article: RawArticle, asOf: string, sourceFallback: string): DiscoveryEvent | null {
-  const label = cleanUsMaterialTitle(article.title);
+function materialEventFromUsArticle(article: RawArticle, asOf: string, sourceFallback: string, subjectHint?: string): DiscoveryEvent | null {
+  const label = cleanUsMaterialTitle(article.title, subjectHint);
   if (!label) return null;
   return {
     kind: "news_mention",
@@ -415,26 +419,19 @@ async function eventFromTargetedMaterial(row: DiscoveryMarketRow, asOf: string):
     }
     const stockNews =
       newsResult.status === "fulfilled"
-        ? newsResult.value.find((article) => materialEventFromUsArticle(article, asOf, "Yahoo Finance") !== null)
+        ? newsResult.value.find((article) => materialEventFromUsArticle(article, asOf, "Yahoo Finance", row.canonical) !== null)
         : undefined;
-    return stockNews ? materialEventFromUsArticle(stockNews, asOf, "Yahoo Finance") : null;
+    return stockNews ? materialEventFromUsArticle(stockNews, asOf, "Yahoo Finance", row.canonical) : null;
   }
   if (!row.naverCode || !/^\d{6}$/.test(row.naverCode)) return null;
-  const [newsResult, researchResult] = await Promise.allSettled([
-    fetchNaverStockNews(row.naverCode, 8),
-    fetchNaverCompanyResearch(row.naverCode, row.canonical, 4),
-  ]);
-
-  const stockNews =
-    newsResult.status === "fulfilled"
-      ? pickTargetedMaterialArticle(row.canonical, newsResult.value)
-      : undefined;
+  const news = await fetchNaverStockNews(row.naverCode, 12);
+  const stockNews = pickTargetedMaterialArticle(row.canonical, news);
   if (stockNews) return materialEventFromArticle(stockNews, asOf, "네이버 종목뉴스");
 
-  const research =
-    researchResult.status === "fulfilled"
-      ? pickTargetedMaterialArticle(row.canonical, researchResult.value)
-      : undefined;
+  const research = pickTargetedMaterialArticle(
+    row.canonical,
+    await fetchNaverCompanyResearch(row.naverCode, row.canonical, 4)
+  );
   if (research) return materialEventFromArticle(research, asOf, "네이버 증권 리서치");
 
   return null;
@@ -722,9 +719,7 @@ function stockPayload(row: DiscoveryMarketRow, candidate: DiscoveryCandidate): D
   const def = resolveStock(candidate.ticker);
   const sector = cleanSectorLabel(candidate.sector) ?? (def ? sectorOf(def.canonical) : undefined);
   const why = discoveryWhy(candidate);
-  const hasMaterial = hasPublicMaterialEvent(candidate);
   const hasDisplayWhy = hasDisplayWhyEvent(candidate);
-  const fallbackWhy = candidate.reason ?? "큰 가격 움직임은 보였지만, 연결된 공개 재료는 확인 안 됨.";
   return {
     canonical: candidate.ticker,
     market: row.market,
@@ -733,10 +728,7 @@ function stockPayload(row: DiscoveryMarketRow, candidate: DiscoveryCandidate): D
     symbol: row.symbol,
     marquee: def?.marquee === true,
     sector: sector ?? inferDiscoverySectorLabel(candidate.ticker, candidate.events, undefined, candidate.asOf),
-    whyShown: hasDisplayWhy
-      ? why
-      : fallbackWhy,
-    ...(hasDisplayWhy || candidate.reason ? { reason: hasDisplayWhy ? why : fallbackWhy } : {}),
+    ...(hasDisplayWhy ? { whyShown: why, reason: why } : candidate.reason ? { whyShown: candidate.reason, reason: candidate.reason } : {}),
   };
 }
 
@@ -749,6 +741,7 @@ function fallbackContextEvent(candidate: DiscoveryCandidate, allowDown = false):
     .filter((event) => {
       if (!isSameDayEvent(event, candidate) || (!allowDown && event.direction === "down")) return false;
       if (event.kind === "price_move") return false;
+      if (event.kind === "theme_link") return true;
       if (event.kind !== "market_context") return true;
       return !!event.label && !/^KOSPI |^KOSDAQ |^NASDAQ |^NYSE /.test(event.label);
     })
@@ -759,17 +752,18 @@ function fallbackContextEvent(candidate: DiscoveryCandidate, allowDown = false):
     })[0];
 }
 
-function fallbackDiscoveryReason(candidate: DiscoveryCandidate): string {
-  const event = fallbackContextEvent(candidate);
-  if (event?.kind === "theme_link" && event.label) return event.label;
-  if (event?.kind === "market_context" && event.label) return event.label;
-  return "오늘 시장에서 다시 확인할 종목으로 남겨뒀어요.";
-}
-
 function fallbackContextQuality(event: DiscoveryEvent): number {
   if (event.kind === "theme_link") return 2;
   if (event.kind === "market_context" && event.label && !/^코스피 |^코스닥 |^NASDAQ |^NYSE /.test(event.label)) return 1;
   return 0;
+}
+
+function fallbackDiscoveryReason(candidate: DiscoveryCandidate): string {
+  const sector = cleanSectorLabel(candidate.sector) ?? "관련 흐름";
+  const event = fallbackContextEvent(candidate, true);
+  if (event?.kind === "theme_link") return `${sector} 안에서 더 확인할 종목이에요.`;
+  if (event?.kind === "market_context") return `${sector} 안에서 더 살펴볼 종목이에요.`;
+  return "오늘 발견 풀에서 더 살펴볼 종목이에요.";
 }
 
 export function recoverDiscoveryCandidates(
@@ -832,6 +826,70 @@ export function recoverDiscoveryCandidates(
     .map((row) => row.candidate);
 
   return [...ranked, ...fallback, ...looseFallback].slice(0, maxCandidates);
+}
+
+function isFamousDiscoveryCandidate(candidate: DiscoveryCandidate): boolean {
+  if (candidate.marquee) return true;
+  const rank = candidate.marketCapRank;
+  return typeof rank === "number" && Number.isFinite(rank) && rank > 0 && rank <= DISCOVERY_RECOVERY_FAMOUS_FRONT_CUTOFF;
+}
+
+function pushFamousCandidatesOutOfFrontBand(
+  candidates: readonly DiscoveryCandidate[],
+  frontBand = 16
+): DiscoveryCandidate[] {
+  const out = [...candidates];
+  for (let i = 0; i < Math.min(frontBand, out.length); i += 1) {
+    const current = out[i];
+    if (!current || !isFamousDiscoveryCandidate(current)) continue;
+    const currentHasDisplayWhy = hasDisplayWhyEvent(current);
+    const replacement = out.findIndex(
+      (row, index) =>
+        index >= frontBand &&
+        !isFamousDiscoveryCandidate(row) &&
+        (!currentHasDisplayWhy || hasDisplayWhyEvent(row))
+    );
+    if (replacement < 0) break;
+    out[i] = out[replacement]!;
+    out[replacement] = current;
+  }
+  return out;
+}
+
+async function hydrateFrontBandMaterial(
+  candidates: readonly DiscoveryCandidate[],
+  rowsByTicker: ReadonlyMap<string, DiscoveryMarketRow>,
+  asOf: string,
+  frontBand = 16
+): Promise<DiscoveryCandidate[]> {
+  const out = [...candidates];
+  const targets = out
+    .slice(0, frontBand)
+    .map((candidate, index) => ({ candidate, index, row: rowsByTicker.get(candidate.ticker) }))
+    .filter((item): item is { candidate: DiscoveryCandidate; index: number; row: DiscoveryMarketRow } =>
+      !!item.row && !hasDisplayWhyEvent(item.candidate)
+    );
+  if (targets.length === 0) return out;
+
+  const hydrated = await mapLimit(targets, 3, async (item) => ({
+    index: item.index,
+    event: await eventFromTargetedMaterial(item.row, asOf),
+  }));
+  for (const result of hydrated) {
+    if (result.status !== "fulfilled" || !result.value.event) continue;
+    const current = out[result.value.index];
+    if (!current) continue;
+    const next: DiscoveryCandidate = {
+      ...current,
+      events: [...current.events, result.value.event],
+    };
+    if (!hasDisplayWhyEvent(next)) continue;
+    out[result.value.index] = {
+      ...next,
+      reason: discoveryWhy(next),
+    };
+  }
+  return out;
 }
 
 function frontSeed(
@@ -1135,12 +1193,15 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
       marquee: def?.marquee === true,
     };
   });
-  const ranked = recoverDiscoveryCandidates(
+  const rowsByTicker = new Map([...byTicker.entries()].map(([ticker, value]) => [ticker, value.row]));
+  let ranked = pushFamousCandidatesOutOfFrontBand(recoverDiscoveryCandidates(
     rankDiscoveryCandidates(candidates, { maxCandidates: DISCOVERY_DECK_CARD_COUNT }),
     candidates,
     DISCOVERY_DECK_CARD_COUNT
-  );
-  const rowsByTicker = new Map([...byTicker.entries()].map(([ticker, value]) => [ticker, value.row]));
+  ));
+  if (targetedMaterialLimit > 0) {
+    ranked = await hydrateFrontBandMaterial(ranked, rowsByTicker, asOf);
+  }
   const fronts: Record<string, DiscoveryFrontSeed> = {};
   const stocks: DiscoveryStockPayload[] = [];
 

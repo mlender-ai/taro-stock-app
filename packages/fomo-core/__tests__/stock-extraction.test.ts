@@ -103,6 +103,25 @@ describe("stockMentionRole — 뉴스 WHY 주어/부차 언급 분리", () => {
     expect(stockMentionRole("삼성전자", item)).toBe("secondary");
     expect(stockMentionRole("엔비디아", item)).toBe("none");
   });
+
+  it("vocab 밖 발견주도 제목에 직접 나오면 primary 로 본다", () => {
+    expect(
+      stockMentionRole("광주신세계", {
+        title: "‘삼전닉스 호남 반도체 클러스터’ 소식에…광주신세계, 1",
+      })
+    ).toBe("primary");
+    expect(
+      stockMentionRole("금호건설", {
+        title: "삼전닉스 호남권에 공장 건설한다는 소식에… 금호건설, 14%대 ↑",
+      })
+    ).toBe("primary");
+    expect(
+      stockMentionRole("광주신세계", {
+        title: "호남 반도체 클러스터 관련주가 들썩",
+        summary: "광주신세계도 함께 언급됐어요.",
+      })
+    ).toBe("secondary");
+  });
 });
 
 describe("테마 풀 확장(B 트랙 §2) — 후킹 테마 추가 + 동적 노출", () => {

@@ -218,6 +218,19 @@ function aliasMatchIndex(def: StockDef, text: string): number {
   return best;
 }
 
+function dynamicNameMatchIndex(canonical: string, text: string): number {
+  const name = canonical.trim();
+  if (name.length < 2 || !isLikelyStock(name)) return Number.POSITIVE_INFINITY;
+  const blob = text.toLowerCase();
+  const low = name.toLowerCase();
+  if (isAsciiAlias(name)) {
+    const match = new RegExp(`(^|[^a-z0-9])${escapeRegex(low)}([^a-z0-9]|$)`, "i").exec(blob);
+    return match ? match.index + (match[1]?.length ?? 0) : Number.POSITIVE_INFINITY;
+  }
+  const index = blob.indexOf(low);
+  return index >= 0 ? index : Number.POSITIVE_INFINITY;
+}
+
 /**
  * 기사/원문이 특정 종목을 어느 정도로 다루는지.
  * - primary: 제목에서 해당 종목이 가장 먼저 등장하거나 제목이 그 종목명으로 시작.
@@ -226,9 +239,13 @@ function aliasMatchIndex(def: StockDef, text: string): number {
  */
 export function stockMentionRole(canonical: string, item: Pick<KeywordSourceItem, "title" | "summary">): StockMentionRole {
   const def = resolveStock(canonical);
-  if (!def) return "none";
   const title = item.title ?? "";
   const summary = item.summary ?? "";
+  if (!def) {
+    const titleIndex = dynamicNameMatchIndex(canonical, title);
+    if (Number.isFinite(titleIndex)) return "primary";
+    return Number.isFinite(dynamicNameMatchIndex(canonical, summary)) ? "secondary" : "none";
+  }
   if (!stockMatchesText(canonical, `${title} ${summary}`)) return "none";
 
   const titleIndex = aliasMatchIndex(def, title);

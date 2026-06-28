@@ -150,7 +150,7 @@ function FomoMeter({ score, color }: { score: number; color: string }) {
 const DIR_COLOR: Record<string, string> = { up: "#FF4D4D", down: "#3B82F6", flat: "#8A8A86" };
 const PRICE_ONLY_REASON_PATTERN = /^오늘 가격이 [+-]?\d+(?:\.\d+)?% 움직였어요/;
 const SURFACE_PRICE_HOOK_PATTERN =
-  /(?:^오늘 가격이|가격 먼저 움직임|가격은 .*거래량|가격은 .*뉴스|오늘 .*제일 많이|오늘 .*가장 강|섹터 평균|평균보다|많이 올랐|[+-]\d+(?:\.\d+)?%|\d+(?:\.\d+)?포인트)/;
+  /(?:^오늘 가격이|가격 먼저 움직임|가격은 .*거래량|가격은 .*뉴스|오늘 .*제일 많이|오늘 .*가장 강|섹터 평균|평균보다|많이 올랐|움직였어요|움직임|강하게 움직|먼저 움직|버텼어요|흐름이 약한 날|주변보다|[+-]\d+(?:\.\d+)?%|\d+(?:\.\d+)?포인트)/;
 
 function nonPriceOnlyHeadline(text: string | undefined): string | undefined {
   if (!text || PRICE_ONLY_REASON_PATTERN.test(text) || SURFACE_PRICE_HOOK_PATTERN.test(text)) return undefined;
