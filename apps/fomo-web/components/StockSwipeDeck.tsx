@@ -164,7 +164,7 @@ function FomoMeter({ score, color }: { score: number; color: string }) {
 const DIR_COLOR: Record<string, string> = { up: "#FF4D4D", down: "#3B82F6", flat: "#8A8A86" };
 const PRICE_ONLY_REASON_PATTERN = /^오늘 가격이 [+-]?\d+(?:\.\d+)?% 움직였어요/;
 const SURFACE_FILLER_HOOK_PATTERN =
-  /(?:더\s*(?:살펴볼|확인할)|발견\s*풀|조용한\s*자리|신호를\s*확인하는\s*중|오늘은\s*뚜렷한\s*신호\s*없음)/;
+  /(?:더\s*(?:살펴볼|확인할)|발견\s*풀|조용한\s*자리|신호를\s*확인하는\s*중|오늘은\s*뚜렷한\s*신호\s*없음|근거는\s*얇|이유\s*얇|흐름\s*(?:이|도)?\s*붙|확인되는\s*화면|눈에\s*띄었어요|한\s*가지\s*숫자만)/;
 const SURFACE_PRICE_HOOK_PATTERN = /(?:^오늘 가격이|^가격 먼저 움직임$|^가격은 .*거래량|^가격은 .*뉴스)/;
 
 function nonPriceOnlyHeadline(text: string | undefined): string | undefined {
@@ -565,7 +565,7 @@ export function StockSwipeDeck({
   const cardFor = (stock: DeckStock): { view: FomoCardView; subLine?: string; usedDiscoveryHeadline?: boolean } => {
     const e = front[stock.canonical];
     if (!e) {
-      const discoveryHeadline = compactDiscoveryCardHeadline({
+      const discoveryHeadline = nonPriceOnlyHeadline(stock.reason) ?? compactDiscoveryCardHeadline({
         reason: stock.reason,
         sector: stock.sector,
       });
@@ -580,11 +580,14 @@ export function StockSwipeDeck({
       return { view, ...(discoveryHeadline ? { usedDiscoveryHeadline: true } : { subLine: "가격·거래량 신호를 불러오고 있어요." }) };
     }
     const fomo = e?.fomo ?? EMPTY_FOMO;
-    const surfaceReasonHeadline = compactDiscoveryCardHeadline({
-      reason: stock.reason,
-      sector: stock.sector,
-      marketCapRank: e?.signals.marketCapRank?.rank,
-    });
+    const rawReasonHeadline = nonPriceOnlyHeadline(stock.reason);
+    const surfaceReasonHeadline =
+      rawReasonHeadline ??
+      compactDiscoveryCardHeadline({
+        reason: stock.reason,
+        sector: stock.sector,
+        marketCapRank: e?.signals.marketCapRank?.rank,
+      });
     const reasonHeadlineSeed = surfaceReasonHeadline ?? compactReasonHeadlineSeed(stock.reason);
     const discoveryHeadline = nonPriceOnlyHeadline(reasonHeadlineSeed);
     const signalsForHook: CardFrontSignals = {

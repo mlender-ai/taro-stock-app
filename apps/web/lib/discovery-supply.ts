@@ -41,6 +41,7 @@ import { computeStockAttentionSignals, type StockAttentionSignal } from "./stock
 import { readSupplyDemandHistoryByTickers } from "./supply-demand-store";
 import { fetchUsMarketRows, latestUsSessionAsOf } from "./us-market-source";
 import { reprocessNewsHook, ruleReprocessNewsHook, type NewsHookInput } from "./news-reprocess";
+import { synthesizeWhyDrivenInsight } from "./insight-synthesis";
 
 const UA = { "User-Agent": "Mozilla/5.0", Accept: "application/json,text/plain,*/*" };
 const MARKETS: DiscoveryMarket[] = ["KOSPI", "KOSDAQ"];
@@ -283,6 +284,7 @@ function eventFromPrice(row: DiscoveryMarketRow, asOf: string): DiscoveryEvent |
     asOf,
     confidence: "H",
     label: `오늘 가격이 ${row.changePct > 0 ? "+" : ""}${row.changePct.toFixed(2)}% 움직였어요.`,
+    changePct: row.changePct,
   };
 }
 
@@ -582,6 +584,11 @@ function eventFromTheme(row: DiscoveryMarketRow, theme: ThemeMoveSignal | undefi
     asOf,
     confidence: "M",
     label,
+    changePct: row.changePct,
+    themeRank: theme.rank,
+    themePeerCount: theme.peerCount,
+    themeAverageChangePct: theme.averageChangePct,
+    themeRelativeChangePct: theme.relativeChangePct,
   };
 }
 
@@ -625,6 +632,11 @@ function eventFromMarketContext(row: DiscoveryMarketRow, theme: ThemeMoveSignal 
       asOf,
       confidence: "M",
       label: relativeLabel,
+      changePct,
+      themeRank: theme.rank,
+      themePeerCount: theme.peerCount,
+      themeAverageChangePct: theme.averageChangePct,
+      themeRelativeChangePct: theme.relativeChangePct,
     };
   }
   if (sector) {
@@ -637,6 +649,7 @@ function eventFromMarketContext(row: DiscoveryMarketRow, theme: ThemeMoveSignal 
         asOf,
         confidence: "M",
         label: formatSectorMarketContextLabel({ sector, rankText, changePct, change }),
+        changePct,
       };
     }
     return {
@@ -647,6 +660,7 @@ function eventFromMarketContext(row: DiscoveryMarketRow, theme: ThemeMoveSignal 
       asOf,
       confidence: "M",
       label: `${sector} 안에서 새로 확인된 시장 흐름이 있어요.`,
+      ...(typeof changePct === "number" ? { changePct } : {}),
     };
   }
   if (typeof changePct === "number" && change) {
@@ -658,6 +672,7 @@ function eventFromMarketContext(row: DiscoveryMarketRow, theme: ThemeMoveSignal 
       asOf,
       confidence: "M",
       label: `${row.market} ${rankText}에서 새로 확인하는 종목이에요.`,
+      changePct,
     };
   }
   return {
@@ -671,6 +686,12 @@ function eventFromMarketContext(row: DiscoveryMarketRow, theme: ThemeMoveSignal 
   };
 }
 
+function flowSharesText(net: number): string {
+  const abs = Math.abs(net);
+  if (abs >= 10_000) return `${Math.round(abs / 10_000).toLocaleString("en-US")}만주`;
+  return `${abs.toLocaleString("en-US")}주`;
+}
+
 function eventFromFlowHistory(history: readonly InvestorFlow[]): DiscoveryEvent | null {
   if (history.length === 0) return null;
   const streak = investorNetStreak(history);
@@ -678,6 +699,8 @@ function eventFromFlowHistory(history: readonly InvestorFlow[]): DiscoveryEvent 
   const n = Math.max(streak.foreign, streak.institution);
   if (n < 2) return null;
   const actor = useForeign ? "외국인이" : "기관이";
+  const latest = [...history].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))[0];
+  const latestNet = latest ? (useForeign ? latest.foreignNet : latest.institutionNet) : undefined;
   return {
     kind: "flow_entry",
     firstSeen: true,
@@ -686,6 +709,56 @@ function eventFromFlowHistory(history: readonly InvestorFlow[]): DiscoveryEvent 
     asOf: history[0]?.date ?? todayKst(),
     confidence: "H",
     label: `${actor} ${n}일째 사는 중이에요.`,
+    flowActor: useForeign ? "foreign" : "institution",
+    flowDays: n,
+    ...(typeof latestNet === "number" && latestNet > 0 ? { flowAmountText: flowSharesText(latestNet) } : {}),
+  };
+}
+
+function volumeRatioFromVolumes(volumes: readonly number[]): number | undefined {
+  if (volumes.length < 6) return undefined;
+  const today = volumes[volumes.length - 1];
+  if (typeof today !== "number" || today <= 0) return undefined;
+  const prev = volumes.slice(-21, -1).filter((value) => value > 0);
+  if (prev.length < 5) return undefined;
+  const avg = prev.reduce((sum, value) => sum + value, 0) / prev.length;
+  return avg > 0 ? today / avg : undefined;
+}
+
+function eventFromVolume(row: DiscoveryMarketRow, ratio: number | undefined, asOf: string): DiscoveryEvent | null {
+  if (typeof ratio !== "number" || ratio < 1.8 || row.changeDir === "down") return null;
+  return {
+    kind: "volume_spike",
+    firstSeen: true,
+    strength: Math.min(1, 0.44 + ratio / 6),
+    source: row.country === "KR" ? "네이버 일봉" : row.sessionLabel ?? "거래량",
+    asOf,
+    confidence: "H",
+    direction: row.changeDir ?? (typeof row.changePct === "number" && row.changePct > 0 ? "up" : "flat"),
+    label: `평소 ${ratio.toFixed(1)}배 거래가 터졌어요.`,
+    volumeRatio: Math.round(ratio * 10) / 10,
+    ...(typeof row.changePct === "number" ? { changePct: row.changePct } : {}),
+  };
+}
+
+function enrichEventWithRow(
+  event: DiscoveryEvent,
+  row: DiscoveryMarketRow,
+  theme: ThemeMoveSignal | undefined,
+  direction: NonNullable<DiscoveryEvent["direction"]>
+): DiscoveryEvent {
+  return {
+    ...event,
+    ...(event.direction ? {} : { direction }),
+    ...(typeof event.changePct === "number" || typeof row.changePct !== "number" ? {} : { changePct: row.changePct }),
+    ...((event.kind === "theme_link" || event.kind === "market_context") && theme
+      ? {
+        themeRank: event.themeRank ?? theme.rank,
+        themePeerCount: event.themePeerCount ?? theme.peerCount,
+        themeAverageChangePct: event.themeAverageChangePct ?? theme.averageChangePct,
+        themeRelativeChangePct: event.themeRelativeChangePct ?? theme.relativeChangePct,
+      }
+      : {}),
   };
 }
 
@@ -786,10 +859,9 @@ function stockPayload(row: DiscoveryMarketRow, candidate: DiscoveryCandidate): D
   const def = resolveStock(candidate.ticker);
   const sector = cleanSectorLabel(candidate.sector) ?? (def ? sectorOf(def.canonical) : undefined);
   const synthesis = synthesizeDiscoveryInsight(candidate);
-  const fallbackThinReason =
-    !synthesis.primary && hasDisplayWhyEvent(candidate)
-      ? `${candidate.ticker} 계기는 더 확인해야 해요`
-      : undefined;
+  const fallbackThinReason = !synthesis.primary && hasDisplayWhyEvent(candidate)
+    ? honestNumericFallbackReason(row, candidate, sector)
+    : undefined;
   const why = synthesis.primary ? synthesis.headline : fallbackThinReason;
   const hasDisplayWhy = hasDisplayWhyEvent(candidate);
   const sourceEvent = synthesis.primary?.kind === "news_mention" || synthesis.primary?.kind === "disclosure" ? synthesis.primary : undefined;
@@ -808,6 +880,18 @@ function stockPayload(row: DiscoveryMarketRow, candidate: DiscoveryCandidate): D
     ...(sourceLabel ? { sourceLabel } : {}),
     ...(sourceEvent?.sourceUrl ? { sourceUrl: sourceEvent.sourceUrl } : {}),
   };
+}
+
+function honestNumericFallbackReason(
+  row: DiscoveryMarketRow,
+  candidate: DiscoveryCandidate,
+  sector: string | undefined
+): string | undefined {
+  const displaySector = cleanSectorLabel(sector) ?? inferDiscoverySectorLabel(candidate.ticker, candidate.events, undefined, candidate.asOf);
+  const rank = typeof row.marketCapRank === "number" ? `시총 ${row.marketCapRank}위 ${displaySector}주` : candidate.ticker;
+  const change = typeof row.changePct === "number" ? `${row.changePct > 0 ? "+" : ""}${row.changePct.toFixed(1)}%` : undefined;
+  if (change) return `${rank} ${change} — 공개 재료·수급·거래량은 아직 비어 있어요`;
+  return typeof row.marketCapRank === "number" ? `${rank} — 공개 재료·수급·거래량은 아직 비어 있어요` : undefined;
 }
 
 function isSameDayEvent(event: DiscoveryEvent, candidate: DiscoveryCandidate): boolean {
@@ -988,7 +1072,12 @@ async function hydrateFrontBandMaterial(
       events: [
         ...current.events,
         withRuleHeadlineHook(
-          result.value.event,
+          enrichEventWithRow(
+            result.value.event,
+            rowsByTicker.get(current.ticker)!,
+            undefined,
+            result.value.event.direction ?? "up"
+          ),
           current.ticker,
           current.sector,
           rowsByTicker.get(current.ticker),
@@ -1014,7 +1103,7 @@ async function hydrateReachedNewsHooks(
     .map((candidate, index) => {
       const primary = synthesizeDiscoveryInsight(candidate).primary;
       const input = primary ? newsHookInputFor(primary, candidate.ticker, candidate.sector, rowsByTicker.get(candidate.ticker), asOf) : undefined;
-      return primary?.kind === "news_mention" && input ? { candidate, index, primary, input } : undefined;
+      return (primary?.kind === "news_mention" || primary?.kind === "disclosure") && input ? { candidate, index, primary, input } : undefined;
     })
     .filter((row): row is { candidate: DiscoveryCandidate; index: number; primary: DiscoveryEvent; input: NewsHookInput } => !!row);
   if (targets.length === 0) return [...candidates];
@@ -1040,6 +1129,44 @@ async function hydrateReachedNewsHooks(
   return out;
 }
 
+function attachReachedVolumeEvents(
+  candidates: readonly DiscoveryCandidate[],
+  rowsByTicker: ReadonlyMap<string, DiscoveryMarketRow>,
+  dailyByTicker: ReadonlyMap<string, { closes: number[]; volumes: number[] }>,
+  asOf: string
+): DiscoveryCandidate[] {
+  return candidates.map((candidate) => {
+    if (candidate.events.some((event) => event.kind === "volume_spike")) return candidate;
+    const row = rowsByTicker.get(candidate.ticker);
+    const daily = dailyByTicker.get(candidate.ticker);
+    if (!row || !daily) return candidate;
+    const event = eventFromVolume(row, volumeRatioFromVolumes(daily.volumes), asOf);
+    if (!event) return candidate;
+    return {
+      ...candidate,
+      events: [...candidate.events, event],
+    };
+  });
+}
+
+async function hydrateReachedWhySynthesis(candidates: readonly DiscoveryCandidate[]): Promise<DiscoveryCandidate[]> {
+  const results = await mapLimit(candidates, 3, async (candidate) => ({
+    ticker: candidate.ticker,
+    result: await synthesizeWhyDrivenInsight(candidate),
+  }));
+  return candidates.map((candidate) => {
+    const found = results.find((row) => row.status === "fulfilled" && row.value.ticker === candidate.ticker);
+    if (!found || found.status !== "fulfilled") return candidate;
+    const insight = found.value.result.insight;
+    if (!insight.primary || insight.headline === "아직 공개된 계기 없음") return candidate;
+    return {
+      ...candidate,
+      reason: insight.headline,
+      synthesizedInsight: insight,
+    };
+  });
+}
+
 function frontSeed(
   row: DiscoveryMarketRow,
   candidate: DiscoveryCandidate,
@@ -1055,6 +1182,7 @@ function frontSeed(
       ? Math.round(Math.max(0, Math.min(1, currentNewsEvent.strength)) * 100)
       : undefined;
   const currentNewsEventLabel = currentNewsEvent?.headlineHook ?? currentNewsEvent?.label;
+  const volumeEvent = candidate.events.find((event) => event.kind === "volume_spike" && typeof event.volumeRatio === "number");
   const mentionSignals =
     attention
       ? { mentionCount: attention.mentionCount, mentionScore: attention.mentionScore }
@@ -1063,6 +1191,7 @@ function frontSeed(
         : undefined;
   const signals: CardFrontSignals = {
     ...(typeof row.changePct === "number" ? { changePct: row.changePct } : {}),
+    ...(typeof volumeEvent?.volumeRatio === "number" ? { volumeRatio: volumeEvent.volumeRatio } : {}),
     ...(mentionSignals ? mentionSignals : {}),
     ...(currentNewsEventLabel ? { newsEventLabel: currentNewsEventLabel } : {}),
     ...(currentNewsEvent?.source ? { newsEventSource: currentNewsEvent.source } : {}),
@@ -1319,8 +1448,9 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     const def = resolveStock(ticker);
     const direction: NonNullable<DiscoveryEvent["direction"]> =
       typeof row.changePct !== "number" ? "flat" : row.changePct > 0 ? "up" : row.changePct < 0 ? "down" : "flat";
-    const directedEvents: DiscoveryEvent[] = events.map((event) => event.direction ? event : { ...event, direction });
-    const sector = row.sectorHint ?? inferDiscoverySectorLabel(ticker, directedEvents, themeSignals.get(ticker), asOf);
+    const theme = themeSignals.get(ticker);
+    const directedEvents: DiscoveryEvent[] = events.map((event) => enrichEventWithRow(event, row, theme, direction));
+    const sector = row.sectorHint ?? inferDiscoverySectorLabel(ticker, directedEvents, theme, asOf);
     const hookedEvents = directedEvents.map((event) => withRuleHeadlineHook(event, ticker, sector, row, asOf));
     const candidateBase: DiscoveryCandidate = {
       ticker,
@@ -1356,24 +1486,31 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     ranked = await hydrateFrontBandMaterial(ranked, rowsByTicker, asOf);
   }
   ranked = await hydrateReachedNewsHooks(ranked, rowsByTicker, asOf);
-  logDiscoverySignalCoverage("after-rank", ranked);
   const fronts: Record<string, DiscoveryFrontSeed> = {};
   const stocks: DiscoveryStockPayload[] = [];
 
-  const sparklineRows = await mapLimit(
+  const dailyRows = await mapLimit(
     ranked.slice(0, DISCOVERY_DECK_CARD_COUNT),
     SPARKLINE_CONCURRENCY,
     async (candidate) => ({
       ticker: candidate.ticker,
-      sparkline:
-        rowsByTicker.get(candidate.ticker)?.sparkline ??
-        (candidate.naverCode ? (await fetchStockDaily(candidate.naverCode, 110)).closes.slice(-42) : []),
+      daily: candidate.naverCode
+        ? await fetchStockDaily(candidate.naverCode, 110)
+        : {
+          candles: [],
+          closes: rowsByTicker.get(candidate.ticker)?.sparkline ?? [],
+          volumes: [],
+        },
     })
   );
+  const dailyByTicker = new Map(
+    dailyRows.flatMap((row) => (row.status === "fulfilled" ? [[row.value.ticker, row.value.daily] as const] : []))
+  );
+  ranked = attachReachedVolumeEvents(ranked, rowsByTicker, dailyByTicker, asOf);
+  ranked = await hydrateReachedWhySynthesis(ranked);
+  logDiscoverySignalCoverage("after-rank", ranked);
   const sparklineByTicker = new Map(
-    sparklineRows
-      .filter((row): row is PromiseFulfilledResult<{ ticker: string; sparkline: number[] }> => row.status === "fulfilled")
-      .map((row) => [row.value.ticker, row.value.sparkline] as const)
+    [...dailyByTicker.entries()].map(([ticker, daily]) => [ticker, daily.closes.slice(-42)] as const)
   );
 
   for (const candidate of ranked) {

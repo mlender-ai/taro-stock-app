@@ -81,7 +81,7 @@ describe("WO-05 discovery supply engine", () => {
     row.events[0]!.sourceName = "한화투자증권 리서치";
     row.events[0]!.headlineHook = "설비 증설 이슈가 확인됐어요";
 
-    expect(discoveryWhy(row)).toBe("뉴스 재료 붙은 종목 — 오늘 설비 증설 이슈가 확인됐어요.");
+    expect(discoveryWhy(row)).toBe("리서치, 설비 증설 이슈가 확인됐어요");
     expect(discoveryWhy(row)).not.toContain("신규 설비 증설 점검");
     expect(discoveryWhy(row)).not.toContain("한화투자증권 리서치");
     expect(discoveryWhy(row)).not.toContain("언급한 뉴스");
@@ -95,7 +95,7 @@ describe("WO-05 discovery supply engine", () => {
     row.events[0]!.sourceName = "네이버 종목뉴스 연결";
     row.events[0]!.headlineHook = "업종 흐름에 함께 묶였어요";
 
-    expect(discoveryWhy(row)).toBe("뉴스 재료 붙은 종목 — 오늘 업종 흐름에 함께 묶였어요.");
+    expect(discoveryWhy(row)).toBe("연결기사, 업종 흐름에 함께 묶였어요");
     expect(discoveryWhy(row)).not.toContain("업종 흐름 기사");
     expect(discoveryWhy(row)).not.toContain("네이버 종목뉴스 연결");
     expect(discoveryWhy(row)).not.toContain("직접 언급한 뉴스");
@@ -115,7 +115,7 @@ describe("WO-05 discovery supply engine", () => {
     recentTheme.events[0]!.direction = "up";
 
     expect(hasDisplayWhyEvent(recentNews)).toBe(true);
-    expect(discoveryWhy(recentNews)).toBe("뉴스 재료 붙은 종목 — 최근 호남 클러스터에 관련주로 묶임.");
+    expect(discoveryWhy(recentNews)).toBe("최근뉴스, 호남 클러스터에 관련주로 묶임");
     expect(hasDisplayWhyEvent(staleNews)).toBe(false);
     expect(hasDisplayWhyEvent(recentTheme)).toBe(false);
   });
@@ -177,10 +177,10 @@ describe("WO-05 discovery supply engine", () => {
     expect(insight.headline).not.toContain("거래량");
     expect(insight.tag).toBe("뉴스 재료");
     expect(insight.observations).toHaveLength(2);
-    expect(insight.observations[0]).toBe("계약 재료가 새로 확인됐어요.");
+    expect(insight.observations[0]).toBe("오늘 계약 재료가 새로 확인됐어요.");
     expect(insight.observations[1]).toContain("거래량");
-    expect(insight.synthesis).toContain("새로 나온 원문");
-    expect(insight.synthesis).toContain("거래 반응");
+    expect(insight.synthesis).toContain("계약 재료");
+    expect(insight.synthesis).toContain("3배");
     expect(insight.evidence[0]).toContain("공급계약 공시");
     expect(insight.evidence[0]).toContain("한국경제");
     expect(discoveryWhy(row)).toBe(insight.headline);
@@ -267,7 +267,9 @@ describe("WO-05 discovery supply engine", () => {
     expect(isWeakDiscoveryCandidate(market)).toBe(true);
     expect(hasDisplayWhyEvent(theme)).toBe(true);
     expect(isWeakDiscoveryCandidate(theme)).toBe(false);
-    expect(discoveryWhy(theme)).toBe("이유 얇은 섹터선두 — 원자력 흐름이 셌고, 이 종목이 거기 묶여 있어요. 뒤를 받칠 수급·거래·뉴스는 아직 안 보여요.");
+    expect(discoveryWhy(theme)).toBe("테마, 원자력 테마");
+    expect(discoveryWhy(theme)).not.toContain("근거는 얇");
+    expect(discoveryWhy(theme)).not.toContain("흐름도 붙");
   });
 
   it("does not output price-rank-only headlines for theme leaders", () => {
@@ -277,12 +279,10 @@ describe("WO-05 discovery supply engine", () => {
     row.events[0]!.direction = "up";
 
     const insight = synthesizeDiscoveryInsight(row);
-    const [state, detail = ""] = insight.headline.split(" — ");
-
-    expect(state.length).toBeLessThanOrEqual(16);
-    expect(state).toBe("혼자 튄 무명주");
-    expect(detail).toContain("시총 411위권");
-    expect(detail).toContain("뒤를 받칠 수급·거래·뉴스는 아직 안 보여요");
+    expect(insight.headline).toContain("시총 411위");
+    expect(insight.headline).toContain("화장품");
+    expect(insight.headline).toContain("1/5");
+    expect(insight.synthesis).toContain("공개 재료·수급·거래량은 아직 비어 있어요");
     expect(insight.headline).not.toBe("오늘 화장품 5개 종목 중 제일 셌어요.");
   });
 
