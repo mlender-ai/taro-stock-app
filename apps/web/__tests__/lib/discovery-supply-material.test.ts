@@ -161,12 +161,17 @@ describe("discovery specific hook copy", () => {
     lucid.sector = "전기차";
 
     expect(hasDisplayWhyEvent(geumho)).toBe(true);
-    expect(discoveryWhy(geumho)).toBe("오늘 건설 안에서 시총 461위권 종목의 변동성이 크게 잡혔어요.");
+    expect(discoveryWhy(geumho)).toBe(
+      "혼자 튄 무명주 — 시총 461위권인데 건설 안에서 시총 461위권 종목의 변동성이 크게 잡혔어요. 뒤를 받칠 수급·거래·뉴스는 아직 안 보여요."
+    );
     expect(discoveryWhy(geumho)).not.toMatch(bannedFillerPattern);
 
     expect(hasDisplayWhyEvent(lucid)).toBe(true);
-    expect(discoveryWhy(lucid)).toBe("오늘 전기차 4개 종목 중 제일 셌어요.");
+    expect(discoveryWhy(lucid)).toBe(
+      "혼자 튄 무명주 — 시총 240위권인데 같은 전기차 종목들 중 오늘 제일 셌어요. 뒤를 받칠 수급·거래·뉴스는 아직 안 보여요."
+    );
     expect(discoveryWhy(lucid)).not.toMatch(bannedFillerPattern);
+    expect(discoveryWhy(lucid)).not.toBe("오늘 전기차 4개 종목 중 제일 셌어요.");
   });
 
   it("keeps banned filler headline strings out of active discovery/card paths", () => {
