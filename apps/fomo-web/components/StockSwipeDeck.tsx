@@ -983,6 +983,8 @@ export function StockSwipeDeck({
           context={{
             fromTheme: selected.sector,
             reason: whyFor(selected),
+            ...(selected.sourceLabel ? { sourceLabel: selected.sourceLabel } : {}),
+            ...(selected.sourceUrl ? { sourceUrl: selected.sourceUrl } : {}),
             ...(selected.naverCode ? { naverCode: selected.naverCode } : {}),
             ...(selected.symbol ? { symbol: selected.symbol } : {}),
             market: selected.market,
