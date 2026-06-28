@@ -103,6 +103,7 @@ export const DISCOVERY_FAMOUS_FRONT_RANK_CUTOFF = 30;
 export const DISCOVERY_FAMOUS_FRONT_BAND_SIZE = 16;
 export const DISCOVERY_FAMOUS_DECK_MIX_COUNT = 4;
 export const DISCOVERY_AWAKENING_RANK_MIN = 150;
+export const DISCOVERY_RECENT_MATERIAL_DAYS = 3;
 
 const RISK_FLAG_PATTERN = /관리|투자경고|투자위험|거래정지|단기과열|이상급등/;
 
@@ -135,7 +136,7 @@ export function eligibleUniverse(
 }
 
 export function hasPublicMaterialEvent(candidate: DiscoveryCandidate): boolean {
-  return candidate.events.some((event) => isCurrentDeckEvent(event, candidate) && isMaterialEvent(event));
+  return candidate.events.some((event) => isDeckDisplayEvent(event, candidate) && isMaterialEvent(event));
 }
 
 function isConstructiveThemeEvent(event: DiscoveryEvent): boolean {
@@ -151,8 +152,27 @@ function sameDay(a: string | undefined, b: string | undefined): boolean {
   return a.slice(0, 10) === b.slice(0, 10);
 }
 
+function dayStart(value: string | undefined): number | undefined {
+  const date = value?.slice(0, 10);
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return undefined;
+  const time = Date.parse(`${date}T00:00:00Z`);
+  return Number.isFinite(time) ? time : undefined;
+}
+
+function eventAgeDays(event: DiscoveryEvent, candidate: DiscoveryCandidate): number | undefined {
+  const eventDay = dayStart(event.asOf);
+  const deckDay = dayStart(candidate.asOf);
+  if (typeof eventDay !== "number" || typeof deckDay !== "number") return undefined;
+  return Math.round((deckDay - eventDay) / 86_400_000);
+}
+
 function isCurrentDeckEvent(event: DiscoveryEvent, candidate: DiscoveryCandidate): boolean {
   return sameDay(event.asOf, candidate.asOf);
+}
+
+function isRecentDeckEvent(event: DiscoveryEvent, candidate: DiscoveryCandidate, maxDays: number): boolean {
+  const age = eventAgeDays(event, candidate);
+  return typeof age === "number" && age >= 0 && age <= maxDays;
 }
 
 function isMaterialEvent(event: DiscoveryEvent): boolean {
@@ -173,8 +193,9 @@ function isDisplayVolumeEvent(event: DiscoveryEvent): boolean {
 }
 
 export function isDeckDisplayEvent(event: DiscoveryEvent, candidate: DiscoveryCandidate): boolean {
+  if (isMaterialEvent(event)) return isRecentDeckEvent(event, candidate, DISCOVERY_RECENT_MATERIAL_DAYS);
   if (!isCurrentDeckEvent(event, candidate)) return false;
-  return isMaterialEvent(event) || isConstructiveThemeEvent(event) || isDisplayVolumeEvent(event);
+  return isDisplayVolumeEvent(event);
 }
 
 export function hasDeckDisplayEvent(candidate: DiscoveryCandidate): boolean {
