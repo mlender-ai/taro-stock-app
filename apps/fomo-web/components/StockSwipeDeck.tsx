@@ -438,7 +438,7 @@ function StockCardLoadingFace({
       <div className="mt-7 rounded-lg border border-hairline bg-white/[0.035] px-3 py-3">
         <span className="block text-[10px] text-muted">카드 준비 중</span>
         <span className="mt-1 block text-sm leading-6 text-whiteout">
-          가격·수급·언급 근거를 맞춰 불러오고 있어요.
+          카드 내용을 준비하고 있어요.
         </span>
       </div>
 
@@ -551,11 +551,11 @@ export function StockSwipeDeck({
         scoreText: "",
         emoji: "",
         badge: "신호 확인 중",
-        headline: serverHeadline ?? "신호를 불러오고 있어요.",
+        headline: serverHeadline ?? "카드 준비 중",
         tone: "calm",
         isLeading: false,
       };
-      return { view, ...(serverHeadline ? { usedDiscoveryHeadline: true } : { subLine: "가격·수급·원문 근거를 맞춰 불러오고 있어요." }) };
+      return { view, ...(serverHeadline ? { usedDiscoveryHeadline: true } : { subLine: "카드 내용을 준비하고 있어요." }) };
     }
     const fomo = e?.fomo ?? EMPTY_FOMO;
     const signalsForHook: CardFrontSignals = {
@@ -573,7 +573,7 @@ export function StockSwipeDeck({
       ...(typeof e?.signals.changePct === "number" ? { changePct: e.signals.changePct } : {}),
       ...(typeof e?.signals.marketCapRank?.rank === "number" ? { marketCapRank: e.signals.marketCapRank.rank } : {}),
     });
-    const headline = serverHeadline ?? "신호를 불러오고 있어요.";
+    const headline = serverHeadline ?? "카드 준비 중";
     const view = { ...baseView, headline };
     const usedDiscoveryHeadline = !!serverHeadline;
     return {
