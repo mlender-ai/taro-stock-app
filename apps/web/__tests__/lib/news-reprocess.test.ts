@@ -61,6 +61,31 @@ describe("news hook reprocessing", () => {
     ).toBe("1분기 실적 발표에 +11%");
   });
 
+  it("localizes English counterparties instead of leaking fragments into Korean", () => {
+    const hook = ruleReprocessNewsHook({
+      ...base,
+      stock: "NN Inc.",
+      sector: "산업재",
+      title: "NN, Inc. Awarded Contract From its NVIDIA Product Partner",
+      changePct: 97.58,
+    });
+
+    expect(hook).toBeDefined();
+    expect(hook).toContain("엔비디아");
+    expect(hook).toContain("+98%");
+    expect(hook).not.toMatch(/\bits\b|NVIDIA|Can와/i);
+  });
+
+  it("rejects English stopword fragments as counterparties", () => {
+    expect(
+      ruleReprocessNewsHook({
+        ...base,
+        stock: "스노우플레이크",
+        title: "Snowflake (SNOW) Down 5.1% Since Last Earnings Report: Can It Rebound",
+      })
+    ).toBeUndefined();
+  });
+
   it("rejects abstract template fillers instead of letting them reach the card", () => {
     expect(validateReprocessedNewsHook("계약 재료가 새로 확인됐어요", base)).toBeUndefined();
     expect(validateReprocessedNewsHook("직접 재료가 붙었어요", base)).toBeUndefined();
