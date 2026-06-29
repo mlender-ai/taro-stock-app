@@ -31,6 +31,8 @@ export interface NewsHookResult {
 
 const cache = new Map<string, NewsHookResult>();
 const GENERIC_TITLE_PATTERN = /^(?:(?:제품·AI 인프라|실적·가이던스|고객·파트너십|인도량 확인|자금조달·유동화)\s*소식|SEC 공시|소식|뉴스)(?:이|가)?\s*나왔어요\.?$/i;
+const US_MARKET_NOISE_PATTERN =
+  /\b(?:what\s+you\s+should\s+know|can\s+it\s+rebound|is\s+it\s+time\s+to|better\s+buy|price\s+target|stock\s+eyes|why\s+these\s+stocks|these\s+stocks|stocks\s+posted|after[-\s]?hours?)\b/i;
 
 function cacheKey(input: NewsHookInput): string {
   return [input.asOf.slice(0, 10), input.stock, input.sector ?? "", input.title, input.summary ?? "", input.changePct ?? "", input.source ?? ""].join("\u001f");
@@ -134,19 +136,54 @@ function pickMonthLabel(title: string): string | undefined {
 function cleanEnglishPhrase(value: string | undefined): string | undefined {
   if (!value) return undefined;
   if (/\baerospace\s+customer\b/i.test(value)) return "항공우주 고객";
+  const knownCompany = localizeKnownEnglishCompany(value);
+  if (knownCompany) return knownCompany;
   const cleaned = value
     .replace(/\b(?:Inc|Corp|Corporation|Co|Company|Ltd|PLC|LLC|Holdings?|Group|The)\b\.?/gi, "")
     .replace(
-      /\b(?:new|major|strategic|global|retail|media|data|hub|customer|customers|partnership|deal|contract|order|key|as|role|seat)\b/gi,
+      /\b(?:its|new|major|strategic|global|retail|media|data|hub|customer|customers|partnership|deal|contract|order|key|as|role|seat|can|why|these|stocks?|posted|double|digit|after|hours?|today|eyes?|june|delivery|deliveries|moved|more|market|is|are|was|were|has|had|have|will|could|should|rebound)\b/gi,
       ""
     )
-    .replace(/\b(?:with|from|by|for|of)\b/gi, "")
+    .replace(/\b(?:with|from|by|for|of|to|in|on|and)\b/gi, "")
     .replace(/^\d+[-\s]*/, "")
     .replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();
   if (!cleaned || cleaned.length < 2) return undefined;
+  if (
+    /^(?:can|why|these|stocks?|stock|posted|double|digit|after|hours?|today|eyes?|june|delivery|deliveries|moved|more|market|rebound)$/i.test(
+      cleaned
+    )
+  ) {
+    return undefined;
+  }
   return localizeEnglishPhrase(cleaned.split(/\s+/).slice(0, 3).join(" "));
+}
+
+function localizeKnownEnglishCompany(value: string | undefined): string | undefined {
+  const clean = value ?? "";
+  const known: Array<[RegExp, string]> = [
+    [/\bNVIDIA\b/i, "엔비디아"],
+    [/\bTesla\b/i, "테슬라"],
+    [/\bStellantis\b/i, "스텔란티스"],
+    [/\bMicrosoft\b/i, "마이크로소프트"],
+    [/\bApple\b/i, "애플"],
+    [/\bAmazon\b/i, "아마존"],
+    [/\bAlphabet\b|\bGoogle\b/i, "구글"],
+    [/\bMeta\b/i, "메타"],
+    [/\bPalantir\b/i, "팔란티어"],
+    [/\bCrowdStrike\b/i, "크라우드스트라이크"],
+    [/\bServiceNow\b/i, "서비스나우"],
+    [/\bWorkday\b/i, "워크데이"],
+    [/\bOracle\b/i, "오라클"],
+    [/\bOpenAI\b/i, "오픈AI"],
+    [/\bAdvanced Micro Devices\b|\bAMD\b/i, "AMD"],
+    [/\bTaiwan Semiconductor\b|\bTSMC\b/i, "TSMC"],
+    [/\bLucid\b/i, "루시드"],
+    [/\bRivian\b/i, "리비안"],
+    [/\bNIO\b/i, "니오"],
+  ];
+  return known.find(([pattern]) => pattern.test(clean))?.[1];
 }
 
 function localizeEnglishPhrase(value: string): string {
@@ -160,6 +197,23 @@ function localizeEnglishPhrase(value: string): string {
     nvidia: "엔비디아",
     tesla: "테슬라",
     stellantis: "스텔란티스",
+    microsoft: "마이크로소프트",
+    apple: "애플",
+    amazon: "아마존",
+    alphabet: "구글",
+    google: "구글",
+    meta: "메타",
+    palantir: "팔란티어",
+    crowdstrike: "크라우드스트라이크",
+    servicenow: "서비스나우",
+    workday: "워크데이",
+    oracle: "오라클",
+    openai: "오픈AI",
+    "advanced micro devices": "AMD",
+    "taiwan semiconductor": "TSMC",
+    lucid: "루시드",
+    rivian: "리비안",
+    nio: "니오",
     "soundhound ai": "사운드하운드AI",
     "voice commerce platform": "음성 커머스 플랫폼",
     "chipmaking systems": "반도체 제조 시스템",
@@ -389,7 +443,7 @@ function pickLeadClause(title: string): string | undefined {
 
 export function ruleReprocessNewsHook(input: NewsHookInput): string | undefined {
   const title = cleanInline(stripStockName(input.title, input.stock));
-  if (!title || GENERIC_TITLE_PATTERN.test(title)) return undefined;
+  if (!title || GENERIC_TITLE_PATTERN.test(title) || US_MARKET_NOISE_PATTERN.test(title)) return undefined;
 
   for (const hook of candidateHooks(input, title)) {
     const normalized = normalizeHookPhrase(hook);

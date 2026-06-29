@@ -245,7 +245,10 @@ export function hasExcessiveLatinHeadline(text: string | undefined): boolean {
 }
 
 const LATIN_ALLOWED_TOKEN = /^(?:AI|GPU|CPU|SEC|KRX|DART|KOSPI|KOSDAQ|NYSE|NASDAQ|ETF|IPO|ESS|FDA|8-K|10-Q|10-K|SK)$/i;
-const ENGLISH_FRAGMENT_TOKEN = /^(?:its|the|with|and|for|from|by|of|to|in|on|as|a|an|inc|corp|co|company|holdings?|group|plc|llc)$/i;
+const ENGLISH_FRAGMENT_TOKEN =
+  /^(?:its|the|with|and|for|from|by|of|to|in|on|as|a|an|can|why|these|stocks?|stock|posted|double|digit|after|hours?|today|eyes?|june|delivery|deliveries|moved|more|market|inc|corp|co|company|holdings?|group|plc|llc)$/i;
+const LATIN_WITH_KOREAN_PARTICLE_PATTERN =
+  /\b([A-Za-z][A-Za-z0-9&'().-]*)\s*(?:와|과|의|가|이|은|는|을|를|에|에서|로|으로|도|만)/g;
 
 export function hasEnglishFragmentHeadline(text: string | undefined): boolean {
   const clean = cleanInline(text);
@@ -254,6 +257,10 @@ export function hasEnglishFragmentHeadline(text: string | undefined): boolean {
   if (latinWords.length === 0) return false;
   const koChars = (clean.match(/[가-힣]/g) ?? []).length;
   const meaningful = latinWords.filter((word) => !LATIN_ALLOWED_TOKEN.test(word));
+  for (const match of clean.matchAll(LATIN_WITH_KOREAN_PARTICLE_PATTERN)) {
+    const token = match[1];
+    if (token && !LATIN_ALLOWED_TOKEN.test(token)) return true;
+  }
   if (meaningful.some((word) => ENGLISH_FRAGMENT_TOKEN.test(word))) return true;
   if (koChars === 0 && meaningful.length > 0) return true;
   if (meaningful.length >= 2) return true;

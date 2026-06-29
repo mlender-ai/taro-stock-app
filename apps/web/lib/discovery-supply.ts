@@ -317,6 +317,7 @@ export function cleanUsMaterialTitle(title: string): string | undefined {
   if (!cleaned || cleaned.length < 6 || MATERIAL_NEWS_NOISE.test(cleaned) || US_MATERIAL_NEWS_NOISE.test(cleaned)) {
     return undefined;
   }
+  if (isUsBundleArticleTitle(cleaned)) return undefined;
   if (!US_MATERIAL_NEWS_CATALYST.test(cleaned)) return undefined;
   if (/[\[\]{}<>]/.test(cleaned)) return undefined;
   return cleaned;
@@ -431,9 +432,13 @@ function isUsBundleArticleTitle(title: string | undefined): boolean {
   const clean = decodeHtmlEntities(title ?? "").replace(/\s+/g, " ").trim();
   if (!clean) return false;
   const beforeColon = clean.split(":")[0] ?? "";
-  const tickers = beforeColon.match(/\b[A-Z]{2,5}\b/g) ?? [];
+  if (/^[A-Z]{1,5}(?:\s*,\s*[A-Z]{1,5}){1,}\s*:/i.test(clean)) return true;
+  const tickers = beforeColon.match(/\b[A-Z]{1,5}\b/g) ?? [];
   if (tickers.length >= 2 && /,|and|&/i.test(beforeColon)) return true;
-  return /\bwhy\s+these\s+stocks\b/i.test(clean) && tickers.length >= 2;
+  if (/\b(?:why\s+these\s+stocks|these\s+stocks|stocks\s+posted|after[-\s]?hours?|more\s+stocks\s+that\s+moved|and\s+more\s+stocks)\b/i.test(clean)) {
+    return true;
+  }
+  return false;
 }
 
 function cleanMaterialSummary(summary: string | undefined): string | undefined {
