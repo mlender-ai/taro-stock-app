@@ -22,6 +22,7 @@ import { dedupeCardCopy } from "@/lib/cardCopyDedupe";
 import { recordDiscoveryEvent } from "@/lib/discoveryMetrics";
 import { isKrStockCode, stockLogoApiSrcForStock } from "@/lib/stockLogo";
 import { FlameIcon, GemIcon, StarIcon, CaretUpIcon, CaretDownIcon, UndoIcon, HeartIcon, XMarkIcon } from "@/components/icons";
+import { FlickerSpinner } from "@/components/FlickerSpinner";
 
 /**
  * 공통 종목 무한 스와이프 덱.
@@ -139,7 +140,8 @@ function Sparkline({ series }: { series: number[] }) {
 function ChartSlot({ series, supported }: { series?: number[] | undefined; supported: boolean }) {
   if (series && series.length >= 2) return <Sparkline series={series} />;
   return (
-    <div className="mt-2 flex h-8 w-full shrink-0 items-center justify-center rounded-lg border border-hairline bg-white/[0.03]">
+    <div className="mt-2 flex h-8 w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-hairline bg-white/[0.03]">
+      {supported && <FlickerSpinner size={14} />}
       <span className="font-pixel text-[10px] text-muted">
         {supported ? "차트 불러오는 중" : "차트 데이터 없음"}
       </span>
