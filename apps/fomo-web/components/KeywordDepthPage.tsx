@@ -27,6 +27,7 @@ import {
   type StockFrontResponse,
 } from "@/lib/fomoApi";
 import { isWatched, toggleWatch } from "@/lib/watchlist";
+import { FlickerSpinner } from "@/components/FlickerSpinner";
 
 /**
  * 키워드 뎁스 페이지 — 카드/히스토리에서 공용. KEYWORD_CARD_FEED_DEV_SPEC v3 §3.
@@ -155,10 +156,9 @@ export function KeywordDepthPage({ card, onClose }: { card: KeywordCard; onClose
             </div>
 
             {loading ? (
-              <div className="mt-3 space-y-2" aria-busy="true">
+              <div className="mt-3 flex flex-col items-center gap-2 py-5" aria-busy="true">
+                <FlickerSpinner size={32} />
                 <p className="text-sm leading-6 text-muted">원문을 정리하는 중이에요…</p>
-                <div className="h-16 animate-pulse rounded-lg border border-hairline bg-surface" />
-                <div className="h-16 animate-pulse rounded-lg border border-hairline bg-surface" />
               </div>
             ) : hasInsight ? (
             <>
@@ -946,9 +946,8 @@ function StockDepthLoadingBlock() {
       <p className="mt-2 text-sm leading-6 text-muted">
         가격·차트·원문 근거를 한 번에 맞춰 불러오고 있어요.
       </p>
-      <div className="mt-4 space-y-2">
-        <div className="h-3 w-5/6 animate-pulse rounded-full bg-white/10" />
-        <div className="h-3 w-2/3 animate-pulse rounded-full bg-white/10" />
+      <div className="mt-5 flex justify-center">
+        <FlickerSpinner size={36} />
       </div>
     </section>
   );
