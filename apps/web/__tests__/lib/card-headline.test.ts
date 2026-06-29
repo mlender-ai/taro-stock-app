@@ -142,4 +142,64 @@ describe("resolveCardHeadline", () => {
     expect(result.text).not.toContain("D-Wave");
     expect(result.provenance).toBe("rule");
   });
+
+  it("allows strong US momentum only as an honest non-material headline", async () => {
+    const event: DiscoveryEvent = {
+      kind: "price_move",
+      firstSeen: true,
+      strength: 0.8,
+      source: "market",
+      asOf: "2026-06-29",
+      confidence: "M",
+      changePct: 12.4,
+    };
+    const usCandidate: DiscoveryCandidate = {
+      ticker: "루시드",
+      market: "NASDAQ",
+      country: "US",
+      sector: "전기차",
+      events: [event],
+      asOf: "2026-06-29",
+    };
+
+    const result = await resolveCardHeadline({
+      candidate: usCandidate,
+      synthesis: synthesis({ primary: event }),
+    });
+
+    expect(result.provenance).toBe("rule_nonmaterial");
+    expect(result.text).toContain("+12.4%");
+    expect(result.text).not.toMatch(/계기\s*없음|직접\s*재료|소식에\s*반응/);
+  });
+
+  it("suppresses weak US non-material moves instead of filling the deck", async () => {
+    const event: DiscoveryEvent = {
+      kind: "price_move",
+      firstSeen: false,
+      strength: 0.25,
+      source: "market",
+      asOf: "2026-06-29",
+      confidence: "L",
+      changePct: 3.2,
+    };
+    const usCandidate: DiscoveryCandidate = {
+      ticker: "몽고DB",
+      market: "NASDAQ",
+      country: "US",
+      sector: "클라우드",
+      events: [event],
+      asOf: "2026-06-29",
+    };
+
+    const result = await resolveCardHeadline({
+      candidate: usCandidate,
+      synthesis: synthesis({ primary: event }),
+    });
+
+    expect(result).toMatchObject({
+      text: "",
+      provenance: "suppressed",
+      method: "none",
+    });
+  });
 });

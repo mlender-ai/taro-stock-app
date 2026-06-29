@@ -9,9 +9,10 @@ import {
 import { hasConcreteSourceValue, hasExcessiveLatinHeadline, isAbstractTemplate, isRawTitleCopy } from "../apps/web/lib/copy-guards";
 import type { DiscoveryCountryScope } from "../apps/web/lib/market-source-types";
 
-type HeadlinePath = "raw_title" | "abstract_template" | "why_synthesis" | "fallback_no_event";
+type HeadlinePath = "raw_title" | "abstract_template" | "why_synthesis" | "rule_nonmaterial" | "fallback_no_event";
 type HeadlineMethod = "ai" | "rule" | "fallback" | "none";
-type ProvenanceEventKind = "news_mention" | "disclosure" | "volume_spike" | "none";
+type ProvenanceEventKind = "news_mention" | "disclosure" | "volume_spike" | "price_move" | "market_context" | "theme_link" | "none";
+type HeadlineTrack = "A_material" | "B_momentum" | "suppressed";
 
 interface Args {
   country: DiscoveryCountryScope;
@@ -25,6 +26,7 @@ interface HeadlineProvenanceRow {
   country: DiscoveryCountryScope | string;
   headline: string;
   path: HeadlinePath;
+  track: HeadlineTrack;
   method: HeadlineMethod;
   hasEvent: boolean;
   eventKind: ProvenanceEventKind;
@@ -41,6 +43,7 @@ interface HeadlineProvenanceReport {
   total: number;
   distributions: {
     path: Record<HeadlinePath, number>;
+    track: Record<HeadlineTrack, number>;
     method: Record<HeadlineMethod, number>;
     eventKind: Record<ProvenanceEventKind, number>;
     hasEvent: {
@@ -97,7 +100,16 @@ function sourceTitleFrom(stock: DiscoveryStockPayload): string | undefined {
 
 function classifyEventKind(stock: DiscoveryStockPayload, front: DiscoveryFrontSeed | undefined, headline: string): ProvenanceEventKind {
   const explicitKind = stock.headlineProvenance?.eventRef?.kind;
-  if (explicitKind === "news_mention" || explicitKind === "disclosure") return explicitKind;
+  if (
+    explicitKind === "news_mention" ||
+    explicitKind === "disclosure" ||
+    explicitKind === "volume_spike" ||
+    explicitKind === "price_move" ||
+    explicitKind === "market_context" ||
+    explicitKind === "theme_link"
+  ) {
+    return explicitKind;
+  }
   const haystack = [
     headline,
     stock.reason,
@@ -124,12 +136,20 @@ function classifyPath(stock: DiscoveryStockPayload, headline: string, eventKind:
   if (stock.headlineProvenance?.provenance === "suppressed" || !headline || FALLBACK_PATTERN.test(headline)) {
     return "fallback_no_event";
   }
+  if (stock.headlineProvenance?.provenance === "rule_nonmaterial") return "rule_nonmaterial";
   const title = sourceTitleFrom(stock);
   if (hasExcessiveLatinHeadline(headline)) return "raw_title";
   if (title && isRawTitleCopy(headline, title)) return "raw_title";
   if (ABSTRACT_TEMPLATE_PATTERN.test(headline) || ADDITIONAL_ABSTRACT_TEMPLATE_PATTERN.test(headline) || isAbstractTemplate(headline)) return "abstract_template";
   if (eventKind === "none") return "fallback_no_event";
   return "why_synthesis";
+}
+
+function classifyTrack(path: HeadlinePath, eventKind: ProvenanceEventKind): HeadlineTrack {
+  if (path === "rule_nonmaterial") return "B_momentum";
+  if (path === "fallback_no_event") return "suppressed";
+  if (eventKind === "news_mention" || eventKind === "disclosure") return "A_material";
+  return "suppressed";
 }
 
 function classifyMethod(stock: DiscoveryStockPayload, path: HeadlinePath, headline: string): HeadlineMethod {
@@ -159,13 +179,15 @@ function buildReport(payload: DiscoveryResponse, args: Args): HeadlineProvenance
     const headline = finalVisibleHeadline(stock);
     const eventKind = classifyEventKind(stock, front, headline);
     const path = classifyPath(stock, headline, eventKind);
-    const concrete = path === "why_synthesis" && isConcreteHeadline(stock, headline);
+    const track = classifyTrack(path, eventKind);
+    const concrete = (path === "why_synthesis" || path === "rule_nonmaterial") && isConcreteHeadline(stock, headline);
     return {
       index: index + 1,
       ticker: stock.canonical,
       country: stock.country ?? payload.country ?? args.country,
       headline,
       path,
+      track,
       method: classifyMethod(stock, path, headline),
       hasEvent: eventKind !== "none",
       eventKind,
@@ -179,7 +201,13 @@ function buildReport(payload: DiscoveryResponse, args: Args): HeadlineProvenance
     raw_title: 0,
     abstract_template: 0,
     why_synthesis: 0,
+    rule_nonmaterial: 0,
     fallback_no_event: 0,
+  };
+  const trackCounts: Record<HeadlineTrack, number> = {
+    A_material: 0,
+    B_momentum: 0,
+    suppressed: 0,
   };
   const methodCounts: Record<HeadlineMethod, number> = {
     ai: 0,
@@ -191,6 +219,9 @@ function buildReport(payload: DiscoveryResponse, args: Args): HeadlineProvenance
     news_mention: 0,
     disclosure: 0,
     volume_spike: 0,
+    price_move: 0,
+    market_context: 0,
+    theme_link: 0,
     none: 0,
   };
   const hasEventCounts = {
@@ -203,6 +234,7 @@ function buildReport(payload: DiscoveryResponse, args: Args): HeadlineProvenance
   };
   rows.forEach((row) => {
     increment(pathCounts, row.path);
+    increment(trackCounts, row.track);
     increment(methodCounts, row.method);
     increment(eventCounts, row.eventKind);
     if (row.hasEvent) {
@@ -225,6 +257,7 @@ function buildReport(payload: DiscoveryResponse, args: Args): HeadlineProvenance
     total: rows.length,
     distributions: {
       path: pathCounts,
+      track: trackCounts,
       method: methodCounts,
       eventKind: eventCounts,
       hasEvent: hasEventCounts,
@@ -241,6 +274,12 @@ function printReport(report: HeadlineProvenanceReport): void {
   console.log("- path");
   (Object.keys(report.distributions.path) as HeadlinePath[]).forEach((key) => {
     const value = report.distributions.path[key];
+    const pct = report.total > 0 ? Math.round((value / report.total) * 100) : 0;
+    console.log(`  - ${key}: ${value} (${pct}%)`);
+  });
+  console.log("- track");
+  (Object.keys(report.distributions.track) as HeadlineTrack[]).forEach((key) => {
+    const value = report.distributions.track[key];
     const pct = report.total > 0 ? Math.round((value / report.total) * 100) : 0;
     console.log(`  - ${key}: ${value} (${pct}%)`);
   });
@@ -270,7 +309,7 @@ function printReport(report: HeadlineProvenanceReport): void {
   });
   console.log("\nTop samples");
   report.cards.slice(0, 12).forEach((row) => {
-    console.log(`${String(row.index).padStart(2, "0")}. ${row.ticker} [${row.path}/${row.eventKind}] ${row.headline}`);
+    console.log(`${String(row.index).padStart(2, "0")}. ${row.ticker} [${row.track}/${row.path}/${row.eventKind}] ${row.headline}`);
   });
 }
 
