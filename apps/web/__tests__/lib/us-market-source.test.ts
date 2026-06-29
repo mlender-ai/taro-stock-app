@@ -80,6 +80,107 @@ describe("US market source", () => {
     expect(smci?.sectorHint).toBe("AI");
   });
 
+  it("builds the US universe from gainers, losers, and most-active movers", async () => {
+    vi.stubEnv("TWELVE_DATA_API_KEY", "td-test");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("market_movers") && url.includes("type=gainers")) {
+        return Response.json({ values: [{ symbol: "OPEN" }] });
+      }
+      if (url.includes("market_movers") && url.includes("type=losers")) {
+        return Response.json({ values: [{ symbol: "KULR" }] });
+      }
+      if (url.includes("market_movers") && url.includes("type=most_active")) {
+        return Response.json({ values: [{ symbol: "SERV" }] });
+      }
+      if (url.includes("quote")) {
+        return Response.json({
+          OPEN: { symbol: "OPEN", price: "2.80", change: "0.42", percent_change: "17.65", volume: "23000000", exchange: "NASDAQ" },
+          KULR: { symbol: "KULR", price: "1.10", change: "-0.15", percent_change: "-12.00", volume: "190000000", exchange: "NYSE" },
+          SERV: { symbol: "SERV", price: "18.80", change: "2.20", percent_change: "13.25", volume: "85000000", exchange: "NASDAQ" },
+        });
+      }
+      if (url.includes("time_series")) {
+        return Response.json({});
+      }
+      return Response.json({});
+    });
+    const { fetchUsMarketDiagnostics, fetchUsMarketRows } = await import("../../lib/us-market-source");
+
+    const rows = await fetchUsMarketRows();
+    expect(rows.some((row) => row.symbol === "OPEN")).toBe(true);
+    expect(rows.some((row) => row.symbol === "KULR")).toBe(true);
+    expect(rows.some((row) => row.symbol === "SERV")).toBe(true);
+
+    const diag = await fetchUsMarketDiagnostics();
+    expect(diag.moverSymbols).toBeGreaterThanOrEqual(3);
+    expect(diag.dynamicRows).toBeGreaterThanOrEqual(3);
+    expect(diag.quoteSymbols).toBeGreaterThan(diag.seedCount);
+  });
+
+  it("uses Nasdaq screener as a dynamic no-key universe before curated seeds", async () => {
+    vi.stubEnv("TWELVE_DATA_API_KEY", "");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/screener/stocks")) {
+        return Response.json({
+          data: {
+            rows: [
+              {
+                symbol: "OPEN",
+                name: "Opendoor Technologies Inc Common Stock",
+                lastsale: "$2.80",
+                netchange: "0.42",
+                pctchange: "17.65%",
+                volume: "23000000",
+                marketCap: "2000000000",
+                country: "United States",
+                sector: "Technology",
+                industry: "Computer Software",
+              },
+              {
+                symbol: "KULR",
+                name: "KULR Technology Group Inc Common Stock",
+                lastsale: "$1.10",
+                netchange: "-0.15",
+                pctchange: "-12.00%",
+                volume: "190000000",
+                marketCap: "350000000",
+                country: "United States",
+                sector: "Industrials",
+                industry: "Industrial Machinery",
+              },
+              {
+                symbol: "AACB",
+                name: "Artius II Acquisition Inc Class A Ordinary Shares",
+                lastsale: "$10.49",
+                netchange: "0.00",
+                pctchange: "0.00%",
+                volume: "560",
+                marketCap: "0",
+                country: "United States",
+                sector: "",
+                industry: "Blank Checks",
+              },
+            ],
+          },
+        });
+      }
+      return Response.json({ data: { tradesTable: { rows: [] } } });
+    });
+    const { fetchUsMarketDiagnostics, fetchUsMarketRows } = await import("../../lib/us-market-source");
+
+    const rows = await fetchUsMarketRows();
+    expect(rows.map((row) => row.symbol)).toEqual(expect.arrayContaining(["OPEN", "KULR"]));
+    expect(rows.some((row) => row.symbol === "AACB")).toBe(false);
+    expect(rows.find((row) => row.symbol === "OPEN")?.changePct).toBe(17.65);
+
+    const diag = await fetchUsMarketDiagnostics();
+    expect(diag.source).toBe("nasdaq-screener");
+    expect(diag.dynamicRows).toBeGreaterThanOrEqual(2);
+    expect(diag.strongMomentumRows).toBeGreaterThanOrEqual(2);
+  });
+
   it("does not wire Yahoo chart endpoints into the US quote adapter", () => {
     const source = readFileSync(fileURLToPath(new URL("../../lib/us-market-source.ts", import.meta.url)), "utf8");
     expect(source).not.toMatch(/query[12]\.finance\.yahoo\.com|chart\/|finance\.yahoo\.com\/v8/i);

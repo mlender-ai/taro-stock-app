@@ -1628,9 +1628,10 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     if (isUsStock) {
       const headlineEvent = stock.headlineProvenance?.eventRef;
       const headlineEventKind = headlineEvent?.kind;
+      const isNonMaterialMomentum = stock.headlineProvenance?.provenance === "rule_nonmaterial";
       const hasSurfaceMaterial = headlineEventKind === "news_mention" || headlineEventKind === "disclosure";
       const hasGroundedMaterial = Boolean(stock.sourceLabel && (stock.sourceUrl || headlineEvent?.url));
-      if (!hasSurfaceMaterial || !hasGroundedMaterial) continue;
+      if (!isNonMaterialMomentum && (!hasSurfaceMaterial || !hasGroundedMaterial)) continue;
     }
     stocks.push(stock);
     fronts[candidate.ticker] = front;

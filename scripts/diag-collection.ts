@@ -11,8 +11,12 @@
 import { extractKeywords, type KeywordSourceItem } from "@fomo/core";
 import { collectThemeDocs, themeNaverCodesFor } from "../apps/web/lib/theme-understanding";
 import { fetchAllNews } from "../apps/web/lib/fomo-news-sources";
+import { fetchUsMarketDiagnostics } from "../apps/web/lib/us-market-source";
 
-const THEMES = process.argv.slice(2).length > 0 ? process.argv.slice(2) : ["반도체", "조선", "자동차", "바이오"];
+const ARGS = process.argv.slice(2);
+const COUNTRY_ARG = ARGS.find((arg) => arg.startsWith("--country="))?.split("=")[1]?.toUpperCase();
+const COUNTRY = COUNTRY_ARG ?? (process.env.DISCOVERY_COUNTRY ?? "KR").toUpperCase();
+const THEMES = ARGS.filter((arg) => !arg.startsWith("--")).length > 0 ? ARGS.filter((arg) => !arg.startsWith("--")) : ["반도체", "조선", "자동차", "바이오"];
 const CONTROLS = new Set(["반도체", "바이오"]); // 소스 건강성 기준선
 
 interface Row {
@@ -25,6 +29,21 @@ interface Row {
 }
 
 async function main(): Promise<void> {
+  if (COUNTRY === "US") {
+    const diag = await fetchUsMarketDiagnostics();
+    console.log("=== US 동적 발견 유니버스 ===");
+    console.log(`source=${diag.source}`);
+    console.log(`seedCount=${diag.seedCount}`);
+    console.log(`moverSymbols=${diag.moverSymbols}`);
+    console.log(`quoteSymbols=${diag.quoteSymbols}`);
+    console.log(`rows=${diag.rows}`);
+    console.log(`rowsWithPrice=${diag.rowsWithPrice}`);
+    console.log(`rowsWithSparkline=${diag.rowsWithSparkline}`);
+    console.log(`dynamicRows=${diag.dynamicRows}`);
+    console.log(`strongMomentumRows=${diag.strongMomentumRows}`);
+    process.exit(0);
+  }
+
   // 1) 뉴스 소스 건강성 + 매칭 가능한 키워드 버킷(한 번만 호출).
   console.log("=== 뉴스 소스 건강성 / 키워드 버킷 ===");
   let bucketKeywords = new Set<string>();
