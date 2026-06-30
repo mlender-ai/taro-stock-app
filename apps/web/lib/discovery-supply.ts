@@ -52,6 +52,8 @@ const PAGE_SIZE = 100;
 const PAGES_PER_MARKET = 10;
 const SPARKLINE_CONCURRENCY = 8;
 const DISCOVERY_DECK_CARD_COUNT = 50;
+const US_DISCOVERY_DECK_CARD_COUNT = 50;
+const US_TARGETED_MATERIAL_CANDIDATE_LIMIT = 64;
 const DISCOVERY_RECOVERY_MIN_CARDS = 12;
 const DISCOVERY_RECOVERY_FAMOUS_FRONT_CUTOFF = 30;
 const TARGETED_MATERIAL_DEFAULT_ENABLED = process.env.DISCOVERY_TARGETED_MATERIAL !== "0";
@@ -171,6 +173,16 @@ function todayKst(): string {
 
 function discoveryAsOf(scope: DiscoveryCountryScope): string {
   return scope === "US" ? latestUsSessionAsOf().date : todayKst();
+}
+
+function discoveryDeckCardCount(scope: DiscoveryCountryScope): number {
+  return scope === "US" ? US_DISCOVERY_DECK_CARD_COUNT : DISCOVERY_DECK_CARD_COUNT;
+}
+
+function targetedMaterialCandidateLimit(scope: DiscoveryCountryScope, requested: number | undefined): number {
+  const base = requested ?? TARGETED_MATERIAL_CANDIDATE_LIMIT;
+  const scopedMax = scope === "US" ? Math.min(TARGETED_MATERIAL_CANDIDATE_LIMIT, US_TARGETED_MATERIAL_CANDIDATE_LIMIT) : TARGETED_MATERIAL_CANDIDATE_LIMIT;
+  return Math.max(0, Math.min(scopedMax, base));
 }
 
 function numberFromText(value: string | undefined): number | undefined {
@@ -1536,8 +1548,9 @@ function interleaveThemeBundles(
 export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOptions = {}): Promise<DiscoveryResponse> {
   const scope = options.country ?? "KR";
   const targetedMaterialEnabled = options.targetedMaterial ?? TARGETED_MATERIAL_DEFAULT_ENABLED;
+  const deckCardCount = discoveryDeckCardCount(scope);
   const targetedMaterialLimit = targetedMaterialEnabled
-    ? Math.max(0, Math.min(TARGETED_MATERIAL_CANDIDATE_LIMIT, options.targetedMaterialLimit ?? TARGETED_MATERIAL_CANDIDATE_LIMIT))
+    ? targetedMaterialCandidateLimit(scope, options.targetedMaterialLimit)
     : 0;
   const asOf = discoveryAsOf(scope);
   const [rows, attentionMap] = await Promise.all([
@@ -1669,11 +1682,11 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
   logDiscoverySignalCoverage("before-rank", candidates);
   const rowsByTicker = new Map([...byTicker.entries()].map(([ticker, value]) => [ticker, value.row]));
   let ranked = pushFamousCandidatesOutOfFrontBand(recoverDiscoveryCandidates(
-    rankDiscoveryCandidates(candidates, { maxCandidates: DISCOVERY_DECK_CARD_COUNT }),
+    rankDiscoveryCandidates(candidates, { maxCandidates: deckCardCount }),
     candidates,
-    DISCOVERY_DECK_CARD_COUNT
+    deckCardCount
   ));
-  if (targetedMaterialLimit > 0) {
+  if (targetedMaterialLimit > 0 && scope !== "US") {
     ranked = await hydrateFrontBandMaterial(ranked, rowsByTicker, asOf);
   }
   ranked = await hydrateReachedNewsHooks(ranked, rowsByTicker, asOf);
@@ -1681,7 +1694,7 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
   const stocks: DiscoveryStockPayload[] = [];
 
   const dailyRows = await mapLimit(
-    ranked.slice(0, DISCOVERY_DECK_CARD_COUNT),
+    ranked.slice(0, deckCardCount),
     SPARKLINE_CONCURRENCY,
     async (candidate) => ({
       ticker: candidate.ticker,
@@ -1711,7 +1724,9 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     const front = frontSeed(row, candidate, attention, themeSignals.get(candidate.ticker), sparklineByTicker.get(candidate.ticker) ?? []);
     const stock = await stockPayload(row, candidate, front);
     const headline = stock.headline?.trim();
-    if (stock.headlineProvenance?.provenance === "suppressed" || !headline) continue;
+    if (stock.headlineProvenance?.provenance === "suppressed" || !headline) {
+      continue;
+    }
     const isUsStock = row.country === "US" || candidate.country === "US" || stock.country === "US";
     if (isUsStock) {
       const headlineEvent = stock.headlineProvenance?.eventRef;
@@ -1742,7 +1757,7 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     stocks,
     cards: interleaveThemeBundles(stocks, bundleCards),
     fronts,
-    confidence: stocks.length >= DISCOVERY_DECK_CARD_COUNT ? "H" : stocks.length >= 30 ? "M" : "L",
+    confidence: stocks.length >= deckCardCount ? "H" : stocks.length >= Math.min(30, Math.ceil(deckCardCount * 0.75)) ? "M" : "L",
     source: targetedMaterialEnabled ? DISCOVERY_SOURCE_LABEL : "시장 시세·공시·수급 캐시",
   };
 }
