@@ -182,7 +182,7 @@ export async function resolveCardHeadline(input: ResolveCardHeadlineInput): Prom
   const reasonDetail = reasonParts.detail ?? input.reason;
 
   if (isUsableHeadline(synthesis.headline, sourceText, rawTitle)) {
-    const eventRef = eventRefFrom(primary ?? materialEvent);
+    const eventRef = eventRefFrom(materialEvent ?? primary);
     return {
       text: cleanInline(synthesis.headline),
       provenance: "synthesis",
@@ -203,7 +203,7 @@ export async function resolveCardHeadline(input: ResolveCardHeadlineInput): Prom
   }
 
   if (isUsableHeadline(reasonDetail, sourceText, rawTitle) && !WHAT_ONLY_PATTERN.test(reasonDetail ?? "")) {
-    const eventRef = eventRefFrom(primary ?? materialEvent);
+    const eventRef = eventRefFrom(materialEvent ?? primary);
     return {
       text: cleanInline(reasonDetail),
       provenance: "rule",
@@ -212,7 +212,7 @@ export async function resolveCardHeadline(input: ResolveCardHeadlineInput): Prom
     };
   }
 
-  const eventRef = eventRefFrom(primary ?? materialEvent);
+  const eventRef = eventRefFrom(materialEvent ?? primary);
   return {
     text: "",
     provenance: "suppressed",

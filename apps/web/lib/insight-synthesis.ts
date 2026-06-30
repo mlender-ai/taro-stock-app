@@ -120,7 +120,11 @@ const GENERIC_KOREAN_TOKENS = new Set([
 const KNOWN_COMPANY_NAME_PATTERN = /엔비디아|삼성전자|테슬라|애플|마이크로소프트|구글|메타|아마존|현대차|기아|SK하이닉스|NVIDIA|Tesla|Apple|Microsoft|Google|Meta|Amazon/i;
 
 function cleanInline(text: unknown): string {
-  return String(text ?? "").replace(/\s+/g, " ").replace(/[.。]+$/g, "").trim();
+  return String(text ?? "")
+    .replace(/\s+/g, " ")
+    .replace(/\b(IBM|AMD|SEC|FDA|GPU|CPU|AI)\s*와\b/g, "$1과")
+    .replace(/[.。]+$/g, "")
+    .trim();
 }
 
 function textParts(output: Pick<DiscoveryInsightSynthesis, "headline" | "observations" | "synthesis" | "evidence">): string[] {

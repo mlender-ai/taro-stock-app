@@ -196,11 +196,13 @@ function pickDeliveryProduct(title: string): string | undefined {
 }
 
 function withAndParticle(value: string): string {
-  const last = value.trim().at(-1);
+  const clean = value.trim();
+  if (/^[A-Z0-9&().+\-\s]+$/.test(clean)) return `${clean}과`;
+  const last = clean.at(-1);
   if (!last) return value;
   const code = last.charCodeAt(0);
-  if (code < 0xac00 || code > 0xd7a3) return `${value}와`;
-  return (code - 0xac00) % 28 === 0 ? `${value}와` : `${value}과`;
+  if (code < 0xac00 || code > 0xd7a3) return `${clean}와`;
+  return (code - 0xac00) % 28 === 0 ? `${clean}와` : `${clean}과`;
 }
 
 function compactTitlePhrase(title: string): string | undefined {

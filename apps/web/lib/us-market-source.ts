@@ -7,15 +7,20 @@ const TWELVE_TIME_SERIES_URL = "https://api.twelvedata.com/time_series";
 const TWELVE_MARKET_MOVERS_URL = "https://api.twelvedata.com/market_movers/stocks";
 const NASDAQ_HISTORICAL_URL = "https://api.nasdaq.com/api/quote";
 const NASDAQ_SCREENER_URL = "https://api.nasdaq.com/api/screener/stocks";
+const YAHOO_CHART_HOSTS = ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com"];
 const UA = "Mozilla/5.0 (compatible; FomoClubBot/1.0)";
 const NASDAQ_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
-const US_DYNAMIC_UNIVERSE_LIMIT = 260;
+const YAHOO_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
+const US_DYNAMIC_UNIVERSE_LIMIT = 360;
 const US_QUOTE_BATCH_SIZE = 80;
-const US_SPARKLINE_LIMIT = 90;
+const US_SPARKLINE_LIMIT = 120;
 const US_NASDAQ_SCREENER_LIMIT = 7000;
-const US_NASDAQ_FALLBACK_LIMIT = 50;
+const US_NASDAQ_FALLBACK_LIMIT = 140;
 const US_NASDAQ_FALLBACK_CONCURRENCY = 12;
+const US_YAHOO_FALLBACK_LIMIT = 140;
+const US_YAHOO_FALLBACK_CONCURRENCY = 10;
 const US_MOVER_TYPES = ["gainers", "losers", "most_active"] as const;
 
 interface TwelveQuote {
@@ -39,7 +44,7 @@ export interface UsMarketDiagnostics {
   rowsWithSparkline: number;
   dynamicRows: number;
   strongMomentumRows: number;
-  source: "twelve-data" | "nasdaq-screener" | "nasdaq-fallback" | "seed";
+  source: "twelve-data" | "nasdaq-screener" | "nasdaq-fallback" | "yahoo-fallback" | "seed";
 }
 
 interface TwelveTimeSeriesValue {
@@ -69,6 +74,27 @@ interface NasdaqScreenerRow {
   country?: string;
   sector?: string;
   industry?: string;
+}
+
+interface YahooChartResponse {
+  chart?: {
+    result?: {
+      meta?: {
+        regularMarketPrice?: number;
+        chartPreviousClose?: number;
+        currency?: string;
+        exchangeName?: string;
+        fullExchangeName?: string;
+      };
+      timestamp?: number[];
+      indicators?: {
+        quote?: {
+          close?: (number | null)[];
+          volume?: (number | null)[];
+        }[];
+      };
+    }[];
+  };
 }
 
 function tdKey(): string | undefined {
@@ -402,6 +428,87 @@ async function fetchNasdaqRows(seeds: readonly UsDiscoverySymbol[]): Promise<Dis
     .filter((row): row is DiscoveryMarketRow => row !== null);
 }
 
+function parseYahooChartRow(seed: UsDiscoverySymbol, payload: YahooChartResponse): DiscoveryMarketRow | null {
+  const result = payload.chart?.result?.[0];
+  const quote = result?.indicators?.quote?.[0];
+  const closes = quote?.close ?? [];
+  const volumes = quote?.volume ?? [];
+  const timestamps = result?.timestamp ?? [];
+  const points: NasdaqDailyPoint[] = [];
+  for (let i = 0; i < closes.length; i += 1) {
+    const close = closes[i];
+    if (typeof close !== "number" || !Number.isFinite(close)) continue;
+    const timestamp = timestamps[i];
+    const date =
+      typeof timestamp === "number"
+        ? new Date(timestamp * 1000).toISOString().slice(0, 10)
+        : latestUsSessionDate();
+    const volume = volumes[i];
+    points.push({
+      date,
+      close,
+      ...(typeof volume === "number" && Number.isFinite(volume) ? { volume } : {}),
+    });
+  }
+  if (points.length < 2) {
+    const price = result?.meta?.regularMarketPrice;
+    const previous = result?.meta?.chartPreviousClose;
+    if (typeof price !== "number" || typeof previous !== "number" || previous === 0) return null;
+    const session = latestUsSessionAsOf();
+    const change = price - previous;
+    const pct = (change / previous) * 100;
+    const priceText = money(price);
+    if (!priceText) return null;
+    return {
+      canonical: seed.canonical,
+      symbol: seed.symbol,
+      market: marketFor(seed.market, result?.meta?.exchangeName ?? result?.meta?.fullExchangeName),
+      country: "US",
+      currency: "USD",
+      ...(seed.fameRank ? { marketCapRank: seed.fameRank, marketCapRankSource: "curated" as const } : {}),
+      priceText,
+      changePct: pct,
+      changeText: `${change > 0 ? "+" : ""}${change.toFixed(2)} (${pct > 0 ? "+" : ""}${pct.toFixed(2)}%)`,
+      changeDir: change > 0 ? "up" : change < 0 ? "down" : "flat",
+      sectorHint: seed.sector,
+      sessionLabel: session.label,
+    };
+  }
+  return parseNasdaqRow(seed, points);
+}
+
+async function fetchYahooDaily(seed: UsDiscoverySymbol): Promise<DiscoveryMarketRow | null> {
+  for (const host of YAHOO_CHART_HOSTS) {
+    try {
+      const url = new URL(`${host}/v8/finance/chart/${encodeURIComponent(seed.symbol)}`);
+      url.searchParams.set("range", "3mo");
+      url.searchParams.set("interval", "1d");
+      const res = await fetch(url.toString(), {
+        headers: {
+          accept: "application/json, text/plain, */*",
+          "user-agent": YAHOO_UA,
+        },
+        signal: AbortSignal.timeout(5_000),
+        next: { revalidate: 1_800 },
+      });
+      if (!res.ok) continue;
+      const parsed = parseYahooChartRow(seed, (await res.json()) as YahooChartResponse);
+      if (parsed) return parsed;
+    } catch {
+      // Try the next Yahoo host. This is a last-resort fallback for curated seeds only.
+    }
+  }
+  return null;
+}
+
+async function fetchYahooRows(seeds: readonly UsDiscoverySymbol[]): Promise<DiscoveryMarketRow[]> {
+  const settled = await mapLimit(seeds.slice(0, US_YAHOO_FALLBACK_LIMIT), US_YAHOO_FALLBACK_CONCURRENCY, fetchYahooDaily);
+  return settled
+    .filter((row): row is PromiseFulfilledResult<DiscoveryMarketRow | null> => row.status === "fulfilled")
+    .map((row) => row.value)
+    .filter((row): row is DiscoveryMarketRow => row !== null);
+}
+
 function seedRows(): DiscoveryMarketRow[] {
   const session = latestUsSessionAsOf();
   return usDiscoveryUniverse().map((seed) => ({
@@ -594,11 +701,29 @@ async function fetchUsMarketRowsInternal(): Promise<{ rows: DiscoveryMarketRow[]
   if (!key) {
     const screenerRows = await fetchNasdaqScreenerRows().catch((): DiscoveryMarketRow[] => []);
     if (screenerRows.length > 0) {
-      const sparkRows = await fetchNasdaqRows(screenerRows.slice(0, US_NASDAQ_FALLBACK_LIMIT).map(seedFromMarketRow)).catch(
-        (): DiscoveryMarketRow[] => [],
-      );
-      const sparkBySymbol = new Map(sparkRows.map((row) => [row.symbol.toUpperCase(), row]));
-      const rows = screenerRows.map((row) => mergeSparkline(row, sparkBySymbol.get(row.symbol.toUpperCase())));
+      const [sparkRows, seedHistoricalRows] = await Promise.all([
+        fetchNasdaqRows(screenerRows.slice(0, US_NASDAQ_FALLBACK_LIMIT).map(seedFromMarketRow)).catch(
+          (): DiscoveryMarketRow[] => [],
+        ),
+        fetchNasdaqRows(seeds).catch((): DiscoveryMarketRow[] => []),
+      ]);
+      const seedFallbackRows =
+        seedHistoricalRows.length > 0 ? seedHistoricalRows : await fetchYahooRows(seeds).catch((): DiscoveryMarketRow[] => []);
+      const sparkBySymbol = new Map([...seedFallbackRows, ...sparkRows].map((row) => [row.symbol.toUpperCase(), row]));
+      const bySymbol = new Map<string, DiscoveryMarketRow>();
+      for (const row of screenerRows) {
+        bySymbol.set(row.symbol.toUpperCase(), mergeSparkline(row, sparkBySymbol.get(row.symbol.toUpperCase())));
+      }
+      for (const row of seedFallbackRows) {
+        const symbol = row.symbol.toUpperCase();
+        if (!bySymbol.has(symbol)) bySymbol.set(symbol, row);
+      }
+      const rows = [...bySymbol.values()].sort((a, b) => {
+        const aSeed = seedSymbols.has(a.symbol.toUpperCase()) ? 1 : 0;
+        const bSeed = seedSymbols.has(b.symbol.toUpperCase()) ? 1 : 0;
+        const byScore = nasdaqMoverScore(b) - nasdaqMoverScore(a);
+        return byScore !== 0 ? byScore : bSeed - aSeed;
+      });
       return {
         rows,
         diagnostics: {
@@ -610,13 +735,17 @@ async function fetchUsMarketRowsInternal(): Promise<{ rows: DiscoveryMarketRow[]
       };
     }
     const nasdaqRows = await fetchNasdaqRows(seeds).catch((): DiscoveryMarketRow[] => []);
-    const rows = nasdaqRows.length > 0 ? nasdaqRows : seedRows();
-    return { rows, diagnostics: fallbackDiagnostics(rows, nasdaqRows.length > 0 ? "nasdaq-fallback" : "seed") };
+    const yahooRows = nasdaqRows.length > 0 ? [] : await fetchYahooRows(seeds).catch((): DiscoveryMarketRow[] => []);
+    const rows = nasdaqRows.length > 0 ? nasdaqRows : yahooRows.length > 0 ? yahooRows : seedRows();
+    return {
+      rows,
+      diagnostics: fallbackDiagnostics(rows, nasdaqRows.length > 0 ? "nasdaq-fallback" : yahooRows.length > 0 ? "yahoo-fallback" : "seed"),
+    };
   }
   const bySymbol = new Map(seeds.map((seed) => [seed.symbol.toUpperCase(), seed]));
   try {
     const moverSymbols = await fetchMoverSymbols(key);
-    const symbols = [...new Set([...moverSymbols, ...seeds.map((seed) => seed.symbol)])]
+    const symbols = [...new Set([...seeds.map((seed) => seed.symbol), ...moverSymbols])]
       .filter((symbol) => /^[A-Z.]{1,6}$/.test(symbol))
       .slice(0, US_DYNAMIC_UNIVERSE_LIMIT);
     if (symbols.length === 0) {
@@ -637,8 +766,15 @@ async function fetchUsMarketRowsInternal(): Promise<{ rows: DiscoveryMarketRow[]
     }
     if (rows.length === 0) {
       const nasdaqRows = await fetchNasdaqRows(seeds).catch((): DiscoveryMarketRow[] => []);
-      const fallbackRows = nasdaqRows.length > 0 ? nasdaqRows : seedRows();
-      return { rows: fallbackRows, diagnostics: fallbackDiagnostics(fallbackRows, nasdaqRows.length > 0 ? "nasdaq-fallback" : "seed") };
+      const yahooRows = nasdaqRows.length > 0 ? [] : await fetchYahooRows(seeds).catch((): DiscoveryMarketRow[] => []);
+      const fallbackRows = nasdaqRows.length > 0 ? nasdaqRows : yahooRows.length > 0 ? yahooRows : seedRows();
+      return {
+        rows: fallbackRows,
+        diagnostics: fallbackDiagnostics(
+          fallbackRows,
+          nasdaqRows.length > 0 ? "nasdaq-fallback" : yahooRows.length > 0 ? "yahoo-fallback" : "seed",
+        ),
+      };
     }
     let hydratedRows = rows;
     if (Object.keys(sparklines).length === 0) {
@@ -683,14 +819,19 @@ async function fetchUsMarketRowsInternal(): Promise<{ rows: DiscoveryMarketRow[]
       };
     }
     const nasdaqRows = await fetchNasdaqRows(seeds).catch((): DiscoveryMarketRow[] => []);
-    const rows = nasdaqRows.length > 0 ? nasdaqRows : seedRows();
-    return { rows, diagnostics: fallbackDiagnostics(rows, nasdaqRows.length > 0 ? "nasdaq-fallback" : "seed") };
+    const yahooRows = nasdaqRows.length > 0 ? [] : await fetchYahooRows(seeds).catch((): DiscoveryMarketRow[] => []);
+    const rows = nasdaqRows.length > 0 ? nasdaqRows : yahooRows.length > 0 ? yahooRows : seedRows();
+    return {
+      rows,
+      diagnostics: fallbackDiagnostics(rows, nasdaqRows.length > 0 ? "nasdaq-fallback" : yahooRows.length > 0 ? "yahoo-fallback" : "seed"),
+    };
   }
 }
 
 /**
- * US quote adapter. Twelve Data is used because Yahoo chart endpoints are unstable from Node/undici.
- * If the key is absent or the upstream fails, return a verified seed universe without price data.
+ * US quote adapter. Twelve Data/Nasdaq are preferred. Yahoo chart is a last-resort
+ * fallback for curated seeds only, because it can be throttled from Node/undici.
+ * If every upstream fails, return a verified seed universe without price data.
  * We never synthesize quotes: price/change fields are present only when a live source returns them.
  */
 export async function fetchUsMarketRows(): Promise<DiscoveryMarketRow[]> {

@@ -181,9 +181,13 @@ describe("US market source", () => {
     expect(diag.strongMomentumRows).toBeGreaterThanOrEqual(2);
   });
 
-  it("does not wire Yahoo chart endpoints into the US quote adapter", () => {
+  it("uses Yahoo chart only as a last-resort fallback, not the primary US quote adapter", () => {
     const source = readFileSync(fileURLToPath(new URL("../../lib/us-market-source.ts", import.meta.url)), "utf8");
-    expect(source).not.toMatch(/query[12]\.finance\.yahoo\.com|chart\/|finance\.yahoo\.com\/v8/i);
+    expect(source).toMatch(/const YAHOO_CHART_HOSTS/);
+    expect(source).toMatch(/yahoo-fallback/);
+    expect(source).toMatch(/last-resort fallback/i);
+    expect(source.indexOf("const TWELVE_DATA_URL")).toBeLessThan(source.indexOf("const YAHOO_CHART_HOSTS"));
+    expect(source.indexOf("fetchNasdaqRows(seeds)")).toBeLessThan(source.indexOf("fetchYahooRows(seeds)"));
   });
 
   it("keeps a verified no-price seed universe when all market data sources fail", async () => {

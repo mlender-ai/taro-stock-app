@@ -52,6 +52,14 @@ const PAGE_SIZE = 100;
 const PAGES_PER_MARKET = 10;
 const SPARKLINE_CONCURRENCY = 8;
 const DISCOVERY_DECK_CARD_COUNT = 50;
+const DISCOVERY_US_RENDER_CANDIDATE_COUNT = Math.max(
+  DISCOVERY_DECK_CARD_COUNT,
+  Math.min(260, Number(process.env.DISCOVERY_US_RENDER_CANDIDATE_COUNT ?? 220) || 220)
+);
+const DISCOVERY_US_CARD_TARGET = Math.max(
+  20,
+  Math.min(DISCOVERY_DECK_CARD_COUNT, Number(process.env.DISCOVERY_US_CARD_TARGET ?? 30) || 30)
+);
 const DISCOVERY_RECOVERY_MIN_CARDS = 12;
 const DISCOVERY_RECOVERY_FAMOUS_FRONT_CUTOFF = 30;
 const TARGETED_MATERIAL_DEFAULT_ENABLED = process.env.DISCOVERY_TARGETED_MATERIAL !== "0";
@@ -69,9 +77,10 @@ const MATERIAL_NEWS_NOISE =
 const MATERIAL_NEWS_CATALYST =
   /공시|계약|공급계약|수주|납품|실적|매출|영업이익|순이익|가이던스|전망치|컨센서스|어닝|흑자|적자|턴어라운드|임상|허가|승인|FDA|품목허가|신약|치료제|기술이전|라이선스|증설|공장|양산|수율|수주잔고|M&A|인수|합병|지분|투자|유상증자|무상증자|자사주|배당|분할|상장|정부|정책|규제|지원|보조금|관세|제재|신제품|출시|개발|특허|공급|독점|선정|채택|수출|수입|국책|프로젝트|수혜|클러스터|산단|거점|밸류체인|관련주|부각|모멘텀|호재|주목|협력|제휴/i;
 const US_MATERIAL_NEWS_NOISE =
-  /price\s?target|target price|\braises?\s+PT\b|\bPT\s+on\b|analyst|rating|upgrade|downgrade|initiates?|maintains?|reiterates?|buybacks?\s+explained|history of|buy,\s*sell,\s*or\s*hold|should you buy|stock to buy|better buy|which .* stock|what investors should know|\b[A-Z]{1,6}\s+investors?\b|investors?\s+(?:have|can|should|alert|deadline|opportunity|reminder|notice)|shareholders?|class action|lawsuit|law firm|securities fraud|motley fool|zacks|benzinga|investorplace|approach with caution|missing link|strain inside|what you|can it|market rotation|running out of power|internet.?s .+ odd duck|all-time low|gaining ground|more significant dip|boom is|fears hit|gains as market dips|limps along|afterglow is gone|and more stocks|more stocks that|stocks that|stock market today|market roundup|why .* stock (?:is )?(?:up|down|rising|falling)|\b(?:is|are|was|were)?\s*(?:up|down|higher|lower|gains?|loses?|rises?|falls?)\s+\d+(?:\.\d+)?%|\b(?:is|are|was|were)\s+(?:up|down|higher|lower)\b|shares? (?:rise|fall|slip|jump|gain|lose) after hours/i;
+  /price\s?target|target price|\braises?\s+PT\b|\bPT\s+on\b|analyst|rating|upgrade|downgrade|initiates?|maintains?|reiterates?|buybacks?\s+explained|history of|buy,\s*sell,\s*or\s*hold|buy,\s*hold,\s*or\s*sell|should you buy|stock to buy|better buy|which .* stock|what investors should know|\b[A-Z]{1,6}\s+investors?\b|investors?\s+(?:have|can|should|alert|deadline|opportunity|reminder|notice)|shareholders?|class action|lawsuit|law firm|securities fraud|motley fool|zacks|benzinga|investorplace|approach with caution|missing link|strain inside|what you|can it|market rotation|risk-on bid|running out of power|internet.?s .+ odd duck|all-time low|gaining ground|more significant dip|boom is|fears hit|gains as market dips|limps along|afterglow is gone|and more stocks|more stocks that|stocks that|stock market today|market roundup|why .* stock (?:is )?(?:up|down|rising|falling)|\bjump\s+\d+(?:\.\d+)?%\s+as\b|\b[A-Z]{1,6}\s+stock\s+(?:rises?|falls?|jumps?|slips?|gains?|loses?)\s+ahead\b|\b(?:is|are|was|were)?\s*(?:up|down|higher|lower|gains?|loses?|rises?|falls?)\s+\d+(?:\.\d+)?%|\b(?:is|are|was|were)\s+(?:up|down|higher|lower)\b|shares? (?:rise|fall|slip|jump|gain|lose) after hours/i;
 const US_MATERIAL_NEWS_CATALYST =
   /earnings|results|revenue|profit|margin|guidance|forecast|quarter|q[1-4]|contract|deal|order|supply|supplier|customer|partnership|launch|unveil|product|chip|gpu|ai|data center|approval|fda|trial|drug|sec|8-k|10-q|filing|acquisition|merger|stake|investment|buyback authorization|dividend/i;
+const US_CURATED_SYMBOL_SET = new Set(US_DISCOVERY_SYMBOLS.map((seed) => seed.symbol.toUpperCase()));
 const DISCOVERY_SOURCE_LABEL = TARGETED_MATERIAL_DEFAULT_ENABLED
   ? "네이버/KR 시세·DART·수급 캐시·Twelve Data/US 시세·SEC"
   : "시장 시세·공시·수급 캐시";
@@ -345,39 +354,107 @@ function pickTargetedMaterialArticle(canonical: string, articles: readonly RawAr
 }
 
 const US_ARTICLE_ALIAS_OVERRIDES: Record<string, string[]> = {
+  ADBE: ["Adobe"],
+  ABNB: ["Airbnb"],
+  AMAT: ["Applied Materials"],
+  AMGN: ["Amgen"],
+  AMZN: ["Amazon"],
+  ANET: ["Arista", "Arista Networks"],
   AMD: ["Advanced Micro Devices"],
+  ASML: ["ASML"],
+  ASTS: ["AST SpaceMobile", "ASTS"],
+  AXP: ["American Express"],
   ARM: ["Arm Holdings"],
   APP: ["AppLovin"],
+  BA: ["Boeing"],
+  BKNG: ["Booking Holdings", "Booking.com", "Booking"],
   AVGO: ["Broadcom"],
+  ABBV: ["AbbVie"],
   BBAI: ["BigBear.ai", "BigBear AI"],
   BE: ["Bloom Energy"],
+  CAT: ["Caterpillar"],
+  CDNS: ["Cadence", "Cadence Design"],
+  CEG: ["Constellation Energy"],
+  CRM: ["Salesforce"],
   COIN: ["Coinbase"],
+  COST: ["Costco"],
   CRWD: ["CrowdStrike"],
+  DASH: ["DoorDash"],
+  DE: ["Deere", "John Deere"],
+  DELL: ["Dell", "Dell Technologies"],
+  DIS: ["Disney", "Walt Disney"],
   DDOG: ["Datadog"],
   DUOL: ["Duolingo"],
+  ETN: ["Eaton"],
+  FSLR: ["First Solar"],
+  FTNT: ["Fortinet"],
+  GE: ["GE Aerospace", "General Electric"],
   GEV: ["GE Vernova"],
+  GOOGL: ["Alphabet", "Google"],
+  GS: ["Goldman Sachs"],
+  HPE: ["Hewlett Packard Enterprise", "HPE"],
   HOOD: ["Robinhood"],
+  HON: ["Honeywell"],
+  INTC: ["Intel"],
   IONQ: ["IonQ"],
+  ISRG: ["Intuitive Surgical"],
+  JNJ: ["Johnson & Johnson", "J&J"],
+  JPM: ["JPMorgan", "JPMorgan Chase"],
+  KLAC: ["KLA"],
   LCID: ["Lucid", "Lucid Group"],
+  LLY: ["Eli Lilly", "Lilly"],
+  LMT: ["Lockheed Martin"],
+  MA: ["Mastercard"],
   MDB: ["MongoDB"],
+  META: ["Meta", "Meta Platforms", "Facebook"],
+  MRK: ["Merck"],
   MRVL: ["Marvell"],
   MU: ["Micron"],
+  NEE: ["NextEra Energy", "NextEra"],
+  NET: ["Cloudflare"],
+  NFLX: ["Netflix"],
   NIO: ["NIO"],
+  NOC: ["Northrop Grumman"],
+  NOW: ["ServiceNow"],
+  NRG: ["NRG Energy"],
+  NVO: ["Novo Nordisk"],
   NVDA: ["Nvidia", "NVIDIA"],
+  ORCL: ["Oracle"],
+  PANW: ["Palo Alto Networks", "Palo Alto"],
+  PFE: ["Pfizer"],
   PLTR: ["Palantir"],
+  PWR: ["Quanta Services", "Quanta"],
   QBTS: ["D-Wave", "D-Wave Quantum"],
+  QCOM: ["Qualcomm"],
+  RDDT: ["Reddit"],
+  REGN: ["Regeneron"],
   RGTI: ["Rigetti"],
   RIVN: ["Rivian"],
   RKLB: ["Rocket Lab"],
+  ROKU: ["Roku"],
+  RTX: ["RTX", "Raytheon"],
+  SHOP: ["Shopify"],
+  SNDK: ["SanDisk"],
   SMCI: ["Super Micro", "Supermicro"],
   SOFI: ["SoFi"],
   SOUN: ["SoundHound", "SoundHound AI"],
+  SPOT: ["Spotify"],
   SQ: ["Block"],
+  SNPS: ["Synopsys"],
+  STX: ["Seagate"],
+  TDG: ["TransDigm"],
+  TMO: ["Thermo Fisher", "Thermo Fisher Scientific"],
   TSM: ["Taiwan Semiconductor", "TSMC"],
   TSLA: ["Tesla"],
+  UBER: ["Uber"],
+  UNH: ["UnitedHealth", "UnitedHealth Group"],
   UPST: ["Upstart"],
+  V: ["Visa"],
+  VRTX: ["Vertex", "Vertex Pharmaceuticals"],
   VRT: ["Vertiv"],
   VST: ["Vistra"],
+  WDC: ["Western Digital"],
+  ZS: ["Zscaler"],
 };
 
 function escapeRegExp(value: string): string {
@@ -570,7 +647,7 @@ async function eventFromTargetedMaterial(row: DiscoveryMarketRow, asOf: string):
   if (row.country !== "KR") {
     const [filingResult, newsResult] = await Promise.allSettled([
       fetchRecentSecFilings(row.symbol, 2),
-      fetchYahooStockNews(row.symbol, 6),
+      fetchYahooStockNews(row.symbol, 10),
     ]);
     const filing = filingResult.status === "fulfilled" ? filingResult.value[0] : undefined;
     if (filing) {
@@ -1039,6 +1116,12 @@ async function stockPayload(
     reason: why,
     ...(sourceLabel ? { sourceLabel } : {}),
   });
+  const headlineRef = headline.eventRef;
+  const headlineSourceLabel = headlineRef?.title
+    ? `${headlineRef.title}${headlineRef.source ? ` · ${headlineRef.source}` : ""}`
+    : headlineRef?.source;
+  const payloadSourceLabel = sourceLabel ?? headlineSourceLabel;
+  const payloadSourceUrl = sourceEvent?.sourceUrl ?? headlineRef?.url;
   return {
     canonical: candidate.ticker,
     market: row.market,
@@ -1050,8 +1133,8 @@ async function stockPayload(
     headline: headline.text,
     headlineProvenance: headline,
     ...(why ? { whyShown: why, reason: why, insightTag: frontReason && !sourceEvent ? "뉴스 재료" : synthesis.tag } : {}),
-    ...(sourceLabel ? { sourceLabel } : {}),
-    ...(sourceEvent?.sourceUrl ? { sourceUrl: sourceEvent.sourceUrl } : {}),
+    ...(payloadSourceLabel ? { sourceLabel: payloadSourceLabel } : {}),
+    ...(payloadSourceUrl ? { sourceUrl: payloadSourceUrl } : {}),
   };
 }
 
@@ -1203,6 +1286,42 @@ function pushFamousCandidatesOutOfFrontBand(
     out[replacement] = current;
   }
   return out;
+}
+
+function hasCandidateMaterialEvent(candidate: DiscoveryCandidate): boolean {
+  return candidate.events.some((event) => event.kind === "news_mention" || event.kind === "disclosure");
+}
+
+function prioritizeUsRenderCandidates(candidates: readonly DiscoveryCandidate[]): DiscoveryCandidate[] {
+  return candidates
+    .map((candidate, index) => {
+      const curated = US_CURATED_SYMBOL_SET.has(candidate.ticker.toUpperCase()) ? 0 : 1;
+      const material = hasCandidateMaterialEvent(candidate) ? 0 : 1;
+      return { candidate, index, curated, material };
+    })
+    .sort(
+      (a, b) =>
+        a.curated - b.curated ||
+        a.material - b.material ||
+        a.index - b.index ||
+        a.candidate.ticker.localeCompare(b.candidate.ticker)
+    )
+    .map((row) => row.candidate);
+}
+
+function includeUsCuratedMaterialCandidates(
+  ranked: readonly DiscoveryCandidate[],
+  candidates: readonly DiscoveryCandidate[],
+  maxCandidates: number
+): DiscoveryCandidate[] {
+  const byTicker = new Map<string, DiscoveryCandidate>();
+  for (const candidate of ranked) byTicker.set(candidate.ticker, candidate);
+  for (const candidate of candidates) {
+    if (!US_CURATED_SYMBOL_SET.has(candidate.ticker.toUpperCase())) continue;
+    if (!hasCandidateMaterialEvent(candidate)) continue;
+    if (!byTicker.has(candidate.ticker)) byTicker.set(candidate.ticker, candidate);
+  }
+  return prioritizeUsRenderCandidates([...byTicker.values()]).slice(0, maxCandidates);
 }
 
 async function hydrateFrontBandMaterial(
@@ -1630,11 +1749,15 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
   });
   logDiscoverySignalCoverage("before-rank", candidates);
   const rowsByTicker = new Map([...byTicker.entries()].map(([ticker, value]) => [ticker, value.row]));
+  const rankCandidateCount = scope === "US" ? DISCOVERY_US_RENDER_CANDIDATE_COUNT : DISCOVERY_DECK_CARD_COUNT;
   let ranked = pushFamousCandidatesOutOfFrontBand(recoverDiscoveryCandidates(
-    rankDiscoveryCandidates(candidates, { maxCandidates: DISCOVERY_DECK_CARD_COUNT }),
+    rankDiscoveryCandidates(candidates, { maxCandidates: rankCandidateCount }),
     candidates,
-    DISCOVERY_DECK_CARD_COUNT
+    rankCandidateCount
   ));
+  if (scope === "US") {
+    ranked = includeUsCuratedMaterialCandidates(ranked, candidates, rankCandidateCount);
+  }
   if (targetedMaterialLimit > 0) {
     ranked = await hydrateFrontBandMaterial(ranked, rowsByTicker, asOf);
   }
@@ -1643,7 +1766,7 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
   const stocks: DiscoveryStockPayload[] = [];
 
   const dailyRows = await mapLimit(
-    ranked.slice(0, DISCOVERY_DECK_CARD_COUNT),
+    ranked.slice(0, rankCandidateCount),
     SPARKLINE_CONCURRENCY,
     async (candidate) => ({
       ticker: candidate.ticker,
@@ -1661,12 +1784,19 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
   );
   ranked = attachReachedVolumeEvents(ranked, rowsByTicker, dailyByTicker, asOf);
   ranked = await hydrateReachedWhySynthesis(ranked);
+  const renderRanked = scope === "US" ? prioritizeUsRenderCandidates(ranked) : ranked;
+  const targetCardCount = scope === "US" ? DISCOVERY_US_CARD_TARGET : DISCOVERY_DECK_CARD_COUNT;
   logDiscoverySignalCoverage("after-rank", ranked);
   const sparklineByTicker = new Map(
-    [...dailyByTicker.entries()].map(([ticker, daily]) => [ticker, daily.closes.slice(-42)] as const)
+    [...rowsByTicker.entries()]
+      .map(([ticker, row]) => [ticker, row.sparkline?.slice(-42) ?? []] as const)
+      .filter(([, sparkline]) => sparkline.length > 0)
   );
+  for (const [ticker, daily] of dailyByTicker.entries()) {
+    sparklineByTicker.set(ticker, daily.closes.slice(-42));
+  }
 
-  for (const candidate of ranked) {
+  for (const candidate of renderRanked) {
     const row = rowsByTicker.get(candidate.ticker);
     if (!row) continue;
     const attention = attentionMap[candidate.ticker];
@@ -1684,6 +1814,7 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     }
     stocks.push(stock);
     fronts[candidate.ticker] = front;
+    if (stocks.length >= targetCardCount) break;
   }
   const raritySets = applyAxisRarity(stocks.map((stock) => fronts[stock.canonical]?.axisSignals ?? []));
   stocks.forEach((stock, index) => {
@@ -1704,7 +1835,7 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     stocks,
     cards: interleaveThemeBundles(stocks, bundleCards),
     fronts,
-    confidence: stocks.length >= DISCOVERY_DECK_CARD_COUNT ? "H" : stocks.length >= 30 ? "M" : "L",
+    confidence: stocks.length >= targetCardCount ? "H" : stocks.length >= 20 ? "M" : "L",
     source: targetedMaterialEnabled ? DISCOVERY_SOURCE_LABEL : "시장 시세·공시·수급 캐시",
   };
 }
