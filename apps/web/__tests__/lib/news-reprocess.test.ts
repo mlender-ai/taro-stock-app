@@ -35,7 +35,7 @@ describe("news hook reprocessing", () => {
       source: "한경비즈니스",
     });
 
-    expect(hook).toBe("호남 투자 발표에 관련주로 언급에 +11%");
+    expect(hook).toBe("대규모 투자에 +11%");
     expect(hook).not.toBe(title);
     expect(hook).not.toContain("한경비즈니스");
   });
