@@ -477,18 +477,51 @@ export interface DiscoveryUpdatedDetail {
   discovery: DiscoveryResponse;
 }
 
-const discoveryKey = (country: DiscoveryCountryScope = "KR") => `discovery:today:v5:${country}:${kstDateKey()}`;
-const discoveryStorageKey = (country: DiscoveryCountryScope = "KR") => `fomo:discovery:v5:${country}:${kstDateKey()}`;
-const LAST_DISCOVERY_STORAGE_KEY = "fomo:discovery:last-good:v5";
+const DISCOVERY_CACHE_VERSION = "v6-headline-safety";
+const discoveryKey = (country: DiscoveryCountryScope = "KR") =>
+  `discovery:today:${DISCOVERY_CACHE_VERSION}:${country}:${kstDateKey()}`;
+const discoveryStorageKey = (country: DiscoveryCountryScope = "KR") =>
+  `fomo:discovery:${DISCOVERY_CACHE_VERSION}:${country}:${kstDateKey()}`;
+const LAST_DISCOVERY_STORAGE_KEY = `fomo:discovery:last-good:${DISCOVERY_CACHE_VERSION}`;
 const lastDiscoveryStorageKey = (country: DiscoveryCountryScope = "KR") => `${LAST_DISCOVERY_STORAGE_KEY}:${country}`;
+const UNSAFE_DISCOVERY_COPY_PATTERN =
+  /\b(?:its|the|with|and)\b\s+[A-Za-z]|[A-Za-z]{2,}\s*(?:와|과|의|가|이|은|는|을|를|에|에서|로|으로)|SHPH\s*,\s*ILLR|설명하긴\s*이른데|아직\s*공개된\s*계기/i;
 
 function isDiscoveryResponse(value: unknown): value is DiscoveryResponse {
   const candidate = value as Partial<DiscoveryResponse> | null;
   return !!candidate && Array.isArray(candidate.stocks) && !!candidate.fronts && typeof candidate.fronts === "object";
 }
 
+function stockCopyFields(stock: DiscoveryStockResponse): string[] {
+  return [
+    stock.headline,
+    stock.headlineProvenance?.text,
+    stock.whyShown,
+    stock.reason,
+  ].filter((text): text is string => typeof text === "string" && text.trim().length > 0);
+}
+
+function cardCopyFields(card: DiscoveryCardResponse): string[] {
+  if (card.kind === "theme_bundle") {
+    return [card.title, card.subtitle, ...card.items.map((item) => item.reason)].filter(
+      (text): text is string => typeof text === "string" && text.trim().length > 0
+    );
+  }
+  return stockCopyFields(card);
+}
+
+function hasUnsafeDiscoveryCopy(value: DiscoveryResponse | null | undefined): boolean {
+  if (!value) return false;
+  const fields = [...value.stocks.flatMap(stockCopyFields), ...(value.cards ?? []).flatMap(cardCopyFields)];
+  return fields.some((text) => UNSAFE_DISCOVERY_COPY_PATTERN.test(text));
+}
+
 function hasDiscoveryCards(value: DiscoveryResponse | null | undefined, country: DiscoveryCountryScope = "all"): value is DiscoveryResponse {
-  return discoveryMatchesCountry(value, country) && (value.stocks.length > 0 || (value.cards?.length ?? 0) > 0);
+  return (
+    discoveryMatchesCountry(value, country) &&
+    !hasUnsafeDiscoveryCopy(value) &&
+    (value.stocks.length > 0 || (value.cards?.length ?? 0) > 0)
+  );
 }
 
 function readStoredDiscovery(country: DiscoveryCountryScope = "KR"): DiscoveryResponse | null {

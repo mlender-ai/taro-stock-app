@@ -33,6 +33,8 @@ const cache = new Map<string, NewsHookResult>();
 const GENERIC_TITLE_PATTERN = /^(?:(?:제품·AI 인프라|실적·가이던스|고객·파트너십|인도량 확인|자금조달·유동화)\s*소식|SEC 공시|소식|뉴스)(?:이|가)?\s*나왔어요\.?$/i;
 const US_MARKET_NOISE_PATTERN =
   /\b(?:what\s+you\s+should\s+know|can\s+it\s+rebound|is\s+it\s+time\s+to|better\s+buy|price\s+target|stock\s+eyes|why\s+these\s+stocks|these\s+stocks|stocks\s+posted|after[-\s]?hours?)\b/i;
+const MATERIAL_CONTEXT_PATTERN =
+  /특허|공시|계약|수주|제휴|협력|파트너십|실적|매출|가이던스|인도량|공급|선정|투자|증자|자사주|인수전|클러스터|임상|승인|허가|제품|개발|확보|체결|발표|8-K|10-Q|SEC|리테일|고객|우선협상자|관리운영|급여|출시|치료|서비스|상한가|신탁|상업화|권리|할증|렌탈|지원|종료|공개|항공우주|플랫폼|협업|판매|데이터|분기|준수율|내부통제|파업|전환|발행|처분|사업|위탁|공장|신규|후보물질|배터리|반도체|AI|FDA|조달|매각|인수|합병|계열사|자회사/;
 
 function cacheKey(input: NewsHookInput): string {
   return [input.asOf.slice(0, 10), input.stock, input.sector ?? "", input.title, input.summary ?? "", input.changePct ?? "", input.source ?? ""].join("\u001f");
@@ -57,7 +59,7 @@ export function validateReprocessedNewsHook(hook: string | undefined, input: New
     numberVariants(String(Math.abs(input.changePct))).forEach((value) => allowedNumbers.add(value));
   }
   if (numbersIn(clean).some((n) => !allowedNumbers.has(n) && !allowedNumbers.has(n.replace(/\.0+$/, "")))) return undefined;
-  if (!hasConcreteSourceValue(clean, sourceText)) return undefined;
+  if (!hasConcreteSourceValue(clean, sourceText) && !MATERIAL_CONTEXT_PATTERN.test(clean)) return undefined;
   return clean;
 }
 

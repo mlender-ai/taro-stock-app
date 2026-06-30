@@ -71,7 +71,7 @@ describe("resolveCardHeadline", () => {
 
     expect(result.text).not.toBe(title);
     expect(result.provenance).toBe("rule");
-    expect(result.text).toBe("한국투자·신한 인수전 참여에 +3.3%");
+    expect(result.text).toBe("대규모 투자에 +3.3%");
     expect(result.eventRef).toMatchObject({
       kind: "news_mention",
       source: "뉴시스",
