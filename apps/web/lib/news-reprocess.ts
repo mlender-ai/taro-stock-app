@@ -383,6 +383,24 @@ function candidateHooks(input: NewsHookInput, title: string): string[] {
   if (/trainium/i.test(title)) hooks.push("트레이니움 칩 판매 이슈");
   if (/sub[-\s]?1nm\s+chip/i.test(title)) hooks.push("서브 1나노 칩 공개");
   if (/bitcoin\s+sales?|sale\s+of\s+bitcoin|sell\s+bitcoin/i.test(title)) hooks.push("비트코인 매각 프레임워크 공개");
+  if (/new\s+billion[-\s]?dollar\s+deal|billion[-\s]?dollar\s+deal|inks?\s+new\s+billion/i.test(title)) {
+    hooks.push("십억달러 규모 계약 체결");
+  }
+  if (/ai\s+sales\s+doubling|sales\s+doubling/i.test(title)) {
+    hooks.push("AI 매출 두 배 성장");
+  }
+  if (/monthly\s+sales\s+rise|monthly\s+sales\s+increase|sales\s+rise/i.test(title)) {
+    hooks.push("월간 매출 증가");
+  }
+  if (/licensing\s+strategy.*reactor\s+rollout|reactor\s+rollout/i.test(title)) {
+    hooks.push("원전 인허가 전략 공개");
+  }
+  if (/full\s+stack\s+ai\s+infrastructure\s+provider|ai\s+infrastructure\s+provider/i.test(title)) {
+    hooks.push("AI 인프라 전략 공개");
+  }
+  if (/new\s+nvidia\s+partnership|nvidia\s+partnership/i.test(title)) {
+    hooks.push("엔비디아 파트너십 이슈");
+  }
   if (/antitrust\s+lawsuit|price[-\s]?fixing|price[-\s]?gouging/i.test(title)) {
     hooks.push("가격담합 소송 제기");
   }
