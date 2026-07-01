@@ -10,14 +10,14 @@ const NASDAQ_SCREENER_URL = "https://api.nasdaq.com/api/screener/stocks";
 const UA = "Mozilla/5.0 (compatible; FomoClubBot/1.0)";
 const NASDAQ_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
-const US_DYNAMIC_UNIVERSE_LIMIT = 260;
+const US_DYNAMIC_UNIVERSE_LIMIT = 60;
 const US_QUOTE_BATCH_SIZE = 60;
-const US_SPARKLINE_LIMIT = 60;
+const US_SPARKLINE_LIMIT = 20;
 const US_NASDAQ_SCREENER_LIMIT = 7000;
 const US_NASDAQ_FALLBACK_LIMIT = 120;
 const US_NASDAQ_FALLBACK_CONCURRENCY = 3;
-const TWELVE_BATCH_PAUSE_MS = 350;
-const TWELVE_RETRY_DELAYS_MS = [0, 1_200, 2_800] as const;
+const TWELVE_BATCH_PAUSE_MS = 150;
+const TWELVE_RETRY_DELAYS_MS = [0] as const;
 const US_MOVER_TYPES = ["gainers", "losers", "most_active"] as const;
 
 interface TwelveQuote {
@@ -532,7 +532,7 @@ async function fetchQuotes(symbols: readonly string[], key: string): Promise<Rec
     try {
       const res = await fetch(url.toString(), {
         headers: { accept: "application/json", "user-agent": UA },
-        signal: AbortSignal.timeout(8_000),
+        signal: AbortSignal.timeout(4_500),
         next: { revalidate: 600 },
       });
       if (res.ok) return normalizeQuoteResponse(await res.json());
@@ -571,7 +571,7 @@ async function fetchSparklines(symbols: readonly string[], key: string): Promise
     try {
       const res = await fetch(url.toString(), {
         headers: { accept: "application/json", "user-agent": UA },
-        signal: AbortSignal.timeout(8_000),
+        signal: AbortSignal.timeout(3_500),
         next: { revalidate: 1_800 },
       });
       if (res.ok) return normalizeTimeSeriesResponse(await res.json());
@@ -681,7 +681,7 @@ async function fetchUsMarketRowsInternal(): Promise<{ rows: DiscoveryMarketRow[]
   }
   const bySymbol = new Map(seeds.map((seed) => [seed.symbol.toUpperCase(), seed]));
   try {
-    const moverSymbols = (await fetchMoverSymbols(key)).filter((symbol) => bySymbol.has(symbol.toUpperCase()));
+    const moverSymbols: string[] = [];
     const symbols = [...new Set([...moverSymbols, ...seeds.map((seed) => seed.symbol)])]
       .filter((symbol) => /^[A-Z.]{1,6}$/.test(symbol))
       .slice(0, US_DYNAMIC_UNIVERSE_LIMIT);

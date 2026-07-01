@@ -80,9 +80,9 @@ describe("US market source", () => {
     expect(smci?.sectorHint).toBe("AI");
   });
 
-  it("builds the US universe from gainers, losers, and most-active movers", async () => {
+  it("keeps the keyed request path capped to the curated quote batch", async () => {
     vi.stubEnv("TWELVE_DATA_API_KEY", "td-test");
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("market_movers") && url.includes("type=gainers")) {
         return Response.json({ values: [{ symbol: "MRVL" }, { symbol: "OPEN" }] });
@@ -117,11 +117,13 @@ describe("US market source", () => {
     expect(rows.some((row) => row.symbol === "OPEN")).toBe(false);
     expect(rows.some((row) => row.symbol === "KULR")).toBe(false);
     expect(rows.some((row) => row.symbol === "SERV")).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("market_movers"))).toBe(false);
 
     const diag = await fetchUsMarketDiagnostics();
-    expect(diag.moverSymbols).toBeGreaterThanOrEqual(3);
-    expect(diag.dynamicRows).toBeGreaterThanOrEqual(3);
-    expect(diag.quoteSymbols).toBe(diag.seedCount);
+    expect(diag.moverSymbols).toBe(0);
+    expect(diag.dynamicRows).toBe(0);
+    expect(diag.quoteSymbols).toBeLessThanOrEqual(60);
+    expect(diag.quoteSymbols).toBeLessThan(diag.seedCount);
   });
 
   it("uses Nasdaq screener as a dynamic no-key universe before curated seeds", async () => {
