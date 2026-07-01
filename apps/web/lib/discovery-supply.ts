@@ -42,7 +42,7 @@ import { resolveCardHeadline, type CardHeadline } from "./card-headline";
 import { selectDominantAxis } from "./card-axis";
 import { fetchSupplyDemand } from "./supply-demand";
 import { readSupplyDemandHistoryByTickers } from "./supply-demand-store";
-import { fetchUsMarketRows, latestUsSessionAsOf } from "./us-market-source";
+import { fetchUsMarketRows, hydrateUsMarketRowsForSymbols, latestUsSessionAsOf } from "./us-market-source";
 import { US_DISCOVERY_SYMBOLS } from "./us-symbols";
 import { reprocessNewsHook, ruleReprocessNewsHook, type NewsHookInput } from "./news-reprocess";
 import { synthesizeWhyDrivenInsight } from "./insight-synthesis";
@@ -77,7 +77,7 @@ const MATERIAL_NEWS_NOISE =
 const MATERIAL_NEWS_CATALYST =
   /공시|계약|공급계약|수주|납품|실적|매출|영업이익|순이익|가이던스|전망치|컨센서스|어닝|흑자|적자|턴어라운드|임상|허가|승인|FDA|품목허가|신약|치료제|기술이전|라이선스|증설|공장|양산|수율|수주잔고|M&A|인수|합병|지분|투자|유상증자|무상증자|자사주|배당|분할|상장|정부|정책|규제|지원|보조금|관세|제재|신제품|출시|개발|특허|공급|독점|선정|채택|수출|수입|국책|프로젝트|수혜|클러스터|산단|거점|밸류체인|관련주|부각|모멘텀|호재|주목|협력|제휴/i;
 const US_MATERIAL_NEWS_NOISE =
-  /price\s?target|target price|\braises?\s+PT\b|\bPT\s+on\b|analyst|rating|upgrade|downgrade|initiates?|maintains?|reiterates?|buybacks?\s+explained|history of|buy,\s*sell,\s*or\s*hold|should you buy|stock to buy|better buy|which .* stock|what investors should know|\b[A-Z]{1,6}\s+investors?\b|investors?\s+(?:have|can|should|alert|deadline|opportunity|reminder|notice)|shareholders?|class action|lawsuit|law firm|securities fraud|motley fool|zacks|benzinga|investorplace|approach with caution|missing link|strain inside|what you|can it|market rotation|running out of power|internet.?s .+ odd duck|all-time low|gaining ground|more significant dip|boom is|fears hit|gains as market dips|limps along|afterglow is gone|and more stocks|more stocks that|stocks that|stock market today|market roundup|why .* stock (?:is )?(?:up|down|rising|falling)|\b(?:is|are|was|were)?\s*(?:up|down|higher|lower|gains?|loses?|rises?|falls?)\s+\d+(?:\.\d+)?%|\b(?:is|are|was|were)\s+(?:up|down|higher|lower)\b|shares? (?:rise|fall|slip|jump|gain|lose) after hours/i;
+  /price\s?target|target price|\braises?\s+PT\b|\bPT\s+on\b|analyst|rating|upgrade|downgrade|initiates?|maintains?|reiterates?|overvalued|undervalued|valuation|fair value|returns?\b|buybacks?\s+explained|history of|buy,\s*sell,\s*or\s*hold|should you buy|stock to buy|better buy|which .* stock|what investors should know|\b[A-Z]{1,6}\s+investors?\b|investors?\s+(?:have|can|should|alert|deadline|opportunity|reminder|notice)|shareholders?|class action|lawsuit|law firm|securities fraud|motley fool|zacks|benzinga|investorplace|approach with caution|missing link|strain inside|what you|can it|market rotation|running out of power|internet.?s .+ odd duck|all-time low|gaining ground|more significant dip|boom is|fears hit|gains as market dips|limps along|afterglow is gone|and more stocks|more stocks that|stocks that|stock market today|market roundup|why .* stock (?:is )?(?:up|down|rising|falling)|\b(?:is|are|was|were)?\s*(?:up|down|higher|lower|gains?|loses?|rises?|falls?)\s+\d+(?:\.\d+)?%|\b(?:is|are|was|were)\s+(?:up|down|higher|lower)\b|shares? (?:rise|fall|slip|jump|gain|lose) after hours/i;
 const US_MATERIAL_NEWS_CATALYST =
   /earnings|results|revenue|profit|margin|guidance|forecast|quarter|q[1-4]|contract|deal|order|supply|supplier|customer|partnership|launch|unveil|product|chip|gpu|ai|data center|approval|fda|trial|drug|sec|8-k|10-q|filing|acquisition|merger|stake|investment|buyback authorization|dividend/i;
 const DISCOVERY_SOURCE_LABEL = TARGETED_MATERIAL_DEFAULT_ENABLED
@@ -1594,6 +1594,10 @@ function interleaveThemeBundles(
   return out;
 }
 
+function hasUsSurfaceMaterial(candidate: DiscoveryCandidate): boolean {
+  return candidate.events.some((event) => event.kind === "news_mention" || event.kind === "disclosure");
+}
+
 export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOptions = {}): Promise<DiscoveryResponse> {
   const scope = options.country ?? "KR";
   const targetedMaterialEnabled = options.targetedMaterial ?? TARGETED_MATERIAL_DEFAULT_ENABLED;
@@ -1736,6 +1740,13 @@ export async function buildDiscoveryResponse(options: BuildDiscoveryResponseOpti
     candidates,
     deckCardCount
   ));
+  if (scope === "US") {
+    const materialTickers = ranked
+      .filter((candidate) => candidate.country === "US" && hasUsSurfaceMaterial(candidate))
+      .map((candidate) => candidate.ticker);
+    const hydratedRows = await hydrateUsMarketRowsForSymbols([...rowsByTicker.values()], materialTickers);
+    for (const row of hydratedRows) rowsByTicker.set(row.canonical, row);
+  }
   if (targetedMaterialLimit > 0 && scope !== "US") {
     ranked = await hydrateFrontBandMaterial(ranked, rowsByTicker, asOf);
   }

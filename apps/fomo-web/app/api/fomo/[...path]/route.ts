@@ -13,10 +13,13 @@ import { consumeRateLimit } from "../../../../lib/request-rate-limit";
 
 export const dynamic = "force-dynamic";
 
+const DEFAULT_BACKEND_ORIGIN =
+  process.env.NODE_ENV === "development" ? "http://127.0.0.1:3200" : "https://fomo-club-backend.vercel.app";
+
 const BACKEND_ORIGIN = (
   process.env.FOMO_BACKEND_ORIGIN ??
   process.env.NEXT_PUBLIC_FOMO_API_BASE ??
-  "https://fomo-club-backend.vercel.app"
+  DEFAULT_BACKEND_ORIGIN
 ).replace(/\/$/, "");
 
 const AUTH_EXCHANGE_PATHS = new Set(["auth/login", "auth/register"]);

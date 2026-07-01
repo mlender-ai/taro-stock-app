@@ -7,15 +7,18 @@ const TWELVE_TIME_SERIES_URL = "https://api.twelvedata.com/time_series";
 const TWELVE_MARKET_MOVERS_URL = "https://api.twelvedata.com/market_movers/stocks";
 const NASDAQ_HISTORICAL_URL = "https://api.nasdaq.com/api/quote";
 const NASDAQ_SCREENER_URL = "https://api.nasdaq.com/api/screener/stocks";
+const YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
 const UA = "Mozilla/5.0 (compatible; FomoClubBot/1.0)";
 const NASDAQ_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 const US_DYNAMIC_UNIVERSE_LIMIT = 260;
 const US_QUOTE_BATCH_SIZE = 80;
-const US_SPARKLINE_LIMIT = 90;
+const US_SPARKLINE_LIMIT = Math.max(0, Math.min(25, Number(process.env.US_SPARKLINE_LIMIT ?? 24) || 24));
 const US_NASDAQ_SCREENER_LIMIT = 7000;
-const US_NASDAQ_FALLBACK_LIMIT = 120;
-const US_NASDAQ_FALLBACK_CONCURRENCY = 12;
+const US_NASDAQ_FALLBACK_LIMIT = 48;
+const US_NASDAQ_FALLBACK_CONCURRENCY = 3;
+const US_TWELVE_RETRY_DELAY_MS = 900;
+const US_TWELVE_BATCH_DELAY_MS = 250;
 const US_MOVER_TYPES = ["gainers", "losers", "most_active"] as const;
 
 interface TwelveQuote {
@@ -34,6 +37,7 @@ export interface UsMarketDiagnostics {
   seedCount: number;
   moverSymbols: number;
   quoteSymbols: number;
+  sparklineSymbols: number;
   rows: number;
   rowsWithPrice: number;
   rowsWithSparkline: number;
@@ -56,6 +60,16 @@ interface NasdaqDailyPoint {
   date: string;
   close: number;
   volume?: number;
+}
+
+interface YahooChartResult {
+  timestamp?: number[];
+  indicators?: {
+    quote?: Array<{
+      close?: Array<number | null>;
+      volume?: Array<number | null>;
+    }>;
+  };
 }
 
 interface NasdaqScreenerRow {
@@ -89,6 +103,10 @@ function chunks<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size) as T[]);
   return out;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function marketFor(defMarket: string, exchange: string | undefined): DiscoveryMarket {
@@ -386,6 +404,63 @@ function parseNasdaqRow(seed: UsDiscoverySymbol, points: readonly NasdaqDailyPoi
   };
 }
 
+function parseYahooChartPoints(data: unknown): NasdaqDailyPoint[] {
+  if (!data || typeof data !== "object") return [];
+  const result = (((data as Record<string, unknown>).chart as Record<string, unknown> | undefined)?.result as YahooChartResult[] | undefined)?.[0];
+  const timestamps = result?.timestamp ?? [];
+  const quote = result?.indicators?.quote?.[0];
+  const closes = quote?.close ?? [];
+  const volumes = quote?.volume ?? [];
+  const points: NasdaqDailyPoint[] = [];
+  for (let i = 0; i < closes.length; i++) {
+    const close = closes[i];
+    const ts = timestamps[i];
+    if (typeof close !== "number" || !Number.isFinite(close) || typeof ts !== "number") continue;
+    const volume = volumes[i];
+    points.push({
+      date: new Date(ts * 1000).toISOString().slice(0, 10),
+      close,
+      ...(typeof volume === "number" && Number.isFinite(volume) ? { volume } : {}),
+    });
+  }
+  return points.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function parseYahooChartRow(row: DiscoveryMarketRow, points: readonly NasdaqDailyPoint[]): DiscoveryMarketRow | null {
+  const seed: UsDiscoverySymbol = {
+    canonical: row.canonical,
+    symbol: row.symbol,
+    market: row.market === "NYSE" ? "NYSE" : "NASDAQ",
+    sector: row.sectorHint ?? "미국주식",
+    ...(typeof row.marketCapRank === "number" ? { fameRank: row.marketCapRank } : {}),
+  };
+  const parsed = parseNasdaqRow(seed, points);
+  if (!parsed) return null;
+  return {
+    ...row,
+    ...(parsed.priceText ? { priceText: parsed.priceText } : {}),
+    ...(typeof parsed.changePct === "number" ? { changePct: parsed.changePct } : {}),
+    ...(parsed.changeText ? { changeText: parsed.changeText } : {}),
+    ...(parsed.changeDir ? { changeDir: parsed.changeDir } : {}),
+    ...(typeof parsed.tradingValue === "number" ? { tradingValue: parsed.tradingValue } : {}),
+    ...(parsed.sparkline ? { sparkline: parsed.sparkline } : {}),
+    ...(parsed.sessionLabel ? { sessionLabel: parsed.sessionLabel } : {}),
+  };
+}
+
+async function fetchYahooChartRow(row: DiscoveryMarketRow): Promise<DiscoveryMarketRow | null> {
+  const url = new URL(`${YAHOO_CHART_URL}/${encodeURIComponent(row.symbol)}`);
+  url.searchParams.set("range", "3mo");
+  url.searchParams.set("interval", "1d");
+  const res = await fetch(url.toString(), {
+    headers: { accept: "application/json", "user-agent": UA },
+    signal: AbortSignal.timeout(4_000),
+    next: { revalidate: 1_800 },
+  });
+  if (!res.ok) return null;
+  return parseYahooChartRow(row, parseYahooChartPoints(await res.json()));
+}
+
 function historyRange(): { from: string; to: string } {
   const to = latestUsSessionDate();
   const fromDate = new Date(`${to}T12:00:00Z`);
@@ -511,26 +586,45 @@ async function fetchMoverSymbols(key: string): Promise<string[]> {
   return [...out];
 }
 
+async function fetchTwelveJson(url: URL, revalidate: number): Promise<unknown | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(url.toString(), {
+      headers: { accept: "application/json", "user-agent": UA },
+      signal: AbortSignal.timeout(8_000),
+      next: { revalidate },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const code = typeof data === "object" && data ? Number((data as Record<string, unknown>).code) : undefined;
+      if (code === 429 && attempt === 0) {
+        await sleep(US_TWELVE_RETRY_DELAY_MS);
+        continue;
+      }
+      return data;
+    }
+    if ((res.status === 429 || res.status >= 500) && attempt === 0) {
+      await sleep(US_TWELVE_RETRY_DELAY_MS);
+      continue;
+    }
+    return null;
+  }
+  return null;
+}
+
 async function fetchQuotes(symbols: readonly string[], key: string): Promise<Record<string, TwelveQuote>> {
   if (symbols.length === 0) return {};
   const url = new URL(TWELVE_DATA_URL);
   url.searchParams.set("symbol", symbols.join(","));
   url.searchParams.set("apikey", key);
-  const res = await fetch(url.toString(), {
-    headers: { accept: "application/json", "user-agent": UA },
-    signal: AbortSignal.timeout(8_000),
-    next: { revalidate: 600 },
-  });
-  if (!res.ok) return {};
-  return normalizeQuoteResponse(await res.json());
+  const data = await fetchTwelveJson(url, 600);
+  return normalizeQuoteResponse(data);
 }
 
 async function fetchQuoteBatches(symbols: readonly string[], key: string): Promise<Record<string, TwelveQuote>> {
   const out: Record<string, TwelveQuote> = {};
-  const settled = await Promise.allSettled(chunks(symbols, US_QUOTE_BATCH_SIZE).map((batch) => fetchQuotes(batch, key)));
-  for (const result of settled) {
-    if (result.status !== "fulfilled") continue;
-    Object.assign(out, result.value);
+  for (const batch of chunks(symbols, US_QUOTE_BATCH_SIZE)) {
+    Object.assign(out, await fetchQuotes(batch, key).catch((): Record<string, TwelveQuote> => ({})));
+    if (symbols.length > US_QUOTE_BATCH_SIZE) await sleep(US_TWELVE_BATCH_DELAY_MS);
   }
   return out;
 }
@@ -542,21 +636,15 @@ async function fetchSparklines(symbols: readonly string[], key: string): Promise
   url.searchParams.set("interval", "1day");
   url.searchParams.set("outputsize", "42");
   url.searchParams.set("apikey", key);
-  const res = await fetch(url.toString(), {
-    headers: { accept: "application/json", "user-agent": UA },
-    signal: AbortSignal.timeout(8_000),
-    next: { revalidate: 1_800 },
-  });
-  if (!res.ok) return {};
-  return normalizeTimeSeriesResponse(await res.json());
+  const data = await fetchTwelveJson(url, 1_800);
+  return normalizeTimeSeriesResponse(data);
 }
 
 async function fetchSparklineBatches(symbols: readonly string[], key: string): Promise<Record<string, number[]>> {
   const out: Record<string, number[]> = {};
-  const settled = await Promise.allSettled(chunks(symbols, US_QUOTE_BATCH_SIZE).map((batch) => fetchSparklines(batch, key)));
-  for (const result of settled) {
-    if (result.status !== "fulfilled") continue;
-    Object.assign(out, result.value);
+  for (const batch of chunks(symbols, US_QUOTE_BATCH_SIZE)) {
+    Object.assign(out, await fetchSparklines(batch, key).catch((): Record<string, number[]> => ({})));
+    if (symbols.length > US_QUOTE_BATCH_SIZE) await sleep(US_TWELVE_BATCH_DELAY_MS);
   }
   return out;
 }
@@ -608,6 +696,44 @@ function mergePreferredRows(primary: readonly DiscoveryMarketRow[], fallback: re
   });
 }
 
+function rowNeedsPriceSupport(row: DiscoveryMarketRow): boolean {
+  return typeof row.changePct !== "number" || (row.sparkline?.length ?? 0) < 2;
+}
+
+export async function hydrateUsMarketRowsForSymbols(
+  rows: readonly DiscoveryMarketRow[],
+  identifiers: readonly string[],
+): Promise<DiscoveryMarketRow[]> {
+  const wanted = new Set(identifiers.map((value) => value.toUpperCase()));
+  if (wanted.size === 0) return [...rows];
+  const key = tdKey();
+  const selected = rows
+    .filter((row) => wanted.has(row.symbol.toUpperCase()) || wanted.has(row.canonical.toUpperCase()))
+    .slice(0, US_SPARKLINE_LIMIT);
+  if (selected.length === 0) return [...rows];
+
+  const sparklineBySymbol = key
+    ? await fetchSparklineBatches(
+      selected.filter((row) => (row.sparkline?.length ?? 0) < 2).map((row) => row.symbol),
+      key
+    ).catch((): Record<string, number[]> => ({}))
+    : {};
+
+  const hydratedBySymbol = new Map<string, DiscoveryMarketRow>();
+  for (const row of selected) {
+    const sparkline = sparklineBySymbol[row.symbol.toUpperCase()];
+    const withTwelveSparkline = sparkline && sparkline.length >= 2 ? { ...row, sparkline } : row;
+    if (!rowNeedsPriceSupport(withTwelveSparkline)) {
+      hydratedBySymbol.set(row.symbol.toUpperCase(), withTwelveSparkline);
+      continue;
+    }
+    const yahoo = await fetchYahooChartRow(withTwelveSparkline).catch((): DiscoveryMarketRow | null => null);
+    hydratedBySymbol.set(row.symbol.toUpperCase(), yahoo ?? withTwelveSparkline);
+  }
+
+  return rows.map((row) => hydratedBySymbol.get(row.symbol.toUpperCase()) ?? row);
+}
+
 async function fetchUsMarketRowsInternal(): Promise<{ rows: DiscoveryMarketRow[]; diagnostics: UsMarketDiagnostics }> {
   const key = tdKey();
   const seeds = usDiscoveryUniverse();
@@ -616,6 +742,7 @@ async function fetchUsMarketRowsInternal(): Promise<{ rows: DiscoveryMarketRow[]
     seedCount: seeds.length,
     moverSymbols: 0,
     quoteSymbols: rows.length,
+    sparklineSymbols: rows.filter((row) => (row.sparkline?.length ?? 0) >= 2).length,
     rows: rows.length,
     rowsWithPrice: rows.filter((row) => typeof row.changePct === "number" || row.priceText).length,
     rowsWithSparkline: rows.filter((row) => (row.sparkline?.length ?? 0) >= 2).length,
@@ -653,10 +780,9 @@ async function fetchUsMarketRowsInternal(): Promise<{ rows: DiscoveryMarketRow[]
       const rows = seedRows();
       return { rows, diagnostics: fallbackDiagnostics(rows, "seed") };
     }
-    const [quotes, sparklines] = await Promise.all([
-      fetchQuoteBatches(symbols, key),
-      fetchSparklineBatches(symbols.slice(0, US_SPARKLINE_LIMIT), key).catch((): Record<string, number[]> => ({})),
-    ]);
+    const quotes = await fetchQuoteBatches(symbols, key);
+    const initialSparklineSymbols = symbols.slice(0, US_SPARKLINE_LIMIT);
+    const sparklines = await fetchSparklineBatches(initialSparklineSymbols, key).catch((): Record<string, number[]> => ({}));
     const rows: DiscoveryMarketRow[] = [];
     for (const symbol of symbols) {
       const upper = symbol.toUpperCase();
@@ -685,6 +811,7 @@ async function fetchUsMarketRowsInternal(): Promise<{ rows: DiscoveryMarketRow[]
         seedCount: seeds.length,
         moverSymbols: moverSymbols.length,
         quoteSymbols: symbols.length,
+        sparklineSymbols: Object.keys(sparklines).length,
         rows: hydratedRows.length,
         rowsWithPrice: hydratedRows.filter((row) => typeof row.changePct === "number" || row.priceText).length,
         rowsWithSparkline: hydratedRows.filter((row) => (row.sparkline?.length ?? 0) >= 2).length,

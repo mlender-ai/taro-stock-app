@@ -45,6 +45,7 @@
     "fomo:index": "tsx scripts/fomo-index-pipeline.ts",
     "keywords:generate": "tsx scripts/keywords-generate.ts",
     "warm:insights": "tsx scripts/warm-insights.ts",
+    "warm:us-discovery": "tsx scripts/warm-us-discovery.ts",
     "supply:collect": "tsx scripts/supply-demand-collect.ts",
     "metrics:fomo": "tsx scripts/fomo-product-metrics.ts",
     "quality:fomo": "tsx scripts/fomo-quality-report.ts",

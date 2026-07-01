@@ -81,6 +81,7 @@ describe("discovery material news filter", () => {
     expect(cleanUsMaterialTitle("OpenAI IPO Fears Hit Oracle and Other Stocks Exposed to the AI Trade")).toBeUndefined();
     expect(cleanUsMaterialTitle("Moderna, Nvidia, Sandisk, Palantir, ON Semi, and More Stocks That Moved Today")).toBeUndefined();
     expect(cleanUsMaterialTitle("SHPH, ILLR, IVF: Why These Stocks Posted Double-Digit Gains After-Hours Today")).toBeUndefined();
+    expect(cleanUsMaterialTitle("Marvell (MRVL) Stock Looks Overvalued On Earnings But Strong On Returns")).toBeUndefined();
     expect(cleanUsMaterialTitle("NN, Inc. Awarded Contract From its NVIDIA Product Partner")).toBe(
       "NN, Inc. Awarded Contract From its NVIDIA Product Partner"
     );

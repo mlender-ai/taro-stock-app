@@ -12,10 +12,30 @@ export function OPTIONS() {
   return withCors(new NextResponse(null, { status: 204 }));
 }
 
+function neutralIndexResponse(date: string) {
+  const score = 50;
+  return corsJson({
+    date,
+    score,
+    state: "관심",
+    zoneColor: scoreToColor(score),
+    zoneDescription: scoreToDescription(score),
+    components: { market: 15, community: 15, emotion: 15, whale: 0 },
+    aiSummary: "",
+    prevDayDelta: 0,
+    avg30Delta: 0,
+    live: false,
+  });
+}
+
 // GET /api/fomo/index — 오늘의 FOMO Index.
 // 스냅샷이 있으면 그대로, 없으면 당일 투표로 라이브 계산(market/community/whale 중립 폴백).
 export async function GET() {
   const date = kstDate();
+  if (!process.env.DATABASE_URL) {
+    return neutralIndexResponse(date);
+  }
+
   try {
     const snap = await prisma.fomoIndexSnapshot.findUnique({ where: { date } });
     if (snap) {

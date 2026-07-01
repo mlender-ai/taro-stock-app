@@ -50,6 +50,7 @@ describe("US market source", () => {
 
   it("hydrates US quotes and sparklines without Yahoo chart endpoints", async () => {
     vi.stubEnv("TWELVE_DATA_API_KEY", "td-test");
+    const timeSeriesCalls: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("market_movers")) {
@@ -63,6 +64,7 @@ describe("US market source", () => {
         });
       }
       if (url.includes("time_series")) {
+        timeSeriesCalls.push(url);
         return Response.json({
           SMCI: { values: [{ datetime: "2026-06-27", close: "49.2" }, { datetime: "2026-06-26", close: "46.1" }] },
           IONQ: { values: [{ datetime: "2026-06-27", close: "38.1" }, { datetime: "2026-06-26", close: "36.9" }] },
@@ -78,6 +80,9 @@ describe("US market source", () => {
     expect(smci?.changePct).toBe(6.72);
     expect(smci?.sparkline).toEqual([46.1, 49.2]);
     expect(smci?.sectorHint).toBe("AI");
+    expect(timeSeriesCalls).toHaveLength(1);
+    const requested = new URL(timeSeriesCalls[0]!).searchParams.get("symbol")?.split(",") ?? [];
+    expect(requested.length).toBeLessThanOrEqual(25);
   });
 
   it("builds the US universe from gainers, losers, and most-active movers", async () => {
@@ -201,9 +206,57 @@ describe("US market source", () => {
     expect(diag.strongMomentumRows).toBe(0);
   });
 
-  it("does not wire Yahoo chart endpoints into the US quote adapter", () => {
-    const source = readFileSync(fileURLToPath(new URL("../../lib/us-market-source.ts", import.meta.url)), "utf8");
-    expect(source).not.toMatch(/query[12]\.finance\.yahoo\.com|chart\/|finance\.yahoo\.com\/v8/i);
+  it("uses Yahoo chart only as an explicit material-symbol fallback", async () => {
+    vi.stubEnv("TWELVE_DATA_API_KEY", "td-test");
+    const urls: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      urls.push(url);
+      if (url.includes("time_series")) return Response.json({});
+      if (url.includes("query1.finance.yahoo.com") && url.includes("/SMCI")) {
+        return Response.json({
+          chart: {
+            result: [
+              {
+                timestamp: [1782432000, 1782518400],
+                indicators: { quote: [{ close: [46.1, 49.2], volume: [1000, 2000] }] },
+              },
+            ],
+          },
+        });
+      }
+      return Response.json({});
+    });
+    const { hydrateUsMarketRowsForSymbols } = await import("../../lib/us-market-source");
+
+    const rows = await hydrateUsMarketRowsForSymbols(
+      [
+        {
+          canonical: "슈퍼마이크로",
+          symbol: "SMCI",
+          market: "NASDAQ",
+          country: "US",
+          currency: "USD",
+          sectorHint: "AI",
+        },
+        {
+          canonical: "엔비디아",
+          symbol: "NVDA",
+          market: "NASDAQ",
+          country: "US",
+          currency: "USD",
+          sectorHint: "AI",
+        },
+      ],
+      ["슈퍼마이크로"]
+    );
+
+    expect(rows.find((row) => row.symbol === "SMCI")?.changePct).toBeCloseTo(6.7245, 3);
+    expect(rows.find((row) => row.symbol === "SMCI")?.sparkline).toEqual([46.1, 49.2]);
+    expect(rows.find((row) => row.symbol === "NVDA")?.sparkline).toBeUndefined();
+    expect(urls.some((url) => url.includes("query1.finance.yahoo.com") && url.includes("/SMCI"))).toBe(true);
+    expect(urls.some((url) => url.includes("query1.finance.yahoo.com") && url.includes("/NVDA"))).toBe(false);
+    expect(readFileSync(fileURLToPath(new URL("../../lib/us-market-source.ts", import.meta.url)), "utf8")).toMatch(/hydrateUsMarketRowsForSymbols/);
   });
 
   it("keeps a verified no-price seed universe when all market data sources fail", async () => {

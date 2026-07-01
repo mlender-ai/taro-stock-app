@@ -12,6 +12,7 @@ import { extractKeywords, type KeywordSourceItem } from "@fomo/core";
 import { collectThemeDocs, themeNaverCodesFor } from "../apps/web/lib/theme-understanding";
 import { fetchAllNews } from "../apps/web/lib/fomo-news-sources";
 import { fetchUsMarketDiagnostics } from "../apps/web/lib/us-market-source";
+import { buildDiscoveryResponse } from "../apps/web/lib/discovery-supply";
 
 const ARGS = process.argv.slice(2);
 const COUNTRY_ARG = ARGS.find((arg) => arg.startsWith("--country="))?.split("=")[1]?.toUpperCase();
@@ -36,11 +37,25 @@ async function main(): Promise<void> {
     console.log(`seedCount=${diag.seedCount}`);
     console.log(`moverSymbols=${diag.moverSymbols}`);
     console.log(`quoteSymbols=${diag.quoteSymbols}`);
+    console.log(`sparklineSymbols=${diag.sparklineSymbols}`);
     console.log(`rows=${diag.rows}`);
     console.log(`rowsWithPrice=${diag.rowsWithPrice}`);
     console.log(`rowsWithSparkline=${diag.rowsWithSparkline}`);
     console.log(`dynamicRows=${diag.dynamicRows}`);
     console.log(`strongMomentumRows=${diag.strongMomentumRows}`);
+    const discovery = await buildDiscoveryResponse({ country: "US", targetedMaterial: true });
+    const materialCards = discovery.stocks;
+    const fronts = discovery.fronts;
+    const withPrice = materialCards.filter((stock) => {
+      const front = fronts[stock.canonical];
+      return typeof front?.signals?.changePct === "number" || Boolean(front?.priceText);
+    }).length;
+    const withSparkline = materialCards.filter((stock) => (fronts[stock.canonical]?.sparkline?.length ?? 0) >= 2).length;
+    console.log(`materialCards=${materialCards.length}`);
+    console.log(`materialCardsWithPrice=${withPrice}`);
+    console.log(`materialCardsWithSparkline=${withSparkline}`);
+    console.log(`materialPriceCoverage=${materialCards.length > 0 ? `${Math.round((withPrice / materialCards.length) * 100)}%` : "n/a"}`);
+    console.log(`materialSparklineCoverage=${materialCards.length > 0 ? `${Math.round((withSparkline / materialCards.length) * 100)}%` : "n/a"}`);
     process.exit(0);
   }
 

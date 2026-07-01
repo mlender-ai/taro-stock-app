@@ -1,0 +1,34 @@
+name: Warm US Discovery
+
+# US discovery quote/sparkline work is pre-warmed through the deployed Vercel
+# route so user requests read the Data Cache instead of cold-fetching quotes.
+
+on:
+  schedule:
+    - cron: "35 13 * * 1-5" # 09:35 ET during US daylight time
+    - cron: "20 21 * * 1-5" # after US close during daylight time
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: warm-us-discovery
+  cancel-in-progress: true
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Warm US discovery
+        env:
+          WARM_BASE_URL: ${{ vars.WARM_BASE_URL }}
+        run: npm run warm:us-discovery

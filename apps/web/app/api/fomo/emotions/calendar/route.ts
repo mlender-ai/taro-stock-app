@@ -26,6 +26,9 @@ export async function GET(req: NextRequest) {
   if (!MONTH_RE.test(month)) {
     return corsJson({ error: "month는 YYYY-MM 형식", code: "BAD_MONTH" }, { status: 400 });
   }
+  if (!process.env.DATABASE_URL) {
+    return corsJson({ month, today: kstDate(), days: {}, market: {} });
+  }
 
   try {
     const lo = `${month}-01`;

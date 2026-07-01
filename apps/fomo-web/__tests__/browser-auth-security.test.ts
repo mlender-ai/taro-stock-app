@@ -37,6 +37,7 @@ describe("FOMO Web browser auth security", () => {
 
   it("only proxies explicitly allowed authenticated routes and methods", () => {
     expect(isAllowedProxyRequest("auth/login", "POST")).toBe(true);
+    expect(isAllowedProxyRequest("index", "GET")).toBe(true);
     expect(isAllowedProxyRequest("discovery", "GET")).toBe(true);
     expect(isAllowedProxyRequest("emotions/calendar", "GET")).toBe(true);
     expect(isAllowedProxyRequest("account", "DELETE")).toBe(true);

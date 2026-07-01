@@ -1,5 +1,5 @@
 // FOMO API 클라이언트. API는 apps/web(@fomo/backend)의 /api/fomo/*에 있다.
-// NEXT_PUBLIC_FOMO_API_BASE로 오버라이드(로컬: http://127.0.0.1:3200), 기본은 배포된 prod.
+// NEXT_PUBLIC_FOMO_API_BASE로 오버라이드. 개발 기본값은 로컬 백엔드, 배포 기본값은 prod.
 import type {
   BannerItem,
   FeedCards,
@@ -16,9 +16,10 @@ import { discoveryMatchesCountry, type DiscoveryCountryScope } from "./discovery
 export type { BannerItem } from "@fomo/core";
 
 const DEFAULT_API_BASE = "https://fomo-club-backend.vercel.app";
+const DEVELOPMENT_API_BASE = "http://127.0.0.1:3200";
 const API_BASE =
   process.env.NEXT_PUBLIC_FOMO_API_BASE?.replace(/\/$/, "") ||
-  DEFAULT_API_BASE;
+  (process.env.NODE_ENV === "development" ? DEVELOPMENT_API_BASE : DEFAULT_API_BASE);
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -517,9 +518,10 @@ function hasUnsafeDiscoveryCopy(value: DiscoveryResponse | null | undefined): bo
 }
 
 function hasDiscoveryCards(value: DiscoveryResponse | null | undefined, country: DiscoveryCountryScope = "all"): value is DiscoveryResponse {
+  const shouldCheckUnsafeCopy = country === "US" || value?.country === "US";
   return (
     discoveryMatchesCountry(value, country) &&
-    !hasUnsafeDiscoveryCopy(value) &&
+    (!shouldCheckUnsafeCopy || !hasUnsafeDiscoveryCopy(value)) &&
     (value.stocks.length > 0 || (value.cards?.length ?? 0) > 0)
   );
 }

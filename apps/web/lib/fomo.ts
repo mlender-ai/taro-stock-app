@@ -55,6 +55,10 @@ export function isEmotionType(v: unknown): v is EmotionType {
 
 /** 당일 감정 투표 집계 → {tally, total}. */
 export async function todayTally(date = kstDate()): Promise<{ tally: EmotionTally; total: number }> {
+  if (!process.env.DATABASE_URL) {
+    return { tally: {}, total: 0 };
+  }
+
   const rows = await prisma.emotionVote.groupBy({
     by: ["emotion"],
     where: { votedDate: date },
